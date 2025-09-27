@@ -1,0 +1,162 @@
+// components/navbar/navbar.tsx  (SIN 'use client')
+import Image from "next/image";
+import Link from "next/link";
+import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
+import styles from "./navbar.module.css";
+import { gqlRequest } from "../../lib/gql";
+
+import CMELOGO from "../../public/images/CMELOGO.png";
+import JobOffersIcon from "../../public/images/icons/Nav/JobOffers.png";
+import ActivePositionsIcon from "../../public/images/icons/Nav/ActivePositions.png";
+import BillingIcon from "../../public/images/icons/Nav/Billing.png";
+import CompletedIcon from "../../public/images/icons/Nav/Completed.png";
+import CompanyIcon from "../../public/images/icons/Nav/Companies.png";
+import IncompletedIcon from "../../public/images/icons/Nav/Incomplete.png";
+import NotificationsIcon from "../../public/images/icons/Nav/notifications.png";
+import ReferralIcon from "../../public/images/icons/Nav/referral.png";
+import UserIcon from "../../public/images/icons/Nav/Users.png";
+import ProfileMini from './ProfileMini';
+
+export const dynamic = "force-dynamic"; // evita pre-render estático
+
+const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
+
+type AuthMe = { authMe: { id: string; email: string; role: string } };
+type ProfileType = {
+  myProfile: {
+    id: string;
+    email: string;
+    full_name?: string | null;
+    profile_picture?: string | null;
+    occupation?: string | null;
+    skills?: string[] | null;
+  } | null;
+};
+
+const AUTH_ME = `query { authMe { id email role } }`;
+const MY_PROFILE = `query { myProfile { id email full_name profile_picture occupation skills } }`;
+
+async function getAuthAndProfile() {
+  const hdrs = await nextHeaders();
+  const cookieHeader = (await nextCookies()).toString();
+
+  try {
+    const authData = await gqlRequest<AuthMe>(
+      GRAPHQL_ENDPOINT, AUTH_ME, {}, hdrs, cookieHeader
+    );
+
+    let profile: ProfileType["myProfile"] = null;
+    try {
+      const p = await gqlRequest<ProfileType>(
+        GRAPHQL_ENDPOINT, MY_PROFILE, {}, hdrs, cookieHeader
+      );
+      profile = p.myProfile ?? null;
+    } catch {
+      profile = null;
+    }
+
+    const isLogged = !!authData?.authMe?.id;
+    return { isLogged, profile };
+  } catch {
+    return { isLogged: false, profile: null };
+  }
+}
+
+export default async function Navbar() {
+  const { isLogged, profile } = await getAuthAndProfile();
+
+  return (
+    <div className={styles.navbarMain}>
+      <div className={styles.navOptions}>
+        <Image className={styles.cmeLogo} src={CMELOGO} alt="CME" width={320} height={320} priority />
+
+        {/* Principal */}
+        <div className={styles.category}>
+          <p className={styles.navTitle}>Principal</p>
+          <a href="/" className={styles.option}>
+            <Image className={styles.navIcon} src={JobOffersIcon} alt="Jobs" width={320} height={320} priority />
+            Ofertas Laborales
+          </a>
+        </div>
+
+        {/* Explorar */}
+        <div className={styles.category}>
+          <p className={styles.navTitle}>Explorar</p>
+          <a href="#" className={styles.option}>
+            <Image className={styles.navIcon} src={CompanyIcon} alt="Companies" width={320} height={320} priority />
+            Empresas
+          </a>
+          <a href="#" className={styles.option}>
+            <Image className={styles.navIcon} src={UserIcon} alt="Users" width={320} height={320} priority />
+            Usuarios
+          </a>
+        </div>
+
+        {/* Resto del menú SOLO si hay sesión */}
+        {isLogged && (
+          <>
+            <div className={styles.category}>
+              <p className={styles.navTitle}>Procesos</p>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={ActivePositionsIcon} alt="Positions" width={320} height={320} priority />
+                Posiciones Activas
+              </a>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={CompletedIcon} alt="Completed" width={320} height={320} priority />
+                Procesos Completados
+              </a>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={IncompletedIcon} alt="Incompleted" width={320} height={320} priority />
+                Verificaciones Incompletas
+              </a>
+            </div>
+
+            <div className={styles.category}>
+              <p className={styles.navTitle}>Reclutadores</p>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={ReferralIcon} alt="Referrals" width={320} height={320} priority />
+                Mis Referidos
+              </a>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={ReferralIcon} alt="TopRecruiters" width={320} height={320} priority />
+                Mejores Reclutadores
+              </a>
+            </div>
+
+            <div className={styles.category}>
+              <p className={styles.navTitle}>Finanzas</p>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={BillingIcon} alt="Billing" width={320} height={320} priority />
+                Resumen
+              </a>
+            </div>
+
+            <div className={styles.category}>
+              <p className={styles.navTitle}>Bandeja de Entrada</p>
+              <a href="#" className={styles.option}>
+                <Image className={styles.navIcon} src={NotificationsIcon} alt="Notifications" width={320} height={320} priority />
+                Notificaciones
+              </a>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Header derecho: perfil o CTAs */}
+      <div className={styles.rightHeader}>
+        {isLogged ? (
+          <ProfileMini
+            name={profile?.full_name || profile?.email?.split("@")[0] || "Usuario"}
+            email={profile?.email || ""}
+            imageUrl={profile?.profile_picture || null}
+          />
+        ) : (
+          <div className={styles.authCtas}>
+            <Link className={styles.ctaBtn} href="/login">Iniciar sesión</Link>
+            <Link className={styles.ctaBtnOutline} href="/register">Registrarme</Link>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,284 @@
+.main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+    background-color: #152048;
+}
+
+.mainInnerContainer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 70%;
+    height: 95%;
+    background-color: #FFFFFF;
+}
+
+.registerFormContainer {
+    width: 50%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: scroll;
+}
+
+.registerFormContainer::-webkit-scrollbar {
+    display: none;
+}
+
+.subtitle {
+    color: #152048;
+}
+
+.cmeLogo {
+    width: 150px;
+    height: auto;
+}
+
+.divider {
+    color: #152048;
+    font-weight: bolder;
+    font-size: larger;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.line {
+    width: 30%;
+    height: 0px;
+    border: solid 1px #152048;
+}
+
+.registerPhoto {
+    width: 50%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.registerForm {
+    width: 60%;
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+}
+
+.registerForm input {
+    width: calc(100% - 21px);
+    height: 40px;
+    padding-left: 20px;
+    font-weight: bolder;
+    color: #15204856;
+    border: 2px solid #15204830;
+    border-radius: 5px;
+}
+
+.registerForm input::placeholder {
+    font-weight: bolder;
+    color: #15204856;
+}
+
+.registerForm input:focus {
+    border: 2px solid #152048;
+    color: #152048;
+}
+
+.formOptions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.registerForm p {
+    font-size: small;
+    color: #152048;
+}
+
+.registerForm a {
+    font-size: small;
+    color: #1b708c;
+}
+
+.formOptions input {
+    width: 15px;
+    border-color: #15204830;
+}
+
+.rememberMe {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 5px;
+}
+
+.registerLink {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: row;
+    gap: 5px;
+}
+
+.sendButton {
+    width: 100%;
+    height: 40px;
+    border-radius: 5px;
+    border: none;
+    color: #FFFFFF;
+    background-color: #152048;
+    font-size: medium;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.sendButton:hover {
+    background-color: #1b295b;
+}
+
+.socialMediaregisterButtion {
+    width: 100%;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    font-weight: bolder;
+    color: #15204856;
+    border: 2px solid #15204830;
+    border-radius: 5px;
+    background-color: #FFFFFF;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.socialMediaregisterButtion:hover {
+    background-color: #1520481a;
+}
+
+.socialMediaregisterButtion img {
+    position: absolute;
+    left: 10px;
+}
+
+.passwordField {
+    position: relative;
+}
+
+.togglePassword {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px;
+}
+
+.passwordField input {
+    width: calc(100% - 20px - 40px);
+    padding-left: 20px;
+    padding-right: 36px;
+}
+
+.formError {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #7f1d1d;
+    border: 1px solid #fecaca;
+    font-size: 0.80rem;
+}
+
+.sendButton[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.fieldError {
+    margin: 8px 0 12px;
+    font-size: .9rem;
+    color: #b91c1c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.registerPhotoWrapper {
+    position: relative;
+    width: 50%;
+    height: 100%;
+}
+
+.phoneRow {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+.countryCode {
+    height: 10px;
+    width: 20% !important;
+    padding-left: 3px !important ;
+    text-align: center;
+    font-weight: bolder;
+    color: #15204856;
+    border: 2px solid #15204830;
+    border-radius: 5px;
+    outline: none;
+}
+
+.countryCode:focus {
+    border: 2px solid #152048;
+    color: #152048;
+}
+
+.phoneLocal {
+    height: 40px;
+    width: calc(75% - 20px);
+    padding-left: 20px;
+    font-weight: bolder;
+    color: #15204856;
+    border: 2px solid #15204830;
+    border-radius: 5px;
+    outline: none;
+}
+
+.phoneLocal::placeholder {
+    font-weight: bolder;
+    color: #15204856;
+}
+
+.phoneLocal:focus {
+    border: 2px solid #152048;
+    color: #152048;
+}
+
+.select {
+    height: 40px;
+    padding: 0 12px;
+    font-weight: bolder;
+    color: #152048;
+    border: 2px solid #15204830;
+    border-radius: 5px;
+    outline: none;
+    background-color: #FFFFFF;
+}
+
+.select:focus {
+    border: 2px solid #152048;
+}

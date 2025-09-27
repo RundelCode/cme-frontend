@@ -1,0 +1,66 @@
+.filtersForm {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 5px;
+}
+
+.searchInput {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    max-width: 400px;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 10px;
+    pointer-events: none;
+}
+
+.searchField {
+    width: 100%;
+    padding: 10px 12px 10px 36px;
+    border: 2px solid #EAECF2;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+}
+
+.searchField:focus {
+    border-color: #152048;
+}
+
+
+.filtersForm select {
+    padding: 10px 10px 10px 10px;
+    border: 2px solid #EAECF2;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    color: #00000060;
+}
+
+.filtersForm select:focus {
+    border-color: #152048;
+    color: #152048;
+}
+
+.numberSearchField {
+    width: 30%;
+    padding: 10px 12px 10px 12px;
+    border: 2px solid #EAECF2;
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    color: #00000060;
+}
+
+
+.numberSearchField:focus {
+    border-color: #152048;
+    color: #152048;
+}
