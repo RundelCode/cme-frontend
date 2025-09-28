@@ -1,4 +1,3 @@
-// src/app/api/graphql/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 

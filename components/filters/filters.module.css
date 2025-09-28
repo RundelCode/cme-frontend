@@ -12,7 +12,7 @@
     display: flex;
     align-items: center;
     width: 100%;
-    max-width: 400px;
+    max-width: 250px;
 }
 
 .searchIcon {
@@ -50,7 +50,7 @@
 }
 
 .numberSearchField {
-    width: 30%;
+    width: 10%;
     padding: 10px 12px 10px 12px;
     border: 2px solid #EAECF2;
     border-radius: 8px;
@@ -63,4 +63,48 @@
 .numberSearchField:focus {
     border-color: #152048;
     color: #152048;
+}
+
+.submitButton {
+    height: 40px;
+    width: 80px;
+    background-color: #152048;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: .2s;
+}
+
+.submitButton:hover {
+    background-color: #1b295b;
+}
+
+.sumbitIcon {
+    width: 20px;
+    height: 20px;
+}
+
+.clearButton {
+    height: 40px;
+    width: 80px;
+    background-color: #152048;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: .2s;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: #f9fafb;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.clearButton:hover {
+    background: #f3f4f6;
 }

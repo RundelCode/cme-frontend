@@ -17,7 +17,7 @@ import ReferralIcon from "../../public/images/icons/Nav/referral.png";
 import UserIcon from "../../public/images/icons/Nav/Users.png";
 import ProfileMini from './ProfileMini';
 
-export const dynamic = "force-dynamic"; // evita pre-render estático
+export const dynamic = "force-dynamic";
 
 const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
 

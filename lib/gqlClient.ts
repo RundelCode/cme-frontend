@@ -30,3 +30,6 @@ export async function gql<T>(query: string, variables?: Record<string, unknown>)
 
   return json.data as T;
 }
+
+
+

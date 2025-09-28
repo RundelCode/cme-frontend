@@ -28,10 +28,8 @@ export async function POST(req: Request) {
       body: JSON.stringify({ query: LOGIN, variables: { email, password } }),
     });
 
-    // 👇 Lee SIEMPRE como texto primero (evita el “Unexpected end of JSON input”)
     const raw = await upstream.text();
 
-    // Intenta parsear JSON del upstream
     let json: any;
     try {
       json = raw ? JSON.parse(raw) : null;
@@ -54,7 +52,6 @@ export async function POST(req: Request) {
 
     const res = NextResponse.json({ user });
 
-    // TTL condicional si usas “recordarme”
     const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60; // 7d vs 1h
 
     res.cookies.set("access_token", session.access_token, {

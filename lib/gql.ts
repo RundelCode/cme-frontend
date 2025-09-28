@@ -2,11 +2,6 @@ type GqlPayload<T> = { data?: T; errors?: { message: string }[] };
 
 const TOKEN_COOKIE_NAMES = ['access_token', 'token', 'id_token', 'jwt', 'session'];
 
-const headersToObject = (h: Headers | Record<string, string>) => {
-  if ("entries" in h) return Object.fromEntries((h as Headers).entries());
-  return h as Record<string, string>;
-};
-
 function parseCookieString(cookieHeader: string): Record<string, string> {
   return cookieHeader
     .split(';')

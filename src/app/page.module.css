@@ -1,48 +1,48 @@
 .page{
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    flex-direction: row;
-    width: 100%;
-    height: 100vh;
+  width: 100%;
+  min-height: 100dvh;
 }
 
 .main{
-    width: 82%;
-    height: 100vh;
-    overflow-y: scroll;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
+  margin-left: var(--nav-w, 18%);
+  min-height: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
 }
-.main
 
 .blueLine{
-    width: 100%;
-    height: 10vh;
-    background-color: #152048;
+  width: 100%;
+  height: 56px;
+  background-color: #152048;
 }
 
 .title{
-    width: calc(100% - 40px);
-    height: 13vh;
-    padding: 0px 20px;
-    display: flex;
-    flex-direction: row;
-    justify-content: flex-start;
-    align-items: center;
-    gap: 20px;
+  width: calc(100% - 40px);
+  min-height: 64px;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 20px;
 }
 
 .jobsOfferIcon{
-    width: auto;
-    height: 30px;
+  width: auto;
+  height: 30px;
 }
 
 .jobListContainer{
-    width: calc(100% - 40px);
-    display: flex;
-    justify-content: flex-start;
-    align-items: center;
+  width: calc(100% - 40px);
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .main { margin-left: var(--nav-w, 18%); }
 }

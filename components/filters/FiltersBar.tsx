@@ -5,6 +5,8 @@ import type { Filters } from "../../hooks/useJobSearch";
 import styles from "./filters.module.css";
 import Image from "next/image";
 import SearchIcon from "../../public/images/icons/search.png";
+import FilterIcon from "../../public/images/icons/Filter.png";
+import Clearicon from "../../public/images/icons/Clear.png";
 
 type Props = {
   defaultValues: Filters;
@@ -27,12 +29,11 @@ export default function FiltersBar({ defaultValues, onSubmit }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className={styles.filtersForm}>
-      {/* Search con icono */}
       <div className={styles.searchInput}>
         <Image src={SearchIcon} alt="Search" className={styles.searchIcon} width={16} height={16} />
         <input
           type="text"
-          placeholder="Search Offers..."
+          placeholder="Buscar Ofertas..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
           className={styles.searchField}
@@ -40,17 +41,17 @@ export default function FiltersBar({ defaultValues, onSubmit }: Props) {
       </div>
 
       <select value={projectType} onChange={(e) => setProjectType(e.target.value)}>
-        <option value="">Project type</option>
-        <option value="full-time">Full-time</option>
-        <option value="part-time">Part-time</option>
-        <option value="contract">Contract</option>
+        <option value="">Tipo de proyecto</option>
+        <option value="full-time">Tiempo completo</option>
+        <option value="part-time">Tiempo parcial</option>
+        <option value="contract">Contrato</option>
       </select>
 
       <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
-        <option value="">Payment type</option>
-        <option value="salary">Salary</option>
-        <option value="hourly">Hourly</option>
-        <option value="per-project">Per project</option>
+        <option value="">Metodo de pago</option>
+        <option value="salary">Salario</option>
+        <option value="hourly">Por hora</option>
+        <option value="per-project">Por proyecto</option>
       </select>
 
       <input
@@ -67,15 +68,41 @@ export default function FiltersBar({ defaultValues, onSubmit }: Props) {
         value={maxSalary}
         onChange={(e) => setMaxSalary(e.target.value === "" ? "" : Number(e.target.value))}
       />
-      <input type="text" className={styles.numberSearchField} placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+      <input type="text" className={styles.numberSearchField} placeholder="Ubicación" value={location} onChange={(e) => setLocation(e.target.value)} />
 
       <select value={orderBy} onChange={(e) => setOrderBy(e.target.value as Filters["orderBy"])}>
-        <option value="newest">Newest first</option>
-        <option value="oldest">Oldest first</option>
-        <option value="salary_desc">Salary high → low</option>
-        <option value="salary_asc">Salary low → high</option>
+        <option value="newest">Nuevos</option>
+        <option value="oldest">Antiguos</option>
+        <option value="salary_desc">Salario ↑</option>
+        <option value="salary_asc">Salario ↓</option>
       </select>
-      <button type="submit">Search</button>
+      <button className={styles.submitButton} type="submit">
+        <Image src={FilterIcon} alt="Filter" className={styles.sumbitIcon} width={20} height={16} />
+      </button>
+      <button
+        type="button"
+        className={styles.clearButton}
+        onClick={() => {
+          setQ("");
+          setProjectType("");
+          setPaymentType("");
+          setMinSalary("");
+          setMaxSalary("");
+          setLocation("");
+          setOrderBy("newest");
+          onSubmit({
+            q: "",
+            projectType: "",
+            paymentType: "",
+            minSalary: "",
+            maxSalary: "",
+            location: "",
+            orderBy: "newest",
+          });
+        }}
+      >
+        <Image src={Clearicon} alt="Clear" className={styles.sumbitIcon} width={20} height={16} />
+      </button>
     </form>
   );
 }
