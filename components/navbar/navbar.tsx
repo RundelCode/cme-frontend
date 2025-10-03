@@ -28,13 +28,14 @@ type ProfileType = {
     email: string;
     full_name?: string | null;
     profile_picture?: string | null;
+    role?: string | null;
     occupation?: string | null;
     skills?: string[] | null;
   } | null;
 };
 
 const AUTH_ME = `query { authMe { id email role } }`;
-const MY_PROFILE = `query { myProfile { id email full_name profile_picture occupation skills } }`;
+const MY_PROFILE = `query { myProfile { id email full_name profile_picture cover_photo occupation skills } }`;
 
 async function getAuthAndProfile() {
   const hdrs = await nextHeaders();
@@ -70,7 +71,6 @@ export default async function Navbar() {
       <div className={styles.navOptions}>
         <Image className={styles.cmeLogo} src={CMELOGO} alt="CME" width={320} height={320} priority />
 
-        {/* Principal */}
         <div className={styles.category}>
           <p className={styles.navTitle}>Principal</p>
           <a href="/" className={styles.option}>
@@ -79,20 +79,18 @@ export default async function Navbar() {
           </a>
         </div>
 
-        {/* Explorar */}
         <div className={styles.category}>
           <p className={styles.navTitle}>Explorar</p>
-          <a href="#" className={styles.option}>
+          <a href="/search/companies" className={styles.option}>
             <Image className={styles.navIcon} src={CompanyIcon} alt="Companies" width={320} height={320} priority />
             Empresas
           </a>
-          <a href="#" className={styles.option}>
+          <a href="/search/users" className={styles.option}>
             <Image className={styles.navIcon} src={UserIcon} alt="Users" width={320} height={320} priority />
             Usuarios
           </a>
         </div>
 
-        {/* Resto del menú SOLO si hay sesión */}
         {isLogged && (
           <>
             <div className={styles.category}>
@@ -142,12 +140,12 @@ export default async function Navbar() {
         )}
       </div>
 
-      {/* Header derecho: perfil o CTAs */}
       <div className={styles.rightHeader}>
         {isLogged ? (
           <ProfileMini
             name={profile?.full_name || profile?.email?.split("@")[0] || "Usuario"}
             email={profile?.email || ""}
+            role={profile?.role || ""}
             imageUrl={profile?.profile_picture || null}
           />
         ) : (

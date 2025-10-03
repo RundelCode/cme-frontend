@@ -8,10 +8,11 @@ import Link from 'next/link';
 type Props = {
   name: string;
   email: string;
+  role: string | null;
   imageUrl: string | null;
 };
 
-export default function ProfileMini({ name, email, imageUrl }: Props) {
+export default function ProfileMini({ name, email, imageUrl, role }: Props) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
@@ -54,19 +55,21 @@ export default function ProfileMini({ name, email, imageUrl }: Props) {
   return (
     <div className={styles.profileMiniWrap}>
       <div className={styles.profileMini}>
-        <div className={styles.avatar}>
-          {imageUrl ? (
-            <Image src={imageUrl} alt={name} width={40} height={40} className={styles.avatarImg} />
-          ) : (
-            <div className={styles.avatarFallback}>{initials(name)}</div>
-          )}
-        </div>
+        <div className={styles.miniLeftSection}>
+          <div className={styles.avatar}>
+            {imageUrl ? (
+              <Image src={imageUrl} alt={name} width={40} height={40} className={styles.avatarImg} />
+            ) : (
+              <div className={styles.avatarFallback}>{initials(name)}</div>
+            )}
+          </div>
 
-        <div className={styles.profileText}>
-          <div className={styles.profileName}>{name}</div>
-          <a className={styles.profileEmail} href={`mailto:${email}`} title={email}>
-            {truncateMiddle(email)}
-          </a>
+          <div className={styles.profileText}>
+            <p className={styles.profileName}>{name}</p>
+            <a className={styles.profileEmail} href={`mailto:${email}`} title={email}>
+              {truncateMiddle(email)}
+            </a>
+          </div>
         </div>
 
         <button
@@ -84,10 +87,14 @@ export default function ProfileMini({ name, email, imageUrl }: Props) {
       {open && (
         <div ref={popRef} className={styles.profileMenu} role="menu">
           <div className={styles.profileMenuItems}>
-            <Link href="/mi-perfil" className={styles.menuItem} role="menuitem">Ver perfil</Link>
-            <Link href="/ajustes" className={styles.menuItem} role="menuitem">Ajustes</Link>
-          </div>
+            {role == 'candidate' || 'headhunter' ? (
+              <Link href="/profile/user" className={styles.menuItem} role="menuitem">Ver perfil</Link>
+            ) : (
+              <Link href="/profile/company" className={styles.menuItem} role="menuitem">Ver perfil</Link>
+            )}
+            <Link href="/settings" className={styles.menuItem} role="menuitem">Ajustes</Link>
 
+          </div>
           <div className={styles.menuDivider} />
           <button onClick={doLogout} className={styles.menuItemDanger} role="menuitem">
             Cerrar sesión

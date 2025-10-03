@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies as nextCookies, headers as nextHeaders } from "next/headers";
+import { SearchCompaniesInput } from "./company-types";
 
 export type Company = {
   id: string;
@@ -54,4 +55,33 @@ export async function getCompanyServer(id: string): Promise<Company> {
     throw new Error(json?.error ?? `Company fetch failed for ${id} (HTTP ${res.status})`);
   }
   return json.company as Company;
+}
+
+export async function searchCompaniesServer(input: SearchCompaniesInput = {}): Promise<Company[]> {
+  const base = resolveBaseUrl();
+  const cookieStore = await nextCookies();
+  const cookieHeader = cookieStore.toString();
+  const hdrs = await nextHeaders();
+  const auth = hdrs.get("authorization") ?? undefined;
+
+  const res = await fetch(`${base}/api/companies/search`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(cookieHeader ? { cookie: cookieHeader } : {}),
+      ...(auth ? { authorization: auth } : {}),
+    },
+    body: JSON.stringify({ input }),
+    cache: "no-store",
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (process.env.NEXT_DEBUG_PAGES) {
+    console.log("[searchCompaniesServer] status:", res.status, "body:", json);
+  }
+
+  if (!res.ok || !json?.items) {
+    throw new Error(json?.error ?? `Company search failed (HTTP ${res.status})`);
+  }
+  return json.items as Company[];
 }

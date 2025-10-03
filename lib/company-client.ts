@@ -1,3 +1,5 @@
+import { SearchCompaniesInput } from "./company-types";
+
 export type Company = {
     id: string;
     name: string;
@@ -28,4 +30,19 @@ export async function getCompany(id: string): Promise<Company> {
         throw new Error(json?.error ?? `Company fetch failed for ${id}`);
     }
     return json.company as Company;
+}
+
+
+export async function searchCompanies(input: SearchCompaniesInput = {}): Promise<Company[]> {
+  const res = await fetch("/api/company/search", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ input }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json?.items) {
+    throw new Error(json?.error ?? `Company search failedd (HTTP ${res.status})`);
+  }
+  return json.items as Company[];
 }

@@ -1,0 +1,79 @@
+.main{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding-left: 18%;  
+  height: 100vh;       
+  overflow-y: auto;
+  background-color: #f6f8ff;
+}
+
+
+.card{
+  width: 90%;
+  height: 80%;
+  background-color: #FFFFFF;
+  display: flex;
+  flex-direction: row;
+}
+
+.settingNav{
+  width: calc(20% - 40px);
+  height: calc(100% - 40px);
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 20px;
+  border-right: 1px solid #00000020;
+  gap: 20px;
+}
+
+.options{
+  width: 98%;
+  height: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.optionSection{
+  width: 100%;
+  height: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.optionSection p {
+  font-size: small;
+  font-weight: 600;
+  color: #8F8F8F;
+}
+
+.option{
+  width: calc(100% - 5px);
+  height: 25px;
+  border: none;
+  padding-left: 5px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: transparent;
+  transition: .2s;
+  font-weight: 600;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.option:hover{
+  background-color: #EAECF2;
+  
+}

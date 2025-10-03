@@ -63,3 +63,51 @@ export const JOB_BY_ID = `
     }
   }
 `;
+
+
+export const SEARCH_COMPANIES = `
+  query SearchCompanies($input: SearchCompaniesInput) {
+    searchCompanies(input: $input) {
+      id
+      name
+      email
+      website
+      description
+      industry
+      location
+      profilePicture
+      coverPhoto
+      companyRating
+      boolVerified
+      verifiedAt
+      subscriptionPlan
+      createdAt
+      updatedAt
+    }
+  }
+`;
+
+
+export const SEARCH_PROFILES = `
+  query SearchProfiles($input: SearchProfilesInput) {
+    searchProfiles(input: $input) {
+      id
+      email
+      full_name
+      phone
+      role
+      status
+      profile_picture
+      cover_photo
+      occupation
+      about_me
+      skills
+      experience
+      education
+      cv_url
+      reputation_score
+      created_at
+      updated_at
+    }
+  }
+`;

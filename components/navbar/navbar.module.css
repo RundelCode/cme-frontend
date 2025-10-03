@@ -1,18 +1,17 @@
-
 .navbarMain {
-  position: fixed;           
+  position: fixed;
   top: 0;
   left: 0;
   width: 18%;
-  height: 100dvh;            
+  height: 100dvh;
   border-right: 1px solid #00000020;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding-top: 20px;
   flex-direction: column;
-  background: #fff;         
-  z-index: 1000;              
+  background: #fff;
+  z-index: 1000;
   box-sizing: border-box;
 }
 
@@ -66,9 +65,11 @@
   text-decoration: none;
   font-weight: bold;
 }
-.option:hover { background-color: #EAECF2; }
 
-/* ----- Header derecho (dentro de la navbar) ----- */
+.option:hover {
+  background-color: #EAECF2;
+}
+
 
 .rightHeader {
   display: flex;
@@ -89,7 +90,7 @@
 }
 
 .ctaBtn {
-  background: #111827;
+  background: #1B295B;
   color: #fff;
   border-radius: 8px;
   text-decoration: none;
@@ -99,9 +100,12 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: .2s;
+
 }
+
 .ctaBtnOutline {
-  border: 1px solid #111827;
+  border: 1px solid #152048;
   color: #111827;
   border-radius: 8px;
   text-decoration: none;
@@ -112,37 +116,89 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: .2s;
+}
+
+.ctaBtn:hover {
+  background-color: #152048;
+}
+
+.ctaBtnOutline:hover {
+  background-color: #f3f4f6;
 }
 
 .profileMiniWrap {
   position: relative;
   width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
+
 .profileMini {
   display: flex;
   align-items: center;
-  gap: .6rem;
+  justify-content: space-between;
   border-radius: 10px;
+  width: 100%;
   max-width: 100%;
-  min-width: 0;
 }
+
+.miniLeftSection {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+}
+
 .avatar {
-  width: 35px; height: 35px;
+  width: 35px;
+  height: 35px;
   border-radius: 50%;
   overflow: hidden;
   background: #e5e7eb;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   aspect-ratio: 1 / 1;
   flex-shrink: 0;
 }
-.avatarImg { border-radius: 50%; object-fit: cover; }
-.avatarFallback { font-weight: 700; color: #374151; }
 
-.profileText { line-height: 1.1; min-width: 0; max-width: 100%; }
-.profileName { font-weight: 700; color: #111827; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.profileEmail { font-size: .7rem; color: #6b7280; text-decoration: underline; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatarImg {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarFallback {
+  font-weight: 700;
+  color: #374151;
+}
+
+.profileText {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-direction: column;
+  overflow: hidden;
+  
+}
+
+.profileName {
+  width: 100%;
+  font-weight: 700;
+  color: #111827;
+  font-size: .9rem;
+  text-overflow: ellipsis;
+}
+
+.profileEmail {
+  font-size: .7rem;
+  color: #6b7280;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+}
 
 .kebab {
   background: transparent;
@@ -156,13 +212,13 @@
 
 .profileMenu {
   position: absolute;
-  left: calc(100% + 8px); 
+  left: calc(100% + 8px);
   bottom: 0;
   width: 260px;
   background: #fff;
-  border: 1px solid rgba(0,0,0,.08);
+  border: 1px solid rgba(0, 0, 0, .08);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
   padding: 8px;
   z-index: 1100;
   max-height: min(70dvh, 520px);
@@ -174,20 +230,56 @@
   align-items: center;
   gap: 10px;
   padding: 6px 6px 8px;
-  border-bottom: 1px solid rgba(0,0,0,.06);
+  border-bottom: 1px solid rgba(0, 0, 0, .06);
   margin-bottom: 6px;
 }
+
 .menuAvatar {
-  width: 32px; height: 32px; border-radius: 999px;
-  overflow: hidden; background: #e5e7eb; display: grid; place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #e5e7eb;
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
 }
-.menuAvatarFallback { font-weight: 700; color: #374151; font-size: .8rem; }
-.menuHeaderText { min-width: 0; max-width: 100%; }
-.menuName { font-weight: 700; font-size: .9rem; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.menuEmail { font-size: .75rem; color: #6b7280; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.profileMenuItems { display: flex; flex-direction: column; padding: 4px; gap: 2px; }
+.menuAvatarFallback {
+  font-weight: 700;
+  color: #374151;
+  font-size: .8rem;
+}
+
+.menuHeaderText {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.menuName {
+  font-weight: 700;
+  font-size: .9rem;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menuEmail {
+  font-size: .75rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profileMenuItems {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  gap: 2px;
+}
+
 .menuItem,
 .menuItemDanger {
   width: calc(100% - 20px);
@@ -201,24 +293,54 @@
   text-decoration: none;
   transition: background-color .15s ease;
 }
-.menuItem { color: #111827; }
-.menuItem:hover { background: #F3F4F6; }
-.menuItemDanger { color: #b91c1c; font-weight: 600; }
-.menuItemDanger:hover { background: #FEF2F2; }
-.menuDivider { height: 1px; background: rgba(0,0,0,.06); margin: 4px 4px 6px; }
+
+.menuItem {
+  color: #111827;
+}
+
+.menuItem:hover {
+  background: #F3F4F6;
+}
+
+.menuItemDanger {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.menuItemDanger:hover {
+  background: #FEF2F2;
+}
+
+.menuDivider {
+  height: 1px;
+  background: rgba(0, 0, 0, .06);
+  margin: 4px 4px 6px;
+}
 
 @media (max-width: 1024px) {
 
-  .profileMenu { width: 240px; }
-  .navbarMain{
-    width: 260px;
+  .profileMenu {
+    width: 240px;
+  }
+
+  .navbarMain {
+    width: 18%;
   }
 }
 
 @media (max-width: 768px) {
-  .navTitle, .profileText { display: none; }
-  .option { justify-content: center; gap: 8px; }
-  .navbarMain{
+
+  .navTitle,
+  .profileText {
+    display: none;
+  }
+
+  .option {
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .navbarMain {
     width: 72px;
   }
 }
