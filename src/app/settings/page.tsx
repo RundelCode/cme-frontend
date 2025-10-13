@@ -7,7 +7,7 @@ type Props = {}
 
 export default function page({ }: Props) {
   return (
-    <div className={styles.main}>
+    <div className={styles.page}>
       <Navbar></Navbar>
       <Client></Client>
     </div>

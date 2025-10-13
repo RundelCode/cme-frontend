@@ -52,7 +52,7 @@ export async function POST(req: Request) {
 
     const res = NextResponse.json({ user });
 
-    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60; // 7d vs 1h
+    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60;
 
     res.cookies.set("access_token", session.access_token, {
       httpOnly: true,

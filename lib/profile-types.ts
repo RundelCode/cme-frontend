@@ -18,7 +18,7 @@ export type UserProfile = {
   updated_at?: string | null;
 };
 
-export type ProfileSortBy = "createdAt" | "updatedAt" | "reputation" | "name";
+export type ProfileSortBy = "createdAt" | "updatedAt" | "REPUTATION" | "name";
 export type ProfileSortOrder = "ASC" | "DESC";
 
 export type SearchProfilesInput = {

@@ -87,7 +87,7 @@ export default function ProfileMini({ name, email, imageUrl, role }: Props) {
       {open && (
         <div ref={popRef} className={styles.profileMenu} role="menu">
           <div className={styles.profileMenuItems}>
-            {role == 'candidate' || 'headhunter' ? (
+            {(role === 'candidate' || role === 'headhunter') ? (
               <Link href="/profile/user" className={styles.menuItem} role="menuitem">Ver perfil</Link>
             ) : (
               <Link href="/profile/company" className={styles.menuItem} role="menuitem">Ver perfil</Link>

@@ -1,79 +1,179 @@
-.main{
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  padding-left: 18%;  
-  height: 100vh;       
-  overflow-y: auto;
-  background-color: #f6f8ff;
-}
-
-
-.card{
-  width: 90%;
-  height: 80%;
-  background-color: #FFFFFF;
-  display: flex;
-  flex-direction: row;
-}
-
-.settingNav{
-  width: calc(20% - 40px);
-  height: calc(100% - 40px);
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  flex-direction: column;
-  padding: 20px;
-  border-right: 1px solid #00000020;
-  gap: 20px;
-}
-
-.options{
-  width: 98%;
-  height: auto;
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 10px;
-}
-
-
-.optionSection{
+.page {
   width: 100%;
-  height: auto;
+  min-height: 100dvh;
+}
+
+/* Contenedor principal */
+.main {
+  margin-left: var(--nav-w, 18%);
+  min-height: 100dvh;
   display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
   flex-direction: column;
-  gap: 10px;
-}
-
-
-.optionSection p {
-  font-size: small;
-  font-weight: 600;
-  color: #8F8F8F;
-}
-
-.option{
-  width: calc(100% - 5px);
-  height: 25px;
-  border: none;
-  padding-left: 5px;
-  display: flex;
-  justify-content: flex-start;
   align-items: center;
-  background-color: transparent;
-  transition: .2s;
-  font-weight: 600;
-  border-radius: 5px;
+  justify-content: center;
+  gap: 2rem;
+  /* relativo */
+}
+
+/* Card: grid responsive con columnas relativas */
+.card {
+  width: 92%;
+  background: #fff;
+  display: grid;
+  grid-template-columns: 22% 1fr;
+  /* Sidebar ~22%, contenido el resto */
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 0.625rem 1.875rem rgba(16, 24, 40, .08);
+  /* 10px 30px -> rem */
+  overflow: hidden;
+}
+
+/* Sidebar */
+.settingNav {
+  padding: 2.5%;
+  border-right: 1px solid #eef2f7;
+  background: #fcfdff;
+  min-height: 60vh;
+  /* antes 480px */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.navTitle {
+  margin: 0;
+  font-size: 1.125rem;
+  /* 18px */
+  font-weight: 800;
+  color: #101828;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  /* 14px aprox */
+}
+
+.optionSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  /* 10px aprox */
+}
+
+.sectionLabel {
+  font-size: 0.75rem;
+  /* 12px */
+  font-weight: 700;
+  color: #8f8f8f;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+/* Botón de opción: alto relativo y paddings en % */
+.option {
+  width: 100%;
+  min-height: 2.25rem;
+  /* ~36px */
+  border: none;
+  padding-inline: 2.5%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: flex-start;
+  background: transparent;
+  transition: background-color .15s ease;
+  font-weight: 700;
+  color: #111827;
+  border-radius: 0.5rem;
   cursor: pointer;
 }
 
-.option:hover{
-  background-color: #EAECF2;
-  
+.option:hover {
+  background: #eaecf2;
+}
+
+.optionActive {
+  background: #eef2ff;
+  color: #1f3bb3;
+  box-shadow: inset 0 0 0 1px #c7d2fe;
+}
+
+/* Pane derecho (contenido) */
+.activeOption {
+  background: #fff;
+  min-height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5px;
+  width: calc(100% - 5px);
+  overflow: auto;
+}
+
+/* Contenedor interior: ancho flexible y alineado a la izquierda */
+.contentWrap {
+  width: 96%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+/* Banner de error genérico */
+.bannerError {
+  width: 100%;
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.625rem;
+  font-weight: 600;
+}
+
+/* Compatibilidad con tu CSS previo */
+.options,
+.optionSection {
+  width: 100%;
+}
+
+/* ======= Responsivo ======= */
+/* <= ~900px (56.25em con root 16px) */
+@media (max-width: 56.25em) {
+  .main {
+    justify-content: flex-start;
+    padding-block: 2rem;
+  }
+
+  .card {
+    width: 95%;
+    grid-template-columns: 1fr;
+    /* stack */
+  }
+
+  .settingNav {
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid #eef2f7;
+    gap: 0.75rem;
+  }
+
+  .activeOption {
+    padding: 5%;
+  }
+
+  .contentWrap {
+    width: 100%;
+  }
+}
+
+/* <= ~600px (37.5em) */
+@media (max-width: 37.5em) {
+  .option {
+    min-height: 2.125rem;
+    padding-inline: 3%;
+  }
 }

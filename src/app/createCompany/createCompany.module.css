@@ -1,0 +1,290 @@
+.page{
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.main{
+  margin-left: var(--nav-w, 18%);
+  min-height: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 40px 0;
+}
+
+.formCard {
+  width: min(900px, 96vw);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.1);
+  padding: 20px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #101828;
+}
+
+.subtitle {
+  margin: 0 0 16px;
+  color: #475467;
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+/* ======= Portada + input separado (no superpuesto) ======= */
+.coverBlock{
+  display: grid;
+  gap: 8px;
+}
+
+.cover {
+  width: 100%;
+  height: 180px;
+  background: #eef2f7;
+  border-radius: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid #e5e7eb;
+}
+
+.coverText {
+  font-size: 13px;
+  color: #475467;
+  background: #ffffffaa;
+  padding: 6px 10px;
+  border-radius: 8px;
+  backdrop-filter: blur(2px);
+}
+
+.fileInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+/* ======= Logo y selector alineados ======= */
+.logoRow {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  margin: 8px 0 8px; /* sin superponer con la portada */
+  align-items: center;
+}
+
+.logoWrapper {
+  background-color: #ffffff;
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #e5e7eb;
+  display: grid;
+  place-items: center;
+}
+
+.logoPlaceholder {
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%);
+}
+
+.logoActions {
+  display: grid;
+  gap: 6px;
+}
+
+.small {
+  font-size: 12px;
+  color: #475467;
+}
+
+.helperText {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* ======= Form ======= */
+.formGrid {
+  display: grid;
+  gap: 14px; /* un poco más de aire */
+  margin: 16px 0;
+}
+
+.formField {
+  display: grid;
+  gap: 6px;
+}
+
+.formFieldCheck {
+  display: flex;
+  align-items: center;
+  padding-top: 24px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.input,
+.textarea,
+.select {
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  outline: none;
+  font-size: 14px;
+  transition: border-color .15s ease;
+  background: #fff;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: #152148;
+  box-shadow: 0 0 0 2px #15214820;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .twoCols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ======= Acciones ======= */
+.actions {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.primaryBtn,
+.secundaryBtn {
+  min-width: 160px;
+  height: 40px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primaryBtn {
+  background-color: #152148;
+  color: #ffffff;
+  border: none;
+}
+
+.primaryBtn:hover {
+  background-color: #1b295b;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secundaryBtn {
+  background-color: transparent;
+  color: #152148;
+  border: 1px solid #152148;
+}
+
+.secundaryBtn:hover {
+  background-color: #f3f4f6;
+}
+
+/* ======= Estados ======= */
+.statusError,
+.statusOk {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.statusError {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.statusOk {
+  background: #e6f4ea;
+  color: #1f7a33;
+  border: 1px solid #b7e1c1;
+}
+
+/* ======= Modal ======= */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(1px);
+}
+
+.modalCard {
+  background: #fff;
+  width: min(92vw, 420px);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.2);
+  padding: 20px 20px 16px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modalBody {
+  margin: 0 16px 16px 0;
+  color: #475467;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

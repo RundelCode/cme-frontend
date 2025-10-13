@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const COMPANY_BY_ID =`
+const COMPANY_BY_ID = `
   query CompanyById($id: ID!) {
     company(id: $id) {
       id

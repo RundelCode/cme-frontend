@@ -1,140 +1,355 @@
-
+/* ====== EXISTENTES ====== */
 .modal {
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    background-color: #FFFFFF;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: #ffffff;
 }
 
 .cover {
-    position: relative;
-    width: 100%;
-    height: 200px;
-    overflow: hidden;
-    background: #eef2f7;
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  background: #eef2f7;
 }
 
 .coverImg {
-    object-fit: cover;
+  object-fit: cover;
 }
 
 .infoSection {
-    width: 90%;
-    margin-top: -40px;
-    z-index: 100;
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 15px;
-    flex-direction: column;
+  width: 90%;
+  margin-top: -40px;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 15px;
+  flex-direction: column;
 }
 
 .logoWrapper {
-    background-color: #FFFFFF;
-    height: 72px;
-    width: 72px;
-    border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid #fff;
-    box-shadow: 0 0 0 1px #e5e7eb;
+  background-color: #ffffff;
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #e5e7eb;
 }
 
 .logoImg,
 .logoPlaceholder {
-    height: 72px;
-    width: 72px;
-    border-radius: 50%;
-
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
 }
 
-.header{
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.meta{
-    font-size: small;
-    font-weight: 600;
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.title{
-    font-size: larger;
-    font-weight: 600;
+.meta {
+  font-size: small;
+  font-weight: 600;
 }
 
-
-.infoSection b, .infoSection p{
-    font-size: small;
+.title {
+  font-size: larger;
+  font-weight: 600;
 }
 
-.textSection{
-    display: flex;
-    flex-direction: row;
-    gap: 5px;
+.infoSection b,
+.infoSection p {
+  font-size: small;
 }
 
-
-.skills{
-    display: flex;
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+.textSection {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
 }
-.skill{
-    background-color: #2128ac50;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+
+.skills {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.skill {
+  background-color: #2128ac50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: small;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid #2128acbc;
+}
+
+.actions {
+  width: 100%;
+  height: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.primaryBtn,
+.secundaryBtn, .secundaryBtnWPP {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40px;
+  text-decoration: none;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: 0.2s;
+  font-weight: 600;
+}
+
+.primaryBtn {
+  background-color: #152148;
+  color: #ffffff;
+}
+
+.secundaryBtn {
+  background-color: transparent;
+  color: #152148;
+  border: 1px solid #152148;
+}
+
+.secundaryBtn:hover {
+  background-color: #f3f4f6;
+}
+
+.primaryBtn:hover {
+  background-color: #1b295b;
+}
+
+.loading {
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(1px);
+}
+
+.modalCard {
+  background: #fff;
+  width: min(92vw, 420px);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.2);
+  padding: 20px 20px 16px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modalBody {
+  margin: 0 0 16px;
+  color: #475467;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ====== NUEVAS PARA REFERMODAL ====== */
+.modalHeader {
+  margin-bottom: 12px;
+}
+
+.modeSwitch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.personLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  color: #000000;
+  border-radius: 10px;
+  transition: .2s;
+}
+
+.avatar {
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.personInfo {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.modalReferButton{
     padding: 5px 10px;
-    font-size: small;
-    font-weight: 600;
-    border-radius: 10px;
-    border: 1px solid #2128acbc;
-}
-
-
-.actions{
-    width: 100%;
-    height: auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-
-}
-
-.primaryBtn{
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 40px;
-    text-decoration: none;
-    cursor: pointer;
-    border-radius: 10px;
-    transition: .2s;
-    font-weight: 600;
-
-}
-
-.primaryBtn{
+    border-radius: 5px;
     background-color: #152148;
-    color: #FFFFFF;
+    border: none;
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: .2s;
 }
 
-.primaryBtn:hover{
-    background-color: #1B295B;
+.modalReferButton:hover{
+    background-color: #1b295b;
+}
+
+.personName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #000000;
+  transition: .2s;
+  text-decoration: none;
+}
+
+.personName:hover{
+    color: #3c5ac7;
+}
+
+.personSub {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.rating {
+  font-size: 13px;
+}
+
+.starsNumber {
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+.formGrid {
+  display: grid;
+  gap: 12px;
+  margin: 15px 0px;
+}
+.formField {
+  display: grid;
+  gap: 6px;
+}
+.input {
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
 }
 
 
-.loading{
-    width: 100%;
-    height: 100%;
+.modalActions{
     display: flex;
-    justify-content: center;
+    justify-content: space-around;
     align-items: center;
+    flex-direction: column;
+}
+
+.referSection{
+  margin: 10px 0px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalSubActions{
+  width:  100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: row;
+}
+
+.modalSubActions button{
+  width: 100%;
+}
+
+.referSection p{
+  font-size: small;
+  font-weight: 600;
+}
+
+.referCode{
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.referCode b{
+  font-size: large;
+}
+
+.referCode code{
+  font-size: large;
+  font-weight: 600;
+}
+
+.referCode p{
+  font-size: small;
+}
+
+.secundaryBtnWPP{
+  margin-top: 10px;
+}
+
+.secundaryBtnWPP {
+  background-color: #3aa13d;
+  color: #FFFFFF;
+  border: none;
+}
+
+.secundaryBtnWPP:hover {
+  background-color: #51d255;
 }

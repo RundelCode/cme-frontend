@@ -8,6 +8,7 @@ import Google from '../../../public/images/icons/Google.png';
 import Facebook from '../../../public/images/icons/Facebook.png';
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from 'next/navigation';
+import { supabase } from '../../../lib/supabase-client';
 
 export default function Login() {
     const [email, setEmail] = useState('');
@@ -19,10 +20,6 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     const router = useRouter();
-
-    const handleGoogle = () => {
-        console.log('TODO: login con Google');
-    };
     const handleFacebook = () => {
         console.log('TODO: login con Facebook');
     };
@@ -34,6 +31,43 @@ export default function Login() {
         e.preventDefault();
         router.push("/register")
     };
+
+    const handleGoogle = async () => {
+  try {
+    setFormError(null);
+    setLoading(true);
+
+    try {
+      localStorage.setItem('social_remember', JSON.stringify(rememberMe));
+    } catch (e) {
+      console.warn('no se pudo guardar social_remember:', e);
+    }
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      console.error('supabase signInWithOAuth error', error);
+      setFormError('Error al iniciar con Google.');
+      setLoading(false);
+      return;
+    }
+
+    if (data?.url) {
+      window.location.href = data.url;
+    }
+
+  } catch (e: any) {
+    console.error('handleGoogle error', e);
+    setFormError('Error al iniciar con Google.');
+  } finally {
+    setLoading(false);
+  }
+};
 
 
     function mapGraphQLError(msg: string) {

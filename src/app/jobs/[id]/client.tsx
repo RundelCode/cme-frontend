@@ -1,0 +1,328 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import useSWR from "swr";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import styles from "./jobs.module.css";
+import { PropagateLoader } from "react-spinners";
+
+type Props = { jobId: string };
+
+const fetcher = (url: string) =>
+    fetch(url).then((r) => {
+        if (!r.ok) throw new Error("Error en la solicitud");
+        return r.json();
+    });
+
+function short(id: string) {
+    if (!id) return "";
+    return `${id.slice(0, 4)}…${id.slice(-4)}`;
+}
+
+function InfoModal({
+    open,
+    title,
+    message,
+    onClose,
+}: {
+    open: boolean;
+    title: string;
+    message: string;
+    onClose: () => void;
+}) {
+    if (!open) return null;
+    return (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+            <div className={styles.modalCard}>
+                <h3 className={styles.modalTitle}>{title}</h3>
+                <p className={styles.modalBody}>{message}</p>
+                <div className={styles.modalActions}>
+                    <button className={styles.primaryBtn} onClick={onClose} autoFocus>
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function CodeModal({
+    open,
+    onCancel,
+    onUseCode,
+}: {
+    open: boolean;
+    onCancel: () => void;
+    onUseCode: (code: string) => void;
+}) {
+    const [code, setCode] = useState("");
+
+    useEffect(() => {
+        if (!open) setCode("");
+    }, [open]);
+
+    const isCodeValid = /^[A-Z0-9]{6}$/.test(code);
+
+    function onChangeCode(e: React.ChangeEvent<HTMLInputElement>) {
+        const cleaned = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6);
+        setCode(cleaned);
+    }
+
+    if (!open) return null;
+
+    return (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+            <div className={styles.modalCard}>
+                <h3 className={styles.modalTitle}>Ingresar código de referencia</h3>
+                <p className={styles.modalBody}>
+                    Escribe el código de 6 caracteres (A–Z y 0–9) que te compartieron.
+                </p>
+
+                <div className={styles.formGrid}>
+                    <label className={styles.formField}>
+                        <span>Código (6)</span>
+                        <input
+                            type="text"
+                            placeholder="ABC123"
+                            maxLength={6}
+                            value={code}
+                            onChange={onChangeCode}
+                            className={styles.input}
+                            aria-label="Código de referido de seis caracteres"
+                        />
+                    </label>
+                </div>
+
+                <div className={styles.modalActions} style={{ justifyContent: "space-between" }}>
+                    <button className={styles.secundaryBtn} onClick={onCancel}>
+                        Cancelar
+                    </button>
+                    <button
+                        className={styles.primaryBtn}
+                        onClick={() => onUseCode(code)}
+                        disabled={!isCodeValid}
+                        aria-disabled={!isCodeValid}
+                        title={!isCodeValid ? "Ingresa un código válido de 6 caracteres" : undefined}
+                    >
+                        Usar código
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+export default function JobDetailClient({ jobId }: Props) {
+    const router = useRouter();
+
+    const { data, error, isLoading } = useSWR(jobId ? `/api/jobs/${jobId}` : null, fetcher);
+    const { data: meData } = useSWR(`/api/me`, fetcher);
+    const userId: string | null = meData?.user?.id ?? null;
+
+    const [infoOpen, setInfoOpen] = useState(false);
+    const [infoTitle, setInfoTitle] = useState("");
+    const [infoMsg, setInfoMsg] = useState("");
+
+    const [codeOpen, setCodeOpen] = useState(false);
+
+    const [absJobUrl, setAbsJobUrl] = useState<string>("");
+
+    useEffect(() => {
+        if (typeof window !== "undefined" && jobId) {
+            setAbsJobUrl(`${window.location.origin}/jobs/${jobId}`);
+        }
+    }, [jobId]);
+
+    function openInfo(title: string, message: string) {
+        setInfoTitle(title);
+        setInfoMsg(message);
+        setInfoOpen(true);
+    }
+
+    function handleOpenCodeModal() {
+        if (!userId) {
+            router.push(`/login?next=/jobs/${jobId}`);
+            return;
+        }
+        setCodeOpen(true);
+    }
+
+    async function handleUseCode(code: string) {
+        try {
+            const res = await fetch("/api/referrals/consume", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobOfferId: jobId, code }),
+            });
+
+            const json = await res.json().catch(() => ({}));
+
+            if (res.status === 401) {
+                router.push(`/login?next=/jobs/${jobId}`);
+                return;
+            }
+            if (!res.ok) {
+                const readable =
+                    json?.error === "referral_not_found_for_offer"
+                        ? "No encontramos una referencia con ese código para esta oferta."
+                        : json?.error || "No se pudo validar el código.";
+                throw new Error(readable);
+            }
+
+            setCodeOpen(false);
+            openInfo(
+                "¡Código aplicado!",
+                "Tu recomendación ha sido asociada con exito."
+            );
+        } catch (e: any) {
+            setCodeOpen(false);
+            openInfo("Error", e?.message || "No se pudo validar el código.");
+        }
+    }
+
+    if (!jobId) return null;
+
+    if (isLoading)
+        return (
+            <div className={styles.loading}>
+                <PropagateLoader />
+            </div>
+        );
+
+    if (error || !data?.job)
+        return <div className={styles.error}>No se pudo cargar la oferta.</div>;
+
+    const { job, company } = data as {
+        job: {
+            id: string;
+            company_id: string | null;
+            title: string;
+            description?: string | null;
+            employment_type?: string | null;
+            location_type?: string | null;
+            skills?: string[] | null;
+            requirements?: string | null;
+            location?: string | null;
+            salary?: number | null;
+            currency?: string | null;
+        };
+        company: {
+            name?: string | null;
+            profilePicture?: string | null;
+            coverPhoto?: string | null;
+            location?: string | null;
+        } | null;
+    };
+
+    const salary =
+        job.salary == null
+            ? "—"
+            : new Intl.NumberFormat(undefined, {
+                style: "currency",
+                currency: job.currency ?? "USD",
+                maximumFractionDigits: 2,
+            }).format(job.salary);
+
+    const companyName =
+        company?.name ?? (job.company_id ? `Company #${short(job.company_id)}` : "Company");
+    const companyLogo = company?.profilePicture ?? null;
+    const companyCover = company?.coverPhoto ?? null;
+    const loc = job.location ?? company?.location ?? "—";
+
+    return (
+        <>
+            <InfoModal
+                open={infoOpen}
+                title={infoTitle}
+                message={infoMsg}
+                onClose={() => setInfoOpen(false)}
+            />
+
+            <CodeModal
+                open={codeOpen}
+                onCancel={() => setCodeOpen(false)}
+                onUseCode={handleUseCode}
+            />
+
+            <div className={styles.modal}>
+                <div className={styles.cover}>
+                    {companyCover ? (
+                        <Image src={companyCover} alt="" fill className={styles.coverImg} priority />
+                    ) : null}
+                </div>
+
+                <div className={styles.infoSection}>
+                    <div className={styles.logoWrapper}>
+                        {companyLogo ? (
+                            <Image
+                                src={companyLogo}
+                                alt={companyName}
+                                width={72}
+                                height={72}
+                                className={styles.logoImg}
+                            />
+                        ) : (
+                            <div className={styles.logoPlaceholder} />
+                        )}
+                    </div>
+
+                    <div className={styles.header}>
+                        <div className={styles.meta}>
+                            {companyName} · {loc}
+                        </div>
+                        <div className={styles.title}>{job.title}</div>
+
+                        <div className={styles.textSection}>
+                            <p>
+                                <b>Tipo:</b> {job.employment_type ?? "—"}
+                            </p>
+                            {" · "}
+                            <p>
+                                <b>Modalidad:</b> {job.location_type ?? "—"}
+                            </p>
+                        </div>
+
+                        <div>
+                            <b>Salario:</b> {salary}
+                        </div>
+                    </div>
+
+                    {Array.isArray(job.skills) && job.skills.length > 0 && (
+                        <div className={styles.skills}>
+                            {job.skills.map((s) => (
+                                <span key={s} className={styles.skill}>
+                                    {s}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {job.description && (
+                        <div>
+                            <h3>Descripción</h3>
+                            <p className={styles.text}>{job.description}</p>
+                        </div>
+                    )}
+
+                    {job.requirements && (
+                        <div>
+                            <h3>Requisitos</h3>
+                            <p className={styles.text}>{job.requirements}</p>
+                        </div>
+                    )}
+
+                    <div className={styles.actions}>
+                        <button
+                            type="button"
+                            className={styles.primaryBtn}
+                            onClick={handleOpenCodeModal}
+                        >
+                            Tengo un código de referencia
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </>
+    );
+}

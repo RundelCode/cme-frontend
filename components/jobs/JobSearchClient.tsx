@@ -165,9 +165,6 @@ function JobCard({
             >
               Ver Detalles
             </button>
-            <a className={styles.primaryBtn} href={`/jobs/${job.id}/apply`}>
-              Aplicar
-            </a>
           </div>
         </div>
       </div>

@@ -1,4 +1,3 @@
-// components/navbar/navbar.tsx  (SIN 'use client')
 import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
@@ -11,7 +10,6 @@ import ActivePositionsIcon from "../../public/images/icons/Nav/ActivePositions.p
 import BillingIcon from "../../public/images/icons/Nav/Billing.png";
 import CompletedIcon from "../../public/images/icons/Nav/Completed.png";
 import CompanyIcon from "../../public/images/icons/Nav/Companies.png";
-import IncompletedIcon from "../../public/images/icons/Nav/Incomplete.png";
 import NotificationsIcon from "../../public/images/icons/Nav/notifications.png";
 import ReferralIcon from "../../public/images/icons/Nav/referral.png";
 import UserIcon from "../../public/images/icons/Nav/Users.png";
@@ -95,17 +93,13 @@ export default async function Navbar() {
           <>
             <div className={styles.category}>
               <p className={styles.navTitle}>Procesos</p>
-              <a href="#" className={styles.option}>
+              <a href="/applications" className={styles.option}>
                 <Image className={styles.navIcon} src={ActivePositionsIcon} alt="Positions" width={320} height={320} priority />
                 Posiciones Activas
               </a>
-              <a href="#" className={styles.option}>
+              <a href="/referrals/completed" className={styles.option}>
                 <Image className={styles.navIcon} src={CompletedIcon} alt="Completed" width={320} height={320} priority />
                 Procesos Completados
-              </a>
-              <a href="#" className={styles.option}>
-                <Image className={styles.navIcon} src={IncompletedIcon} alt="Incompleted" width={320} height={320} priority />
-                Verificaciones Incompletas
               </a>
             </div>
 

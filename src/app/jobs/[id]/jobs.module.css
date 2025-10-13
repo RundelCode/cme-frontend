@@ -1,0 +1,418 @@
+.main {
+  height: 100vh;
+  width: 100%;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.page {
+  width: calc(100% - 18%);
+  height: 100%;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+}
+
+.modal {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.cover {
+  position: relative;
+  width: 100%;
+  height: 10vh;
+  max-height: 200px;
+  overflow: hidden;
+  background: #eef2f7;
+}
+
+.coverImg {
+  object-fit: cover;
+}
+
+.infoSection {
+  width: 90%;
+  margin-top: -40px;
+  z-index: 100;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  gap: 15px;
+  flex-direction: column;
+}
+
+.logoWrapper {
+  background-color: #ffffff;
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #e5e7eb;
+}
+
+.logoImg,
+.logoPlaceholder {
+  height: 72px;
+  width: 72px;
+  border-radius: 50%;
+}
+
+.logoPlaceholder {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, #e5e7eb, #f3f4f6);
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ====== HEADER E INFORMACIÓN ====== */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.meta {
+  font-size: small;
+  font-weight: 600;
+  color: #374151;
+}
+
+.title {
+  font-size: larger;
+  font-weight: 600;
+  color: #111827;
+}
+
+.infoSection b,
+.infoSection p {
+  font-size: small;
+}
+
+.textSection {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+  flex-wrap: wrap;
+  color: #374151;
+}
+
+.skills {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.skill {
+  background-color: #2128ac50;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: small;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid #2128acbc;
+  color: #152148;
+}
+
+/* ====== BOTONES ====== */
+.actions {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.primaryBtn,
+.secundaryBtn,
+.secundaryBtnWPP {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 42px;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: 0.2s;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.primaryBtn {
+  background-color: #152148;
+  color: #ffffff;
+  border: none;
+}
+
+.primaryBtn:hover {
+  background-color: #1b295b;
+}
+
+.secundaryBtn {
+  background-color: transparent;
+  color: #152148;
+  border: 1px solid #152148;
+}
+
+.secundaryBtn:hover {
+  background-color: #f3f4f6;
+}
+
+/* ====== BOTÓN LINK (Tengo un código de referencia) ====== */
+.linkBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: #2563eb;
+  text-decoration: underline;
+  font: inherit;
+}
+
+.linkBtn:hover {
+  opacity: 0.85;
+}
+
+/* ====== SPINNER ====== */
+.loading {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ====== MODAL GENÉRICO ====== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(1px);
+}
+
+.modalCard {
+  background: #fff;
+  width: min(92vw, 420px);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.2);
+  padding: 20px 20px 16px;
+}
+
+.modalTitle {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modalBody {
+  margin: 0 0 16px;
+  color: #475467;
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ====== NUEVAS PARA REFERMODAL (si las usas luego) ====== */
+.modalHeader {
+  margin-bottom: 12px;
+}
+
+.modeSwitch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.personLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  color: #000000;
+  border-radius: 10px;
+  transition: 0.2s;
+}
+
+.avatar {
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+.personInfo {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.modalReferButton {
+  padding: 5px 10px;
+  border-radius: 5px;
+  background-color: #152148;
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.modalReferButton:hover {
+  background-color: #1b295b;
+}
+
+.personName {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #000000;
+  transition: 0.2s;
+  text-decoration: none;
+}
+
+.personName:hover {
+  color: #3c5ac7;
+}
+
+.personSub {
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+.rating {
+  font-size: 13px;
+}
+
+.starsNumber {
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+/* ====== FORMULARIO EN REFERMODAL ====== */
+.formGrid {
+  display: grid;
+  gap: 12px;
+  margin: 15px 0px;
+}
+
+.formField {
+  display: grid;
+  gap: 6px;
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+
+/* ====== REFER CODE SECTION ====== */
+.referSection {
+  margin: 10px 0px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modalSubActions {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-direction: row;
+}
+
+.modalSubActions button {
+  width: 100%;
+}
+
+.referSection p {
+  font-size: small;
+  font-weight: 600;
+}
+
+.referCode {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.referCode b {
+  font-size: large;
+}
+
+.referCode code {
+  font-size: large;
+  font-weight: 600;
+}
+
+.referCode p {
+  font-size: small;
+}
+
+/* ====== BOTÓN WHATSAPP ====== */
+.secundaryBtnWPP {
+  margin-top: 10px;
+  background-color: #3aa13d;
+  color: #ffffff;
+  border: none;
+}
+
+.secundaryBtnWPP:hover {
+  background-color: #51d255;
+}
+
+@media (min-width: 768px) {
+  .cover {
+    height: 260px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .cover {
+    height: 320px;
+  }
+}
