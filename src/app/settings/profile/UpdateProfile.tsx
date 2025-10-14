@@ -127,11 +127,11 @@ export default function UpdateProfile() {
     }
   };
 
-  if (loading) return <div className={styles.loading}><PropagateLoader/></div>;
+  if (loading) return <div className={styles.loading}><PropagateLoader /></div>;
   if (err && !saving) return <div className={styles.error}>{err}</div>;
 
   return (
-    <div className={styles.card}>
+    <>
       <header className={styles.header}>
         <h3 className={styles.title}>Editar mi perfil</h3>
         <p className={styles.sub}>Actualiza tu información básica y tus imágenes.</p>
@@ -234,6 +234,6 @@ export default function UpdateProfile() {
           </button>
         </div>
       </form>
-    </div>
+    </>
   );
 }

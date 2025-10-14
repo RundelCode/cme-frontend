@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 
-export const runtime = 'nodejs';
+export const runtime = 'nodejs'; // IMPORTANTE: no edge
+
 const UPSTREAM = process.env.NEXT_PUBLIC_UPLOADS_GRAPHQL_ENDPOINT || 'http://localhost:4000/graphql';
 
 function pick(h: Headers, k: string) {
@@ -9,39 +10,40 @@ function pick(h: Headers, k: string) {
 
 export async function POST(req: NextRequest) {
   try {
-    const inCT = pick(req.headers, 'content-type') || '';
-    const inOpName = pick(req.headers, 'x-apollo-operation-name') || '';
-    const inApolloPref = pick(req.headers, 'apollo-require-preflight') || '';
-    const inAuth = pick(req.headers, 'authorization') || '';
-
-    console.log('[proxy] incoming CT =', inCT);
-    console.log('[proxy] incoming x-apollo-operation-name =', inOpName);
-    console.log('[proxy] incoming apollo-require-preflight =', inApolloPref);
-    console.log('[proxy] incoming authorization (present?) =', Boolean(inAuth));
-
+    // Reusar todos los headers críticos del multipart
     const headers: Record<string, string> = {};
-    if (inCT) headers['content-type'] = inCT; // mantiene el boundary
-    if (inOpName) headers['x-apollo-operation-name'] = inOpName;
-    if (inApolloPref) headers['apollo-require-preflight'] = inApolloPref;
-    if (inAuth) headers['authorization'] = inAuth;
+    const pass = [
+      'content-type', // incluye el boundary!
+      'content-length',
+      'transfer-encoding',
+      'authorization',
+      'cookie',
+      'x-apollo-operation-name',
+      'apollo-require-preflight',
+    ];
 
+    for (const k of pass) {
+      const v = pick(req.headers, k);
+      if (v) headers[k] = v;
+    }
+
+    // OJO: duplex:'half' para streaming en Node
     const upstreamRes = await fetch(UPSTREAM, {
       method: 'POST',
-      // @ts-ignore
-      duplex: 'half',
       headers,
       body: req.body as any,
+      // @ts-expect-error: duplex es necesario en Node >=18
+      duplex: 'half',
+      redirect: 'manual',
     });
 
-    console.log('[proxy] upstream status =', upstreamRes.status);
-    console.log('[proxy] upstream CT =', upstreamRes.headers.get('content-type'));
+    const outHeaders = new Headers();
+    const ct = upstreamRes.headers.get('content-type') || 'application/json';
+    outHeaders.set('content-type', ct);
 
     return new Response(upstreamRes.body, {
       status: upstreamRes.status,
-      headers: {
-        'content-type':
-          upstreamRes.headers.get('content-type') || 'application/json',
-      },
+      headers: outHeaders,
     });
   } catch (e: any) {
     console.error('[proxy] error =', e?.message, e);

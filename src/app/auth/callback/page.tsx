@@ -1,6 +1,7 @@
-// /src/app/auth/callback/page.tsx  (cliente)
 "use client";
 import { useEffect } from "react";
+import styles from "./page.module.css";
+import { PropagateLoader } from "react-spinners";
 
 export default function AuthCallback() {
   useEffect(() => {
@@ -32,5 +33,12 @@ export default function AuthCallback() {
       window.location.replace("/");
     })();
   }, []);
-  return <p>Procesando autenticación...</p>;
+
+  return (
+    <div className={styles.container}>
+      <div>
+        <PropagateLoader color="#15204856" />
+      </div>
+    </div>
+  );
 }

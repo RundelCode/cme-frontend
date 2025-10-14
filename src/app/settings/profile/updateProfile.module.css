@@ -1,16 +1,10 @@
-.card {
-    width: 98%;
-    height: auto;
-    background: #fff;
-    border-radius: 16px;
-    border: 1px solid #e5e7eb;
-    box-shadow: 0 10px 30px rgba(16, 24, 40, .08);
-    overflow: hidden;
-}
 
 .header {
-    padding: 18px 20px 8px;
-    border-bottom: 1px solid #eef2f7;
+    display:flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-direction: column;
+    width: 100%;
 }
 
 .title {
@@ -27,12 +21,13 @@
 }
 
 .form {
-    padding: 16px 20px 20px;
-    display: grid;
-    gap: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
 }
 
-/* Cover */
 .coverBox {
     position: relative;
     width: 100%;
@@ -81,7 +76,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-top: -24px;
+    width: 100%;
+    margin: 10px 0px;
 }
 
 .avatarWrap {
@@ -127,9 +123,11 @@
 
 /* Form grid */
 .grid {
+    width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+    margin-bottom: 10px;
 }
 
 .field {
@@ -172,9 +170,8 @@
     color: #475467;
 }
 
-/* updateProfile.module.css */
 .error{
-  width:100%;
+  width:calc(100% - 12px);
   background:#fee2e2; color:#991b1b; border:1px solid #fecaca;
   padding:10px 12px; border-radius:10px; font-size:14px; font-weight:600;
 }

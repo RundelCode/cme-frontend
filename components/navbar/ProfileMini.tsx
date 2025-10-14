@@ -13,6 +13,7 @@ type Props = {
 };
 
 export default function ProfileMini({ name, email, imageUrl, role }: Props) {
+  console.log("Rol:", role)
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);

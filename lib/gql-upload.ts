@@ -1,12 +1,10 @@
-// lib/gql-upload.ts
 export async function gqlUploadMultipart<T>(
   endpoint: string,
-  operationName: string,           // 'uploadAvatar' | 'uploadCover'
-  mutation: string,                // ej: `mutation UploadAvatar($file: Upload!) { uploadAvatar(file: $file) { url path } }`
+  operationName: string,
+  mutation: string,
   file: File
 ) {
   const form = new FormData();
-
   const operations = JSON.stringify({
     query: mutation,
     operationName,
@@ -16,27 +14,15 @@ export async function gqlUploadMultipart<T>(
 
   form.append('operations', operations);
   form.append('map', map);
-  form.append('0', file, file.name);
-
-  // LOGS
-  console.log('[upload] endpoint=', endpoint);
-  console.log('[upload] opName=', operationName);
-  console.log('[upload] file name/size/type=', file.name, file.size, file.type);
+  form.append('0', file, (file as any).name || 'upload.bin');
 
   const res = await fetch(endpoint, {
     method: 'POST',
-    credentials: 'include',
-    headers: {
-      'apollo-require-preflight': 'true',
-      'x-apollo-operation-name': operationName,
-    } as any,
     body: form,
+    credentials: 'include',
   });
 
   const text = await res.text();
-  console.log('[upload] status=', res.status);
-  console.log('[upload] raw response=', text);
-
   let json: any = {};
   try { json = JSON.parse(text); } catch {}
 

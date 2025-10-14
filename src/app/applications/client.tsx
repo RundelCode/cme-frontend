@@ -269,7 +269,7 @@ export default function Client() {
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Estado de mis postulaciones</h2>
               {refsFiltered.length === 0 ? (
-                <div className={styles.empty}>No tienes procesos activos (no contratados).</div>
+                <div className={styles.empty}>No tienes procesos activos.</div>
               ) : (
                 <ul className={styles.list}>
                   {refsFiltered.map(({ referral, jobOffer, company }) => (

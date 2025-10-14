@@ -17,7 +17,7 @@
 
 /* Card: grid responsive con columnas relativas */
 .card {
-  width: 92%;
+  width: 70%;
   background: #fff;
   display: grid;
   grid-template-columns: 22% 1fr;
@@ -29,13 +29,11 @@
   overflow: hidden;
 }
 
-/* Sidebar */
 .settingNav {
-  padding: 2.5%;
+  padding: 10px 10px;
   border-right: 1px solid #eef2f7;
   background: #fcfdff;
   min-height: 60vh;
-  /* antes 480px */
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -108,7 +106,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 5px;
+  padding: 20px 0px;
   width: calc(100% - 5px);
   overflow: auto;
 }
@@ -123,7 +121,6 @@
   gap: 0.75rem;
 }
 
-/* Banner de error genérico */
 .bannerError {
   width: 100%;
   background: #fee2e2;
@@ -162,7 +159,11 @@
   }
 
   .activeOption {
-    padding: 5%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
   }
 
   .contentWrap {
