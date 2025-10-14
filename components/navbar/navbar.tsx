@@ -36,14 +36,13 @@ const AUTH_ME = `query { authMe { id email role } }`;
 const MY_PROFILE = `query { myProfile { id email full_name profile_picture cover_photo occupation skills } }`;
 
 async function getAuthAndProfile() {
+  
   const hdrs = await nextHeaders();
   const cookieHeader = (await nextCookies()).toString();
-
   try {
     const authData = await gqlRequest<AuthMe>(
       GRAPHQL_ENDPOINT, AUTH_ME, {}, hdrs, cookieHeader
     );
-
     let profile: ProfileType["myProfile"] = null;
     try {
       const p = await gqlRequest<ProfileType>(

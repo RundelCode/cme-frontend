@@ -1,86 +1,145 @@
+// /src/app/api/social-login/route.ts
 import { NextResponse } from "next/server";
 
-const SOCIAL_LOGIN = `
-  mutation SocialLogin($access_token: String!, $refresh_token: String) {
-    socialLogin(access_token: $access_token, refresh_token: $refresh_token) {
-      user { id email role profile_picture }
-      session { access_token refresh_token token_type expires_in }
-    }
-  }
-`;
+type GraphQLResponse = { data?: any; errors?: any };
+
+function getGraphqlUrl() {
+  return (
+    process.env.MY_GRAPHQL_URL ||
+    process.env.NEXT_PUBLIC_GRAPHQL_URL ||
+    process.env.GRAPHQL_URL ||
+    process.env.GRAPHQL_ENDPOINT
+  );
+}
+
+function mask(token?: string | null) {
+  if (!token) return null;
+  return token.length > 20 ? `${token.slice(0, 8)}...${token.slice(-8)}` : "****";
+}
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const access_token = body?.access_token;
-    const refresh_token = body?.refreshToken ?? null;
-    const rememberMe = !!body?.rememberMe;
-
-    if (!access_token) {
-      return NextResponse.json({ error: 'access_token is required' }, { status: 400 });
+    const body = await req.json().catch(() => null);
+    const incomingToken = body?.access_token ?? null;
+    const incomingRefresh = body?.refresh_token ?? null;
+    console.log("[/api/social-login] access_token completo:", incomingToken);
+    if (!incomingToken) {
+      console.error("[/api/social-login] no access_token recibido");
+      return NextResponse.json({ error: "No access_token" }, { status: 400 });
     }
 
-    if (!process.env.GRAPHQL_ENDPOINT) {
-      console.error("GRAPHQL_ENDPOINT no definido");
-      return NextResponse.json({ error: "Misconfig: GRAPHQL_ENDPOINT no definido" }, { status: 500 });
+    const graphqlUrl = getGraphqlUrl();
+    if (!graphqlUrl) {
+      console.error("[/api/social-login] GRAPHQL URL no configurada en env");
+      return NextResponse.json(
+        { error: "Server misconfiguration: GRAPHQL URL missing" },
+        { status: 500 }
+      );
     }
 
-    const upstream = await fetch(process.env.GRAPHQL_ENDPOINT, {
+    const graphqlBody = {
+      query: `mutation ($access_token: String!, $refresh_token: String) {
+        socialLogin(access_token: $access_token, refresh_token: $refresh_token) {
+          user { id email role profile_picture }
+          session { access_token refresh_token token_type expires_in }
+        }
+      }`,
+      variables: { access_token: incomingToken, refresh_token: incomingRefresh },
+    };
+
+    const graphqlRes = await fetch(graphqlUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: SOCIAL_LOGIN, variables: { access_token, refresh_token } }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${incomingToken}`,
+      },
+      body: JSON.stringify(graphqlBody),
     });
 
-    const raw = await upstream.text();
-    let json: any;
-    try { json = raw ? JSON.parse(raw) : null; } 
-    catch (e) {
-      console.error("Upstream devolvió no-JSON:\n", raw);
-      return NextResponse.json({ error: "El gateway devolvió una respuesta no JSON.", details: raw?.slice(0, 300) }, { status: 502 });
+    const status = graphqlRes.status;
+    const text = await graphqlRes.text();
+    let parsed: GraphQLResponse | null = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (e) {
+      parsed = { data: null, errors: text };
     }
 
-    console.log('/api/social-login -> upstream status:', upstream.status, 'body:', JSON.stringify(json));
-
-    if (!upstream.ok || json?.errors?.length || !json?.data?.socialLogin) {
-      const message = json?.errors?.map((e: any) => e.message).join(" | ") || `Upstream ${upstream.status}`;
-      console.error('/api/social-login error upstream:', message);
-      return NextResponse.json({ error: message }, { status: 401 });
+    if (!graphqlRes.ok) {
+      console.error("[/api/social-login] GraphQL HTTP error:", status, text);
+      return NextResponse.json(
+        { error: "GraphQL HTTP error", details: text },
+        { status: 502 }
+      );
     }
 
-    const { user, session } = json.data.socialLogin ?? {};
-    if (!session?.access_token) {
-      console.error('/api/social-login: session missing in upstream response', json);
-      return NextResponse.json({ error: 'session_missing_in_upstream' }, { status: 502 });
+    if (parsed?.errors) {
+      console.error("[/api/social-login] GraphQL returned errors:", parsed.errors);
+      return NextResponse.json(
+        { error: "GraphQL errors", details: parsed.errors },
+        { status: 400 }
+      );
     }
 
-    const res = NextResponse.json({ user, session });
+    const session = parsed?.data?.socialLogin?.session;
+    const user = parsed?.data?.socialLogin?.user ?? null;
 
-    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60;
+    if (!session) {
+      console.error("[/api/social-login] no session in GraphQL response", parsed);
+      return NextResponse.json({ error: "no session" }, { status: 500 });
+    }
+
+    // 👇 Log del token que devuelve el backend
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[DEBUG] Session access_token:", session.access_token);
+      console.log("[DEBUG] Session refresh_token:", session.refresh_token);
+    }
+
+    const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+    const isProd = process.env.NODE_ENV === "production";
+
+    const ACCESS_TTL = 60 * 60 * 24 * 7;
+    const REFRESH_TTL = 60 * 60 * 24 * 30;
+
+    const res = NextResponse.json({ ok: true, user });
+
+    const sameSiteVal =
+      (process.env.COOKIE_SAMESITE as any) || (isProd ? "none" : "lax");
 
     res.cookies.set("access_token", session.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: isProd,
+      sameSite: sameSiteVal,
       path: "/",
       maxAge: ACCESS_TTL,
+      domain: cookieDomain,
     });
 
     if (session.refresh_token) {
       res.cookies.set("refresh_token", session.refresh_token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
+        secure: isProd,
+        sameSite: sameSiteVal,
         path: "/",
-        maxAge: 60 * 60 * 24 * 7,
+        maxAge: REFRESH_TTL,
+        domain: cookieDomain,
       });
-    } else {
-      console.log('/api/social-login: no refresh_token returned, skipping refresh cookie');
     }
 
-    console.log('/api/social-login: cookies set, returning success');
+    // 👇 Confirmar que las cookies se guardan correctamente
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[DEBUG] Cookies set:", {
+        access_token: res.cookies.get("access_token"),
+        refresh_token: res.cookies.get("refresh_token"),
+      });
+    }
+
     return res;
   } catch (err: any) {
-    console.error("Error /api/social-login:", err);
-    return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
+    console.error("[/api/social-login] Error:", err?.message ?? err);
+    return NextResponse.json(
+      { error: err?.message || "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }

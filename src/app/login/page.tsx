@@ -32,43 +32,19 @@ export default function Login() {
         router.push("/register")
     };
 
-    const handleGoogle = async () => {
-  try {
-    setFormError(null);
-    setLoading(true);
+    async function signInWithGoogle() {
+        const redirectTo = `${window.location.origin}/auth/callback`;
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo }
+        });
 
-    try {
-      localStorage.setItem('social_remember', JSON.stringify(rememberMe));
-    } catch (e) {
-      console.warn('no se pudo guardar social_remember:', e);
+        if (error) {
+            console.error('Error iniciando OAuth:', error);
+        } else {
+            console.log('redirecting to provider...');
+        }
     }
-
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      console.error('supabase signInWithOAuth error', error);
-      setFormError('Error al iniciar con Google.');
-      setLoading(false);
-      return;
-    }
-
-    if (data?.url) {
-      window.location.href = data.url;
-    }
-
-  } catch (e: any) {
-    console.error('handleGoogle error', e);
-    setFormError('Error al iniciar con Google.');
-  } finally {
-    setLoading(false);
-  }
-};
-
 
     function mapGraphQLError(msg: string) {
         const m = msg.toLowerCase();
@@ -133,7 +109,7 @@ export default function Login() {
 
                     {/* Social */}
                     <form onSubmit={(e) => e.preventDefault()} className={styles.loginForm}>
-                        <button type="button" className={styles.socialMediaLoginButtion} onClick={handleGoogle}>
+                        <button type="button" className={styles.socialMediaLoginButtion} onClick={signInWithGoogle}>
                             <Image className={styles.cmeLogo} src={Google} alt="GoogleIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
                             Continua con Google
                         </button>
