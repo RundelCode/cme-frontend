@@ -1,9 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { uploadAvatarGql, uploadCoverGql } from '.././../../../lib/uploads-client';
 const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? '/api/graphql';
-import styles from './updateProfile.module.css'
-import { PropagateLoader } from "react-spinners";
+const UPLOADS_BASE = process.env.NEXT_PUBLIC_UPLOADS_BASE ?? 'http://localhost:3015';
+import styles from './updateProfile.module.css';
+import { PropagateLoader } from 'react-spinners';
 
 
 async function gql<T>(q: string, variables?: any) {
@@ -38,6 +38,34 @@ const UPDATE_MY_PROFILE = `
   }
 `;
 
+async function uploadOneShot(kind: 'avatar' | 'cover', file: File) {
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+
+  console.log('🧪 [client] subiendo via proxy ->', `/api/uploads/self/${kind}`, file.name, file.size);
+
+  const res = await fetch(`/api/uploads/self/${kind}`, {
+    method: 'POST',
+    credentials: 'include',
+    body: fd,
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      (json?.error) ||
+      (json?.message && (Array.isArray(json.message) ? json.message.join(', ') : json.message)) ||
+      `Fallo subiendo ${kind} (${res.status})`;
+    console.error('🧪 [client] error uploadOneShot:', msg, json);
+    throw new Error(msg);
+  }
+
+  console.log('🧪 [client] uploadOneShot ok:', json);
+  return json as { url: string; bucket: string; path: string };
+}
+
+/** -------------------- COMPONENTE -------------------- **/
+
 export default function UpdateProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +84,11 @@ export default function UpdateProfile() {
   // Previews locales
   const avatarPreview = avatarFile ? URL.createObjectURL(avatarFile) : avatarUrl || undefined;
   const coverPreview = coverFile ? URL.createObjectURL(coverFile) : coverUrl || undefined;
+
+  useEffect(() => {
+    console.log('🧪 Probando acceso a cookies desde cliente...');
+    console.log('document.cookie:', document.cookie || '(vacío)');
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -78,32 +111,41 @@ export default function UpdateProfile() {
         setLoading(false);
       }
     })();
-    // revoke previews al desmontar
+
+    // cleanup de blobs cuando el componente se desmonta
     return () => {
-      if (avatarPreview?.startsWith('blob:')) URL.revokeObjectURL(avatarPreview);
-      if (coverPreview?.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+      try {
+        if (avatarPreview?.startsWith('blob:')) URL.revokeObjectURL(avatarPreview);
+        if (coverPreview?.startsWith('blob:')) URL.revokeObjectURL(coverPreview);
+      } catch { }
     };
-  }, []); // eslint-disable-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      setSaving(true);
-      setErr(null);
-      setOk(null);
+    setSaving(true);
+    setErr(null);
+    setOk(null);
 
-      let newAvatarUrl = avatarUrl;
+    try {
+      // 1) Subir imágenes primero (solo si vienen nuevas)
       let newCoverUrl = coverUrl;
+      let newAvatarUrl = avatarUrl;
+
+      if (coverFile) {
+        const up = await uploadOneShot('cover', coverFile);
+        if (!up?.url) throw new Error('No se pudo subir la portada');
+        newCoverUrl = up.url;
+      }
 
       if (avatarFile) {
-        const up = await uploadAvatarGql(avatarFile);
-        newAvatarUrl = up?.url ?? null;
-      }
-      if (coverFile) {
-        const up = await uploadCoverGql(coverFile);
-        newCoverUrl = up?.url ?? null;
+        const up = await uploadOneShot('avatar', avatarFile);
+        if (!up?.url) throw new Error('No se pudo subir el avatar');
+        newAvatarUrl = up.url;
       }
 
+      // 2) Preparar input para GraphQL (solo campos presentes)
       const input = {
         fullName: fullName || undefined,
         occupation: occupation || undefined,
@@ -114,14 +156,17 @@ export default function UpdateProfile() {
         coverPhoto: newCoverUrl || undefined,
       };
 
+      // 3) Actualizar perfil vía GraphQL
       await gql(UPDATE_MY_PROFILE, { input });
+
+      // 4) Sincronizar estado local y limpiar selección de archivos
       setAvatarUrl(newAvatarUrl ?? null);
       setCoverUrl(newCoverUrl ?? null);
       setAvatarFile(null);
       setCoverFile(null);
       setOk('Perfil actualizado correctamente.');
     } catch (e: any) {
-      setErr(e?.message ?? 'Error');
+      setErr(e?.message ?? 'Error actualizando el perfil');
     } finally {
       setSaving(false);
     }

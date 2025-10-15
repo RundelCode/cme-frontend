@@ -1,19 +1,34 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
-export function middleware(req: NextRequest) {
-  const token = req.cookies.get("access_token")?.value;
-  const isAuthPage = req.nextUrl.pathname.startsWith("/login") || req.nextUrl.pathname.startsWith("/register");
+export async function middleware(req: NextRequest) {
+  const { pathname, search } = req.nextUrl;
+  const res = NextResponse.next();
 
-  if (!token && !isAuthPage) {
-    const url = new URL("/login", req.url);
-    url.searchParams.set("next", req.nextUrl.pathname);
+  const supabase = createMiddlewareClient({ req, res });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const isAuthPage =
+    pathname.startsWith('/login') || pathname.startsWith('/register');
+
+
+  if (!session && !isAuthPage) {
+    const url = new URL('/login', req.url);
+    url.searchParams.set('next', pathname + (search || ''));
     return NextResponse.redirect(url);
   }
-  if (token && isAuthPage) return NextResponse.redirect(new URL("/", req.url));
-  return NextResponse.next();
+  if (session && isAuthPage) {
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
+  return res;
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/login|api/logout|api/uploads/graphql).*)",],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+  ],
 };
