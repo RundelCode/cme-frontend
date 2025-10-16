@@ -1,10 +1,30 @@
+// lib/profile-types.ts
+
+// 👇 OJO: estos valores deben ser EXACTAMENTE los que expone GraphQL
+export type ProfileSortBy = "createdAt" | "updatedAt" | "reputation" | "name";
+export type ProfileSortOrder = "ASC" | "DESC";
+
+export type SearchProfilesInput = {
+  q?: string;
+  role?: "candidate" | "company_admin" | "headhunter" | "admin";
+  status?: "active" | "inactive" | "banned" | "pending";
+  minReputation?: number;
+  maxReputation?: number;
+  skillsAny?: string[];
+  skillsAll?: string[];
+  sortBy?: ProfileSortBy;
+  order?: ProfileSortOrder;
+  limit?: number;
+  offset?: number;
+};
+
 export type UserProfile = {
   id: string;
   email: string;
   full_name?: string | null;
   phone?: string | null;
-  role?: "candidate" | "company_admin" | "headhunter" | "admin" | null;
-  status?: "active" | "inactive" | "banned" | "pending" | null;
+  role?: string | null;
+  status?: string | null;
   profile_picture?: string | null;
   cover_photo?: string | null;
   occupation?: string | null;
@@ -14,23 +34,6 @@ export type UserProfile = {
   education?: any;
   cv_url?: string | null;
   reputation_score?: number | null;
-  created_at: string;
-  updated_at?: string | null;
-};
-
-export type ProfileSortBy = "createdAt" | "updatedAt" | "REPUTATION" | "name";
-export type ProfileSortOrder = "ASC" | "DESC";
-
-export type SearchProfilesInput = {
-  q?: string;
-  role?: UserProfile["role"];
-  status?: UserProfile["status"];
-  minReputation?: number;
-  maxReputation?: number;
-  skillsAny?: string[];
-  skillsAll?: string[];
-  sortBy?: ProfileSortBy;
-  order?: ProfileSortOrder;
-  limit?: number;
-  offset?: number;
+  created_at?: string;
+  updated_at?: string;
 };

@@ -39,7 +39,7 @@ export default function UserSearchClient() {
         try {
             const res = await searchProfiles({
                 q,
-                sortBy: "REPUTATION",
+                sortBy: "reputation",
                 order: "DESC",
                 limit: 20,
             });

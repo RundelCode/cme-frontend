@@ -192,15 +192,16 @@
 }
 
 .actions {
+    width: 100%;
     display: flex;
     gap: 10px;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-top: 6px;
 }
 
 .primaryBtn,
 .secondaryBtn {
-    min-width: 160px;
+    width: 48%;
     height: 40px;
     border-radius: 10px;
     font-weight: 700;
@@ -234,4 +235,143 @@
 
 .secondaryBtn:hover {
     background: #f3f4f6;
+}
+
+/* Textarea (Sobre mí, descripciones) */
+.textarea {
+    padding: 10px 12px;
+    border: 1px solid rgba(0, 0, 0, .15);
+    border-radius: 8px;
+    outline: none;
+    font-size: 14px;
+    background: #fff;
+    transition: border-color .15s ease, box-shadow .15s ease;
+    resize: vertical;
+    min-height: 96px;
+}
+
+.textarea:focus {
+    border-color: #152148;
+    box-shadow: 0 0 0 2px #15214820;
+}
+
+/* Secciones (Experiencia / Educación / CV) */
+.section {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 0 8px;
+}
+
+.sectionHeader h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 800;
+    color: #101828;
+}
+
+/* Botón pequeño de añadir (+ Añadir) */
+.smallBtn {
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 12px;
+    transition: .2s ease;
+}
+
+.smallBtn:hover {
+    background: #f3f4f6;
+}
+
+/* Texto tenue “Sin registros” */
+.muted {
+    margin: 0 2px 8px;
+    color: #6b7280;
+    font-size: 13px;
+}
+
+/* Tarjeta contenedora de cada item (exp/edu) */
+.card {
+    width: calc(100% - 20px);
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+}
+
+/* Fila dentro de la tarjeta (inputs en línea) */
+.cardRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+/* Alineación a la derecha (botón eliminar) */
+.rowRight {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Botón eliminar */
+.dangerBtn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid #fecaca;
+    color: #991b1b;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: .2s ease;
+}
+
+.dangerBtn:hover {
+    background: #fee2e2;
+}
+
+/* Link “Ver CV actual” */
+.link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #152148;
+    text-decoration: none;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: .2s ease;
+}
+
+.link:hover {
+    background: #f3f4f6;
+}
+
+/* Margen utilitario */
+.mb8 {
+    margin-bottom: 8px;
+}
+
+/* ===== Responsivo ===== */
+@media (max-width: 768px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cardRow {
+        grid-template-columns: 1fr;
+    }
 }

@@ -1,3 +1,4 @@
+// app/api/profile/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { SEARCH_PROFILES } from "../../../../../lib/queries";
 
@@ -6,7 +7,9 @@ function resolveGraphqlUrl(req: NextRequest) {
     process.env.GRAPHQL_URL ||
     process.env.NEXT_PUBLIC_GRAPHQL_URL ||
     "/api/graphql";
-  return env.startsWith("/") ? new URL(env, req.nextUrl.origin).toString() : env;
+  return env.startsWith("/")
+    ? new URL(env, req.nextUrl.origin).toString()
+    : env;
 }
 
 export async function POST(req: NextRequest) {
@@ -19,7 +22,7 @@ export async function POST(req: NextRequest) {
       accept: "application/json",
     };
 
-    // auth opcional (el endpoint es público; si hay token, se reenvía)
+    // auth opcional (público; si hay token, se reenvía)
     const auth = req.headers.get("authorization");
     if (auth) headers["authorization"] = auth;
 
@@ -27,6 +30,13 @@ export async function POST(req: NextRequest) {
     const xCorrId = req.headers.get("x-correlation-id");
     if (xReqId) headers["x-request-id"] = xReqId;
     if (xCorrId) headers["x-correlation-id"] = xCorrId;
+
+    // 🔎 LOG de variables que mandamos al GraphQL
+    console.log("[profiles/search] → variables", {
+      input: {
+        ...input,
+      },
+    });
 
     const gqlRes = await fetch(url, {
       method: "POST",
@@ -40,23 +50,35 @@ export async function POST(req: NextRequest) {
 
     const raw = await gqlRes.text();
     let data: any = null;
-    try { data = JSON.parse(raw); } catch {}
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      // noop
+    }
 
     if (!gqlRes.ok) {
+      console.error("[profiles/search] GraphQL HTTP error:", gqlRes.status, raw);
       return NextResponse.json(
         { error: `GraphQL HTTP ${gqlRes.status}`, raw },
-        { status: 502 },
-      );
-    }
-    if (data?.errors?.length) {
-      return NextResponse.json(
-        { error: data.errors[0]?.message ?? "GraphQL error", details: data.errors },
-        { status: 500 },
+        { status: 502 }
       );
     }
 
+    if (data?.errors?.length) {
+      console.error("[profiles/search] GraphQL errors:", data.errors);
+      return NextResponse.json(
+        { error: data.errors[0]?.message ?? "GraphQL error", details: data.errors },
+        { status: 500 }
+      );
+    }
+
+    // ✅ OK
     return NextResponse.json({ items: data?.data?.searchProfiles ?? [] });
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Search error (proxy)" }, { status: 500 });
+    console.error("[profiles/search] Proxy error:", e);
+    return NextResponse.json(
+      { error: e?.message ?? "Search error (proxy)" },
+      { status: 500 }
+    );
   }
 }

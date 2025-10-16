@@ -15,18 +15,16 @@
   /* relativo */
 }
 
-/* Card: grid responsive con columnas relativas */
 .card {
   width: 70%;
   background: #fff;
   display: grid;
   grid-template-columns: 22% 1fr;
-  /* Sidebar ~22%, contenido el resto */
   border-radius: 1rem;
   border: 1px solid #e5e7eb;
   box-shadow: 0 0.625rem 1.875rem rgba(16, 24, 40, .08);
-  /* 10px 30px -> rem */
   overflow: hidden;
+  margin: 40px 0px;
 }
 
 .settingNav {

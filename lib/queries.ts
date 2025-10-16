@@ -88,6 +88,7 @@ export const SEARCH_COMPANIES = `
 `;
 
 
+// lib/queries.ts
 export const SEARCH_PROFILES = `
   query SearchProfiles($input: SearchProfilesInput) {
     searchProfiles(input: $input) {
@@ -96,21 +97,30 @@ export const SEARCH_PROFILES = `
       full_name
       phone
       role
-      status
       profile_picture
       cover_photo
       occupation
       about_me
       skills
-      experience
-      education
       cv_url
-      reputation_score
-      created_at
-      updated_at
+      experience {
+        role
+        company
+        start
+        end
+        description
+      }
+      education {
+        degree
+        institution
+        start
+        end
+        description
+      }
     }
   }
 `;
+
 
 
 export const CREATE_APPLICATION = `
