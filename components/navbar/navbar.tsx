@@ -256,6 +256,21 @@ export default async function Navbar() {
                       />
                       Editar empresa
                     </Link>
+                    <Link
+                      href={`/jobs/new`}
+                      className={styles.option}
+                      title="Crear Oferta Laboral"
+                    >
+                      <Image
+                        className={styles.navIcon}
+                        src={CompanyIcon}
+                        alt="Crear Oferta Laboral"
+                        width={320}
+                        height={320}
+                        priority
+                      />
+                      Agregar Oferta
+                    </Link>
                   </>
                 ) : (
                   <Link
