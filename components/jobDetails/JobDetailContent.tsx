@@ -62,9 +62,13 @@ function ReferModal({
   const router = useRouter();
   const [mode, setMode] = useState<"list" | "add">("list");
 
+  // ⬇️ Paginación controlada
+  const [page, setPage] = useState(0);     // 0-based
+  const [limit, setLimit] = useState(10);  // 10 / 25 / 50
+
   const { data, error, isLoading, mutate } = useSWR(
     open && mode === "list"
-      ? `/api/applications?jobOfferId=${jobId}&limit=50&offset=0`
+      ? `/api/applications?jobOfferId=${jobId}&limit=${limit}&offset=${page * limit}`
       : null,
     fetcher
   );
@@ -80,6 +84,7 @@ function ReferModal({
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
 
+  // reset general al cerrar
   useEffect(() => {
     if (!open) {
       setReferralCode(null);
@@ -91,8 +96,14 @@ function ReferModal({
       setReferBusyId(null);
       setReferMsg(null);
       setReferError(null);
+      setPage(0); // reset de página
     }
   }, [open]);
+
+  // si cambia la oferta, volvemos a la primera página
+  useEffect(() => {
+    setPage(0);
+  }, [jobId]);
 
   const people: Array<{
     profileId: string;
@@ -166,8 +177,7 @@ function ReferModal({
 
       try {
         await navigator.clipboard.writeText(code);
-      } catch {
-      }
+      } catch { }
     } catch (e: any) {
       setGenError(e?.message || "Error generando el código.");
     } finally {
@@ -236,9 +246,7 @@ function ReferModal({
       return;
     }
 
-    const greeting = contactName?.trim()
-      ? `Hola ${contactName.trim()}`
-      : "Hola";
+    const greeting = contactName?.trim() ? `Hola ${contactName.trim()}` : "Hola";
 
     const msg = `${greeting}
 Vi una oferta que te puede interesar: ${jobTitle}
@@ -252,6 +260,9 @@ Este es tu codigo de referido: ${referralCode}
   }
 
   if (!open) return null;
+
+  // Heurística sin "total": si recibes menos de limit, no hay siguiente página
+  const canNext = people.length >= limit;
 
   return (
     <div className={styles.modalOverlay} role="dialog" aria-modal="true">
@@ -290,55 +301,110 @@ Este es tu codigo de referido: ${referralCode}
               </div>
             )}
 
-            {referMsg && <div className={styles.text} style={{ color: "#065f46" }}>{referMsg}</div>}
+            {referMsg && (
+              <div className={styles.text} style={{ color: "#065f46" }}>
+                {referMsg}
+              </div>
+            )}
             {referError && <div className={styles.error}>{referError}</div>}
 
             {!isLoading && !error && people.length === 0 && (
               <p className={styles.text}>Aún no hay interesados para esta oferta.</p>
             )}
+
             {!isLoading && !error && people.length > 0 && (
-              <ul className={styles.list}>
-                {people.map((p) => (
-                  <div key={p.profileId} className={styles.personLink}>
-                    <Image
-                      src={p.photo || "/images/placeholders/company.png"}
-                      alt={p.name ?? p.profileId}
-                      width={48}
-                      height={48}
-                      className={styles.avatar}
-                    />
-                    <div className={styles.personInfo}>
-                      <a
-                        href={`/profiles/users?id=${p.profileId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.personName}
+              <>
+                <ul className={styles.list}>
+                  {people.map((p) => (
+                    <div key={p.profileId} className={styles.personLink}>
+                      <Image
+                        src={p.photo || "/images/placeholders/company.png"}
+                        alt={p.name ?? p.profileId}
+                        width={48}
+                        height={48}
+                        className={styles.avatar}
+                      />
+                      <div className={styles.personInfo}>
+                        <a
+                          href={`/profiles/users?id=${p.profileId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.personName}
+                        >
+                          {p.name ?? "—"}
+                        </a>
+                        <div className={styles.personSub}>
+                          {p.occupation ?? "—"}
+                        </div>
+                        <div className={styles.rating}>
+                          {renderStars(p.reputation)}
+                        </div>
+                      </div>
+                      <button
+                        className={styles.modalReferButton}
+                        onClick={() => handleReferCandidate(p.profileId)}
+                        disabled={referBusyId === p.profileId}
+                        aria-busy={referBusyId === p.profileId}
+                        title="Crear referencia para este candidato"
                       >
-                        {p.name ?? "—"}
-                      </a>
-                      <div className={styles.personSub}>{p.occupation ?? "—"}</div>
-                      <div className={styles.rating}>{renderStars(p.reputation)}</div>
+                        {referBusyId === p.profileId ? "Creando..." : "Referir"}
+                      </button>
                     </div>
-                    <button
-                      className={styles.modalReferButton}
-                      onClick={() => handleReferCandidate(p.profileId)}
-                      disabled={referBusyId === p.profileId}
-                      aria-busy={referBusyId === p.profileId}
-                      title="Crear referencia para este candidato"
+                  ))}
+                </ul>
+
+                {/* Pager */}
+                <div className={styles.pager}>
+                  <div className={styles.pageSize}>
+                    <label className={styles.small} htmlFor="psize">
+                      Mostrar
+                    </label>
+                    <select
+                      id="psize"
+                      className={styles.select}
+                      value={limit}
+                      onChange={(e) => {
+                        setPage(0);
+                        setLimit(parseInt(e.target.value, 10) || 10);
+                      }}
                     >
-                      {referBusyId === p.profileId ? "Creando..." : "Referir"}
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+
+                  <div className={styles.pageNav}>
+                    <button
+                      className={styles.secundaryBtn}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0 || isLoading}
+                    >
+                      Anterior
+                    </button>
+
+                    <span className={styles.pageLabel}>Página {page + 1}</span>
+
+                    <button
+                      className={styles.secundaryBtn}
+                      onClick={() => setPage((p) => p + 1)}
+                      disabled={isLoading || !canNext}
+                      title={!canNext ? "No hay más resultados" : ""}
+                    >
+                      Siguiente
                     </button>
                   </div>
-                ))}
-              </ul>
+                </div>
+              </>
             )}
           </div>
         ) : (
           <div className={styles.referSection}>
             <p className={styles.text}>
               Comparte esta oferta con tu contacto. Puedes generar un{" "}
-              <b>código de referido</b> para asociar la postulación a tu recomendación,
-              y enviar un mensaje de WhatsApp personalizado con los detalles.
+              <b>código de referido</b> para asociar la postulación a tu
+              recomendación, y enviar un mensaje de WhatsApp personalizado con
+              los detalles.
             </p>
 
             {/* Inputs nombre y teléfono */}
@@ -412,7 +478,10 @@ Este es tu codigo de referido: ${referralCode}
 export default function JobDetailClient({ jobId }: Props) {
   const router = useRouter();
 
-  const { data, error, isLoading } = useSWR(jobId ? `/api/jobs/${jobId}` : null, fetcher);
+  const { data, error, isLoading } = useSWR(
+    jobId ? `/api/jobs/${jobId}` : null,
+    fetcher
+  );
   const { data: meData } = useSWR(`/api/me`, fetcher);
   const userId: string | null = meData?.user?.id ?? null;
 

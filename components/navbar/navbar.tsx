@@ -29,12 +29,18 @@ type ProfileType = {
     cover_photo?: string | null;
     occupation?: string | null;
     skills?: string[] | null;
-    role?: string | null; // <- importante
+    role?: string | null;
   } | null;
+};
+type CompanyLite = {
+  id: string;
+  name: string;
+  profilePicture?: string | null;
+  coverPhoto?: string | null;
+  companyRating?: number | null;
 };
 
 const AUTH_ME = `query { authMe { id email role } }`;
-// Agregamos role al query de perfil
 const MY_PROFILE = `query {
   myProfile {
     id
@@ -47,12 +53,27 @@ const MY_PROFILE = `query {
     role
   }
 }`;
+const COMPANY_BY_ADMIN = `query ($adminId: ID!) {
+  companyByAdmin(adminId: $adminId) {
+    id
+    name
+    profilePicture
+    coverPhoto
+    companyRating
+  }
+}`;
+
+// Normaliza el rol
+function normalizeRole(role: unknown): string {
+  return typeof role === "string" ? role.trim().toLowerCase() : "";
+}
 
 async function getAuthAndProfile() {
   const hdrs = await nextHeaders();
   const cookieHeader = (await nextCookies()).toString();
 
   try {
+    // 1) Sesión
     const authData = await gqlRequest<AuthMeResp>(
       GRAPHQL_ENDPOINT,
       AUTH_ME,
@@ -60,7 +81,10 @@ async function getAuthAndProfile() {
       hdrs,
       cookieHeader
     );
+    const isLogged = !!authData?.authMe?.id;
+    const authMe = authData?.authMe ?? null;
 
+    // 2) Perfil (opcional)
     let profile: ProfileType["myProfile"] = null;
     try {
       const p = await gqlRequest<ProfileType>(
@@ -75,23 +99,43 @@ async function getAuthAndProfile() {
       profile = null;
     }
 
-    const isLogged = !!authData?.authMe?.id;
-    const authMe = authData?.authMe ?? null;
+    // 3) Rol resuelto
+    const rawRole = profile?.role ?? authMe?.role ?? "";
+    const resolvedRole = normalizeRole(rawRole);
+    const isCompanyAdmin = resolvedRole === "company_admin";
 
-    return { isLogged, profile, authMe };
+    // 4) Si es admin de empresa, consultar su empresa por adminId (authMe.id)
+    let adminCompany: CompanyLite | null = null;
+    if (isCompanyAdmin && authMe?.id) {
+      try {
+        const resp = await gqlRequest<{ companyByAdmin: CompanyLite | null }>(
+          GRAPHQL_ENDPOINT,
+          COMPANY_BY_ADMIN,
+          { adminId: authMe.id },
+          hdrs,
+          cookieHeader
+        );
+        adminCompany = resp?.companyByAdmin ?? null;
+      } catch {
+        adminCompany = null;
+      }
+    }
+
+    return { isLogged, profile, authMe, adminCompany, resolvedRole };
   } catch {
-    return { isLogged: false, profile: null, authMe: null as AuthMeResp["authMe"] };
+    return {
+      isLogged: false,
+      profile: null,
+      authMe: null as AuthMeResp["authMe"],
+      adminCompany: null as CompanyLite | null,
+      resolvedRole: "" as string,
+    };
   }
 }
 
 export default async function Navbar() {
-  const { isLogged, profile, authMe } = await getAuthAndProfile();
-
-  // Log de depuración (opcional)
-  console.log("Perfil", profile);
-
-  // Rol con fallback: primero profile.role, luego authMe.role
-  const resolvedRole = profile?.role ?? authMe?.role ?? "";
+  const { isLogged, profile, authMe, adminCompany, resolvedRole } = await getAuthAndProfile();
+  const isCompanyAdmin = resolvedRole === "company_admin";
 
   return (
     <div className={styles.navbarMain}>
@@ -107,7 +151,7 @@ export default async function Navbar() {
 
         <div className={styles.category}>
           <p className={styles.navTitle}>Principal</p>
-          <a href="/" className={styles.option}>
+          <Link href="/" className={styles.option}>
             <Image
               className={styles.navIcon}
               src={JobOffersIcon}
@@ -117,12 +161,12 @@ export default async function Navbar() {
               priority
             />
             Ofertas Laborales
-          </a>
+          </Link>
         </div>
 
         <div className={styles.category}>
           <p className={styles.navTitle}>Explorar</p>
-          <a href="/search/companies" className={styles.option}>
+          <Link href="/search/companies" className={styles.option}>
             <Image
               className={styles.navIcon}
               src={CompanyIcon}
@@ -132,8 +176,8 @@ export default async function Navbar() {
               priority
             />
             Empresas
-          </a>
-          <a href="/search/users" className={styles.option}>
+          </Link>
+          <Link href="/search/users" className={styles.option}>
             <Image
               className={styles.navIcon}
               src={UserIcon}
@@ -143,14 +187,14 @@ export default async function Navbar() {
               priority
             />
             Usuarios
-          </a>
+          </Link>
         </div>
 
         {isLogged && (
           <>
             <div className={styles.category}>
               <p className={styles.navTitle}>Procesos</p>
-              <a href="/applications" className={styles.option}>
+              <Link href="/applications" className={styles.option}>
                 <Image
                   className={styles.navIcon}
                   src={ActivePositionsIcon}
@@ -160,8 +204,8 @@ export default async function Navbar() {
                   priority
                 />
                 Posiciones Activas
-              </a>
-              <a href="/referrals/completed" className={styles.option}>
+              </Link>
+              <Link href="/referrals/completed" className={styles.option}>
                 <Image
                   className={styles.navIcon}
                   src={CompletedIcon}
@@ -171,38 +215,100 @@ export default async function Navbar() {
                   priority
                 />
                 Procesos Completados
-              </a>
+              </Link>
             </div>
 
-            <div className={styles.category}>
-              <p className={styles.navTitle}>Reclutadores</p>
-              <a href="#" className={styles.option}>
-                <Image
-                  className={styles.navIcon}
-                  src={ReferralIcon}
-                  alt="Referrals"
-                  width={320}
-                  height={320}
-                  priority
-                />
-                Mis Referidos
-              </a>
-              <a href="#" className={styles.option}>
-                <Image
-                  className={styles.navIcon}
-                  src={ReferralIcon}
-                  alt="TopRecruiters"
-                  width={320}
-                  height={320}
-                  priority
-                />
-                Mejores Reclutadores
-              </a>
-            </div>
+            {/* Empresa: SOLO para company_admin, usando companyByAdmin(adminId) */}
+            {isCompanyAdmin && (
+              <div className={styles.category}>
+                <p className={styles.navTitle}>Empresa</p>
+
+                {adminCompany?.id ? (
+                  <>
+                    <Link
+                      href={`/profile/company?id=${adminCompany.id}`}
+                      className={styles.option}
+                      title={adminCompany.name}
+                    >
+                      <Image
+                        className={styles.navIcon}
+                        src={CompanyIcon}
+                        alt="Mi empresa"
+                        width={320}
+                        height={320}
+                        priority
+                      />
+                      Mi empresa
+                    </Link>
+
+                    <Link
+                      href={`/updateCompany`}
+                      className={styles.option}
+                      title="Editar empresa"
+                    >
+                      <Image
+                        className={styles.navIcon}
+                        src={CompanyIcon}
+                        alt="Editar empresa"
+                        width={320}
+                        height={320}
+                        priority
+                      />
+                      Editar empresa
+                    </Link>
+                  </>
+                ) : (
+                  <Link
+                    href="/createCompany"
+                    className={styles.option}
+                    title="Crear empresa"
+                  >
+                    <Image
+                      className={styles.navIcon}
+                      src={CompanyIcon}
+                      alt="Crear empresa"
+                      width={320}
+                      height={320}
+                      priority
+                    />
+                    Crear empresa
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* Reclutadores: oculto para company_admin */}
+            {!isCompanyAdmin && (
+              <div className={styles.category}>
+                <p className={styles.navTitle}>Reclutadores</p>
+                <Link href="#" className={styles.option}>
+                  <Image
+                    className={styles.navIcon}
+                    src={ReferralIcon}
+                    alt="Referrals"
+                    width={320}
+                    height={320}
+                    priority
+                  />
+                  Mis Referidos
+                </Link>
+                <Link href="#" className={styles.option}>
+                  <Image
+                    className={styles.navIcon}
+                    src={ReferralIcon}
+                    alt="TopRecruiters"
+                    width={320}
+                    height={320}
+                    priority
+                  />
+                  Mejores Reclutadores
+                </Link>
+              </div>
+            )}
 
             <div className={styles.category}>
               <p className={styles.navTitle}>Finanzas</p>
-              <a href="#" className={styles.option}>
+              <Link href="#" className={styles.option}>
                 <Image
                   className={styles.navIcon}
                   src={BillingIcon}
@@ -212,12 +318,12 @@ export default async function Navbar() {
                   priority
                 />
                 Resumen
-              </a>
+              </Link>
             </div>
 
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>
-              <a href="#" className={styles.option}>
+              <Link href="#" className={styles.option}>
                 <Image
                   className={styles.navIcon}
                   src={NotificationsIcon}
@@ -227,7 +333,7 @@ export default async function Navbar() {
                   priority
                 />
                 Notificaciones
-              </a>
+              </Link>
             </div>
           </>
         )}

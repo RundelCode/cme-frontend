@@ -36,7 +36,7 @@ export default function Register() {
 
   const phone = useMemo(() => {
     const cc = countryCode.trim().startsWith('+') ? countryCode.trim() : `+${countryCode.trim()}`;
-    const local = phoneLocal.replace(/[^\d]/g, ''); // solo dígitos
+    const local = phoneLocal.replace(/[^\d]/g, '');
     return `${cc}${local}`;
   }, [countryCode, phoneLocal]);
 
@@ -91,7 +91,7 @@ export default function Register() {
 
       const params = new URLSearchParams(window.location.search);
       const next = params.get("next") || "/dashboard";
-      router.push("/");
+      router.push("/login");
     } catch (err: any) {
       setFormError(err?.message || 'Ocurrió un error al registrar la cuenta.');
     } finally {

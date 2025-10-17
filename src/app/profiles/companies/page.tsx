@@ -1,12 +1,14 @@
+// src/app/profile/company/page.tsx (o la ruta que uses)
 import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
 import styles from "./companyProfile.module.css";
 import { gqlRequest } from "../../../../lib/gql";
+import CompanyRatingClient from "./rating/CompanyRatingClient";
+import CompanyOffers from "./offers/CompanyOffers";
 
 export const dynamic = "force-dynamic";
-
 const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
 
 type Company = {
@@ -146,16 +148,21 @@ export default async function Page({
                     <span className={styles.verifiedStar} title="Verificada">★</span>
                   )}
                 </h2>
+
                 <div className={styles.meta}>
                   <span>{company.industry ?? "—"}</span>
                   <span className={styles.dot}>·</span>
                   <span>{company.location ?? "—"}</span>
                 </div>
-                {company.companyRating != null && (
-                  <div className={styles.rating}>
-                    <span className={styles.ratingValue}>{company.companyRating.toFixed(1)}</span>
-                  </div>
-                )}
+
+                <div className={styles.ratingRow}>
+                  <CompanyRatingClient
+                    companyId={company.id}
+                    initialRating={company.companyRating ?? 0}
+                    className={styles.stars}
+                    valueClassName={styles.ratingValue}
+                  />
+                </div>
               </div>
             </div>
 
@@ -182,13 +189,12 @@ export default async function Page({
                     )}
                   </dd>
                 </div>
-                <div className={styles.detailRow}>
-                  <dt>Plan</dt><dd>{company.subscriptionPlan ?? "—"}</dd>
-                </div>
-                <div className={styles.detailRow}>
-                  <dt>Verificada</dt><dd>{company.boolVerified ? "Sí" : "No"}</dd>
-                </div>
               </dl>
+            </div>
+
+            <div className={styles.section}>
+              <h3>Ofertas de trabajo</h3>
+              <CompanyOffers companyId={company.id} />
             </div>
           </div>
         )}

@@ -84,6 +84,7 @@
   flex-wrap: wrap;
   gap: 10px;
 }
+
 .skill {
   background-color: #2128ac50;
   display: flex;
@@ -106,7 +107,8 @@
 }
 
 .primaryBtn,
-.secundaryBtn, .secundaryBtnWPP {
+.secundaryBtn,
+.secundaryBtnWPP {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -226,19 +228,19 @@
   gap: 2px;
 }
 
-.modalReferButton{
-    padding: 5px 10px;
-    border-radius: 5px;
-    background-color: #152148;
-    border: none;
-    color: #ffffff;
-    font-weight: 600;
-    cursor: pointer;
-    transition: .2s;
+.modalReferButton {
+  padding: 5px 10px;
+  border-radius: 5px;
+  background-color: #152148;
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s;
 }
 
-.modalReferButton:hover{
-    background-color: #1b295b;
+.modalReferButton:hover {
+  background-color: #1b295b;
 }
 
 .personName {
@@ -251,8 +253,8 @@
   text-decoration: none;
 }
 
-.personName:hover{
-    color: #3c5ac7;
+.personName:hover {
+  color: #3c5ac7;
 }
 
 .personSub {
@@ -274,10 +276,12 @@
   gap: 12px;
   margin: 15px 0px;
 }
+
 .formField {
   display: grid;
   gap: 6px;
 }
+
 .input {
   padding: 10px 12px;
   border: 1px solid rgba(0, 0, 0, 0.15);
@@ -285,14 +289,14 @@
 }
 
 
-.modalActions{
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    flex-direction: column;
+.modalActions {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-direction: column;
 }
 
-.referSection{
+.referSection {
   margin: 10px 0px;
   display: flex;
   justify-content: space-around;
@@ -301,24 +305,24 @@
   gap: 10px;
 }
 
-.modalSubActions{
-  width:  100%;
+.modalSubActions {
+  width: 100%;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-direction: row;
 }
 
-.modalSubActions button{
+.modalSubActions button {
   width: 100%;
 }
 
-.referSection p{
+.referSection p {
   font-size: small;
   font-weight: 600;
 }
 
-.referCode{
+.referCode {
   width: 100%;
   display: flex;
   justify-content: center;
@@ -327,20 +331,20 @@
   gap: 5px;
 }
 
-.referCode b{
+.referCode b {
   font-size: large;
 }
 
-.referCode code{
+.referCode code {
   font-size: large;
   font-weight: 600;
 }
 
-.referCode p{
+.referCode p {
   font-size: small;
 }
 
-.secundaryBtnWPP{
+.secundaryBtnWPP {
   margin-top: 10px;
 }
 
@@ -352,4 +356,36 @@
 
 .secundaryBtnWPP:hover {
   background-color: #51d255;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pageSize {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.select {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+}
+
+.pageNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pageLabel {
+  color: #475569;
+  font-size: 13px;
 }

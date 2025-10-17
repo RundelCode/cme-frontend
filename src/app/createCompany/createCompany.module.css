@@ -288,3 +288,8 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+
+.coverImg{ width:100%; height:100%; object-fit:cover; border-radius:12px; }
+.logoPreview{ width:96px; height:96px; border-radius:12px; object-fit:cover; border:1px solid #e5e7eb; background:#fff; }
+.statusNote{ margin:.75rem 0; font-size:.9rem; color:#4b5563; }
