@@ -105,7 +105,8 @@ function ReferModal({
     setPage(0);
   }, [jobId]);
 
-  const people: Array<{
+  // 1) People básicos desde /api/applications
+  const peopleBasic: Array<{
     profileId: string;
     name: string | null;
     photo: string | null;
@@ -114,7 +115,7 @@ function ReferModal({
     appliedAt?: string;
   }> = useMemo(() => {
     if (!data) return [];
-    if (Array.isArray(data.people)) return data.people;
+    if (Array.isArray(data.people)) return data.people; // por si ya viene expandido desde el backend
     if (Array.isArray(data.items)) {
       return data.items.map((a: any) => ({
         profileId: a.candidate_id,
@@ -127,6 +128,119 @@ function ReferModal({
     }
     return [];
   }, [data]);
+
+  // 2) IDs únicos a enriquecer
+  const ids = useMemo(
+    () => Array.from(new Set(peopleBasic.map((p) => p.profileId).filter(Boolean))),
+    [peopleBasic]
+  );
+
+  // 3) Fetch de perfiles (intenta GET /api/profiles?ids=..., si falla prueba POST /api/profiles/batch, si no GraphQL)
+  const idsKey = useMemo(() => (ids.length ? ids.join(",") : ""), [ids]);
+
+  const { data: profilesData, isLoading: loadingProfiles } = useSWR(
+    open && mode === "list" && idsKey ? ["profiles-merge", idsKey] : null,
+    async (_key: string, idsJoined: string) => {
+      const idsArg = idsJoined.split(",").filter(Boolean);
+
+      const tryGet = async () => {
+        const q = encodeURIComponent(idsJoined);
+        const r = await fetch(`/api/profiles?ids=${q}`, { method: "GET" });
+        if (!r.ok) throw new Error("GET /api/profiles not available");
+        return r.json();
+      };
+
+      // try POST /api/profiles/batch { ids }
+      const tryPostBatch = async () => {
+        const r = await fetch(`/api/profiles/batch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids: idsArg }),
+        });
+        if (!r.ok) throw new Error("POST /api/profiles/batch not available");
+        return r.json();
+      };
+
+      // try GraphQL directo
+      const tryGraphql = async () => {
+        const query = `
+        query ProfilesByIds($ids: [ID!]!) {
+          profilesByIds(ids: $ids) {
+            id
+            full_name
+            profile_picture
+            occupation
+            reputation_score
+          }
+        }
+      `;
+        const r = await fetch(`/api/graphql`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, variables: { ids: idsArg }, operationName: "ProfilesByIds" }),
+        });
+        const j = await r.json();
+        if (j?.errors?.length) throw new Error("GraphQL profilesByIds failed");
+        return { profiles: j?.data?.profilesByIds ?? [] };
+      };
+
+      try {
+        const j = await tryGet();
+        const profiles = j?.profiles ?? j ?? [];
+        return { profiles };
+      } catch {
+        try {
+          const j = await tryPostBatch();
+          const profiles = j?.profiles ?? j ?? [];
+          return { profiles };
+        } catch {
+          const j = await tryGraphql();
+          const profiles = j?.profiles ?? j ?? [];
+          return { profiles };
+        }
+      }
+    },
+    {
+      // 👇 evita revalidaciones que te estaban disparando el loader
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60_000, // 1 minuto
+      keepPreviousData: true,
+    }
+  );
+
+  // 4) Fusionar perfiles en people
+  const profileMap: Record<
+    string,
+    { name?: string | null; photo?: string | null; occupation?: string | null; reputation?: number | null }
+  > = useMemo(() => {
+    const map: Record<string, any> = {};
+    const arr = profilesData?.profiles ?? [];
+    for (const p of arr) {
+      map[p.id] = {
+        name: p.full_name ?? p.name ?? null,
+        photo: p.profile_picture ?? p.photo ?? null,
+        occupation: p.occupation ?? null,
+        reputation: p.reputation_score ?? p.reputation ?? null,
+      };
+    }
+    return map;
+  }, [profilesData]);
+
+  const people: typeof peopleBasic = useMemo(() => {
+    if (!peopleBasic.length) return [];
+    if (!ids.length) return peopleBasic;
+    return peopleBasic.map((p) => {
+      const ext = profileMap[p.profileId] || {};
+      return {
+        ...p,
+        name: ext.name ?? p.name,
+        photo: ext.photo ?? p.photo,
+        occupation: ext.occupation ?? p.occupation,
+        reputation: ext.reputation ?? p.reputation,
+      };
+    });
+  }, [peopleBasic, profileMap, ids.length]);
 
   function renderStars(value: number | null | undefined, max = 5) {
     if (value == null) return null;
@@ -155,29 +269,19 @@ function ReferModal({
       });
 
       let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
+      try { payload = await res.json(); } catch { payload = null; }
 
       if (res.status === 401) {
         throw new Error("No autorizado. Inicia sesión para continuar.");
       }
       if (!res.ok || !payload?.code) {
-        throw new Error(
-          payload?.message ||
-          payload?.error ||
-          "No se pudo generar el código. Intenta nuevamente."
-        );
+        throw new Error(payload?.message || payload?.error || "No se pudo generar el código. Intenta nuevamente.");
       }
 
       const code = String(payload.code);
       setReferralCode(code);
 
-      try {
-        await navigator.clipboard.writeText(code);
-      } catch { }
+      try { await navigator.clipboard.writeText(code); } catch { }
     } catch (e: any) {
       setGenError(e?.message || "Error generando el código.");
     } finally {
@@ -197,11 +301,7 @@ function ReferModal({
       });
 
       let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
+      try { payload = await res.json(); } catch { payload = null; }
 
       if (res.status === 401) {
         router.push(`/login?next=/jobs/${jobId}`);
@@ -239,22 +339,18 @@ function ReferModal({
       setGenError("Primero genera el código de referido.");
       return;
     }
-
     const waNumber = toWaNumber(contactPhone);
     if (!waNumber) {
       setGenError("Teléfono inválido. Incluye código de país (ej: 573001234567).");
       return;
     }
-
     const greeting = contactName?.trim() ? `Hola ${contactName.trim()}` : "Hola";
-
     const msg = `${greeting}
 Vi una oferta que te puede interesar: ${jobTitle}
 ${jobUrl}
 
 Este es tu codigo de referido: ${referralCode}
 Úsalo al aplicar para que quede asociada la recomendación.`;
-
     const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
@@ -262,7 +358,7 @@ Este es tu codigo de referido: ${referralCode}
   if (!open) return null;
 
   // Heurística sin "total": si recibes menos de limit, no hay siguiente página
-  const canNext = people.length >= limit;
+  const canNext = (peopleBasic.length >= limit);
 
   return (
     <div className={styles.modalOverlay} role="dialog" aria-modal="true">
@@ -290,7 +386,7 @@ Este es tu codigo de referido: ${referralCode}
 
         {mode === "list" ? (
           <div>
-            {isLoading && (
+            {(isLoading || loadingProfiles) && (
               <div className={styles.loading}>
                 <PropagateLoader />
               </div>
@@ -331,10 +427,15 @@ Este es tu codigo de referido: ${referralCode}
                           rel="noopener noreferrer"
                           className={styles.personName}
                         >
-                          {p.name ?? "—"}
+                          {p.name ?? `ID ${short(p.profileId)}`}
                         </a>
                         <div className={styles.personSub}>
                           {p.occupation ?? "—"}
+                          {p.appliedAt ? (
+                            <span className={styles.personAppliedAt}>
+                              {" · "}Aplicó: {new Date(p.appliedAt).toLocaleString()}
+                            </span>
+                          ) : null}
                         </div>
                         <div className={styles.rating}>
                           {renderStars(p.reputation)}
@@ -474,6 +575,7 @@ Este es tu codigo de referido: ${referralCode}
     </div>
   );
 }
+
 
 export default function JobDetailClient({ jobId }: Props) {
   const router = useRouter();

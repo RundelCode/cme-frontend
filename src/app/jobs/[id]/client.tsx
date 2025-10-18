@@ -48,7 +48,7 @@ function InfoModal({
     );
 }
 
-/* ======= Modal para ingresar código (sin candidateId) ======= */
+/* ======= Modal para ingresar código ======= */
 function CodeModal({
     open,
     onCancel,
@@ -122,6 +122,7 @@ export default function JobDetailClient({ jobId }: Props) {
 
     const { data, error, isLoading } = useSWR(jobId ? `/api/jobs/${jobId}` : null, fetcher);
     const { data: meData } = useSWR(`/api/me`, fetcher);
+    // Mantengo tu estructura actual: meData?.user?.id
     const userId: string | null = meData?.user?.id ?? null;
 
     const [infoOpen, setInfoOpen] = useState(false);
@@ -152,7 +153,8 @@ export default function JobDetailClient({ jobId }: Props) {
                     "Content-Type": "application/json",
                     "x-debug": "1",
                 },
-                body: JSON.stringify({ jobOfferId: jobId, code }),
+                // 👉 FIX: enviar candidateId al backend
+                body: JSON.stringify({ jobOfferId: jobId, code, candidateId: userId }),
             });
 
             const json = await res.json().catch(() => ({}));
@@ -165,7 +167,9 @@ export default function JobDetailClient({ jobId }: Props) {
                 const readable =
                     json?.error === "referral_not_found_for_offer"
                         ? "No encontramos una referencia con ese código para esta oferta."
-                        : json?.error || "No se pudo validar el código.";
+                        : json?.error === "candidate_id_required"
+                            ? "No se detectó el candidato. Inicia sesión como candidato o reintenta."
+                            : json?.error || "No se pudo validar el código.";
                 if (json?.debug) console.log("[consume.debug]", json.debug);
                 throw new Error(readable);
             }

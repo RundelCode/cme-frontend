@@ -363,6 +363,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+  margin-bottom: 12px;
 }
 
 .pageSize {
@@ -382,9 +383,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  width: 70%;
 }
 
 .pageLabel {
   color: #475569;
   font-size: 13px;
+  width: 50%;
 }
