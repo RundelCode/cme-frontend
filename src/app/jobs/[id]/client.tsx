@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import useSWR from "swr";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ function short(id: string) {
     return `${id.slice(0, 4)}…${id.slice(-4)}`;
 }
 
+/* ======= Modal simple de información ======= */
 function InfoModal({
     open,
     title,
@@ -47,6 +48,7 @@ function InfoModal({
     );
 }
 
+/* ======= Modal para ingresar código (sin candidateId) ======= */
 function CodeModal({
     open,
     onCancel,
@@ -58,14 +60,13 @@ function CodeModal({
 }) {
     const [code, setCode] = useState("");
 
-    useEffect(() => {
-        if (!open) setCode("");
-    }, [open]);
-
-    const isCodeValid = /^[A-Z0-9]{6}$/.test(code);
+    const isCodeValid = /^[A-Z0-9]{6}$/.test(code || "");
 
     function onChangeCode(e: React.ChangeEvent<HTMLInputElement>) {
-        const cleaned = e.target.value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6);
+        const cleaned = e.target.value
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .toUpperCase()
+            .slice(0, 6);
         setCode(cleaned);
     }
 
@@ -94,7 +95,10 @@ function CodeModal({
                     </label>
                 </div>
 
-                <div className={styles.modalActions} style={{ justifyContent: "space-between" }}>
+                <div
+                    className={styles.modalActions}
+                    style={{ justifyContent: "space-between" }}
+                >
                     <button className={styles.secundaryBtn} onClick={onCancel}>
                         Cancelar
                     </button>
@@ -126,14 +130,6 @@ export default function JobDetailClient({ jobId }: Props) {
 
     const [codeOpen, setCodeOpen] = useState(false);
 
-    const [absJobUrl, setAbsJobUrl] = useState<string>("");
-
-    useEffect(() => {
-        if (typeof window !== "undefined" && jobId) {
-            setAbsJobUrl(`${window.location.origin}/jobs/${jobId}`);
-        }
-    }, [jobId]);
-
     function openInfo(title: string, message: string) {
         setInfoTitle(title);
         setInfoMsg(message);
@@ -150,9 +146,12 @@ export default function JobDetailClient({ jobId }: Props) {
 
     async function handleUseCode(code: string) {
         try {
-            const res = await fetch("/api/referrals/consume", {
+            const res = await fetch("/api/referrals/consume?debug=1", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-debug": "1",
+                },
                 body: JSON.stringify({ jobOfferId: jobId, code }),
             });
 
@@ -167,14 +166,13 @@ export default function JobDetailClient({ jobId }: Props) {
                     json?.error === "referral_not_found_for_offer"
                         ? "No encontramos una referencia con ese código para esta oferta."
                         : json?.error || "No se pudo validar el código.";
+                if (json?.debug) console.log("[consume.debug]", json.debug);
                 throw new Error(readable);
             }
 
+            if (json?.debug) console.log("[consume.debug]", json.debug);
             setCodeOpen(false);
-            openInfo(
-                "¡Código aplicado!",
-                "Tu recomendación ha sido asociada con exito."
-            );
+            openInfo("¡Código aplicado!", "Tu recomendación ha sido asociada con éxito.");
         } catch (e: any) {
             setCodeOpen(false);
             openInfo("Error", e?.message || "No se pudo validar el código.");
@@ -245,14 +243,18 @@ export default function JobDetailClient({ jobId }: Props) {
                 onUseCode={handleUseCode}
             />
 
-            <div className={styles.modal}>
-                <div className={styles.cover}>
+            <div className={styles.card}>
+                {/* Cover */}
+                <div className={styles.coverBox}>
                     {companyCover ? (
                         <Image src={companyCover} alt="" fill className={styles.coverImg} priority />
-                    ) : null}
+                    ) : (
+                        <div className={styles.coverPlaceholder} />
+                    )}
                 </div>
 
-                <div className={styles.infoSection}>
+                {/* Header compacto */}
+                <div className={styles.headerRow}>
                     <div className={styles.logoWrapper}>
                         {companyLogo ? (
                             <Image
@@ -267,60 +269,65 @@ export default function JobDetailClient({ jobId }: Props) {
                         )}
                     </div>
 
-                    <div className={styles.header}>
-                        <div className={styles.meta}>
-                            {companyName} · {loc}
-                        </div>
+                    <div className={styles.headerInfo}>
                         <div className={styles.title}>{job.title}</div>
-
-                        <div className={styles.textSection}>
-                            <p>
+                        <div className={styles.meta}>
+                            <span className={styles.muted}>{companyName}</span>
+                            <span className={styles.dot}>•</span>
+                            <span className={styles.muted}>{loc}</span>
+                        </div>
+                        <div className={styles.meta}>
+                            <span>
                                 <b>Tipo:</b> {job.employment_type ?? "—"}
-                            </p>
-                            {" · "}
-                            <p>
+                            </span>
+                            <span className={styles.dot}>•</span>
+                            <span>
                                 <b>Modalidad:</b> {job.location_type ?? "—"}
-                            </p>
-                        </div>
-
-                        <div>
-                            <b>Salario:</b> {salary}
+                            </span>
+                            <span className={styles.dot}>•</span>
+                            <span>
+                                <b>Salario:</b> {salary}
+                            </span>
                         </div>
                     </div>
+                </div>
 
-                    {Array.isArray(job.skills) && job.skills.length > 0 && (
-                        <div className={styles.skills}>
-                            {job.skills.map((s) => (
-                                <span key={s} className={styles.skill}>
-                                    {s}
-                                </span>
-                            ))}
-                        </div>
-                    )}
-
-                    {job.description && (
-                        <div>
-                            <h3>Descripción</h3>
-                            <p className={styles.text}>{job.description}</p>
-                        </div>
-                    )}
-
-                    {job.requirements && (
-                        <div>
-                            <h3>Requisitos</h3>
-                            <p className={styles.text}>{job.requirements}</p>
-                        </div>
-                    )}
-
-                    <div className={styles.actions}>
-                        <button
-                            type="button"
-                            className={styles.primaryBtn}
-                            onClick={handleOpenCodeModal}
-                        >
-                            Tengo un código de referencia
-                        </button>
+                {/* Skills */}
+                {Array.isArray(job.skills) && job.skills.length > 0 && (
+                    <div className={styles.skills}>
+                        {job.skills.map((s) => (
+                            <span key={s} className={styles.skill}>
+                                {s}
+                            </span>
+                        ))}
                     </div>
+                )}
+
+                {/* Descripción */}
+                {job.description && (
+                    <div className={styles.section}>
+                        <h3 className={styles.sectionTitle}>Descripción</h3>
+                        <p className={styles.text}>{job.description}</p>
+                    </div>
+                )}
+
+                {/* Requisitos */}
+                {job.requirements && (
+                    <div className={styles.section}>
+                        <h3 className={styles.sectionTitle}>Requisitos</h3>
+                        <p className={styles.text}>{job.requirements}</p>
+                    </div>
+                )}
+
+                {/* CTA */}
+                <div className={styles.actions}>
+                    <button
+                        type="button"
+                        className={styles.primaryBtn}
+                        onClick={handleOpenCodeModal}
+                    >
+                        Tengo un código de referencia
+                    </button>
                 </div>
             </div>
         </>

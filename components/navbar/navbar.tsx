@@ -134,7 +134,8 @@ async function getAuthAndProfile() {
 }
 
 export default async function Navbar() {
-  const { isLogged, profile, authMe, adminCompany, resolvedRole } = await getAuthAndProfile();
+  const { isLogged, profile, authMe, adminCompany, resolvedRole } =
+    await getAuthAndProfile();
   const isCompanyAdmin = resolvedRole === "company_admin";
 
   return (
@@ -271,6 +272,21 @@ export default async function Navbar() {
                       />
                       Agregar Oferta
                     </Link>
+                    <Link
+                      href={`/company/jobs`}
+                      className={styles.option}
+                      title="Gestionar ofertas"
+                    >
+                      <Image
+                        className={styles.navIcon}
+                        src={CompanyIcon}
+                        alt="Gestionar Ofertas Laborales"
+                        width={320}
+                        height={320}
+                        priority
+                      />
+                      Gestionar Ofertas
+                    </Link>
                   </>
                 ) : (
                   <Link
@@ -357,7 +373,11 @@ export default async function Navbar() {
       <div className={styles.rightHeader}>
         {isLogged ? (
           <ProfileMini
-            name={profile?.full_name || profile?.email?.split("@")[0] || "Usuario"}
+            name={
+              profile?.full_name ||
+              profile?.email?.split("@")[0] ||
+              "Usuario"
+            }
             email={profile?.email || ""}
             role={resolvedRole}
             imageUrl={profile?.profile_picture || null}

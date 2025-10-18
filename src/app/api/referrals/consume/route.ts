@@ -16,40 +16,6 @@ const LIST_REFERRALS = /* GraphQL */ `
       id
       status
       referral_code
-      headhunter_id
-      job_offer_id
-      created_at
-    }
-  }
-`;
-
-const UPDATE_REFERRAL = /* GraphQL */ `
-  mutation UpdateReferral($id: ID!, $status: String!) {
-    updateReferral(id: $id, status: $status) {
-      id
-      status
-      referral_code
-      updated_at
-    }
-  }
-`;
-
-const CREATE_REFERRAL = /* GraphQL */ `
-  mutation CreateReferral(
-    $headhunterId: ID!,
-    $candidateId: ID!,
-    $jobOfferId: ID!,
-    $status: String
-  ) {
-    createReferral(
-      headhunterId: $headhunterId,
-      candidateId: $candidateId,
-      jobOfferId: $jobOfferId,
-      status: $status
-    ) {
-      id
-      status
-      referral_code
       candidate_id
       headhunter_id
       job_offer_id
@@ -58,32 +24,51 @@ const CREATE_REFERRAL = /* GraphQL */ `
   }
 `;
 
+const UPDATE_REFERRAL = /* GraphQL */ `
+  mutation ClaimReferral($id: ID!, $candidateId: ID!, $status: String!) {
+    updateReferral(id: $id, candidateId: $candidateId, status: $status) {
+      id
+      status
+      candidate_id
+      updated_at
+    }
+  }
+`;
+
 export async function POST(req: NextRequest) {
+  const debugEnabled =
+    req.headers.get("x-debug") === "1" ||
+    req.nextUrl.searchParams.get("debug") === "1";
+
+  const debug: string[] = [];
+  const dlog = (...a: any[]) => { if (debugEnabled) debug.push(a.map(String).join(" ")); console.log("[consume]", ...a); };
+  const derror = (...a: any[]) => { if (debugEnabled) debug.push("ERROR: " + a.map(String).join(" ")); console.error("[consume]", ...a); };
+
   try {
-    const { jobOfferId, code } = await req.json().catch(() => ({}));
+    const { jobOfferId, code, candidateId: candidateIdFromBody } = await req.json().catch(() => ({}));
+    dlog("Body:", JSON.stringify({ jobOfferId, code, candidateIdFromBody }));
+
     if (!jobOfferId || !code) {
-      return NextResponse.json({ error: "jobOfferId_and_code_required" }, { status: 400 });
+      return NextResponse.json({ error: "jobOfferId_and_code_required", debug }, { status: 400 });
     }
 
     const url = resolveGraphqlUrl(req);
+    dlog("GraphQL URL:", url);
 
-    const headers: Record<string, string> = {
+    const auth = req.headers.get("authorization") ?? "";
+    const cookie = req.headers.get("cookie") ?? "";
+    const baseHeaders: Record<string, string> = {
       "content-type": "application/json",
       accept: "application/json",
     };
-    const auth = req.headers.get("authorization");
-    const cookie = req.headers.get("cookie");
-    const xReqId = req.headers.get("x-request-id");
-    const xCorrId = req.headers.get("x-correlation-id");
-    if (auth) headers["authorization"] = auth;
-    if (cookie) headers["cookie"] = cookie;
-    if (xReqId) headers["x-request-id"] = xReqId as string;
-    if (xCorrId) headers["x-correlation-id"] = xCorrId as string;
+    if (auth) baseHeaders["authorization"] = auth;
+    if (cookie) baseHeaders["cookie"] = cookie;
 
-    // 1) Buscar la referencia de esta oferta
+    // STEP 1: listar referrals
+    dlog("Listando referrals por job:", jobOfferId);
     const listRes = await fetch(url, {
       method: "POST",
-      headers,
+      headers: baseHeaders,
       body: JSON.stringify({
         query: LIST_REFERRALS,
         variables: { limit: 200, offset: 0, jobOfferId, status: null },
@@ -93,130 +78,84 @@ export async function POST(req: NextRequest) {
     });
 
     const listRaw = await listRes.text();
+    dlog("LIST_REFERRALS RAW:", listRaw.slice(0, 800));
     const listJson: any = (() => { try { return JSON.parse(listRaw); } catch { return null; } })();
-
-    if (!listRes.ok) {
-      return NextResponse.json(
-        { error: `GraphQL HTTP ${listRes.status}`, details: listJson?.errors ?? null },
-        { status: 502 },
-      );
+    if (!listRes.ok || listJson?.errors?.length) {
+      derror("List referrals error:", listJson?.errors);
+      return NextResponse.json({ error: "list_referrals_failed", details: listJson?.errors, debug }, { status: 500 });
     }
-    if (listJson?.errors?.length) {
-      return NextResponse.json(
-        { error: listJson.errors[0]?.message ?? "GraphQL error", details: listJson.errors },
-        { status: 500 },
-      );
-    }
-
-    const items: Array<{
-      id: string; status: string; referral_code: string;
-      headhunter_id: string; job_offer_id: string;
-    }> = listJson?.data?.referrals ?? [];
 
     const target = String(code).trim().toUpperCase();
-    const found = items.find(r => String(r.referral_code || "").toUpperCase() === target);
-
+    const referrals: any[] = listJson?.data?.referrals ?? [];
+    const found = referrals.find(r => String(r.referral_code || "").toUpperCase() === target);
+    dlog("Referral encontrada:", JSON.stringify(found));
     if (!found) {
-      return NextResponse.json({ error: "referral_not_found_for_offer" }, { status: 404 });
+      return NextResponse.json({ error: "referral_not_found_for_offer", debug }, { status: 404 });
     }
 
-    // 2) Obtener el user actual (para candidateId)
-    const meRes = await fetch(new URL("/api/me", req.nextUrl).toString(), {
-      method: "GET",
-      headers: { cookie: cookie || "", authorization: auth || "" },
-      cache: "no-store",
-    });
-    if (meRes.status !== 200) {
-      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
-    }
-    const meJson = await meRes.json();
-    const userId: string | undefined = meJson?.user?.id;
-    if (!userId) {
-      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    // STEP 2: /api/me para saber rol e id
+    const meUrl = new URL("/api/me", req.nextUrl.origin).toString();
+    dlog("Consultando /api/me:", meUrl);
+    const meRes = await fetch(meUrl, { method: "GET", headers: { cookie, authorization: auth }, cache: "no-store" });
+    const meRaw = await meRes.text();
+    dlog("/api/me RAW:", meRaw.slice(0, 800));
+    const meJson: any = (() => { try { return JSON.parse(meRaw); } catch { return null; } })();
+
+    const meId: string | undefined = meJson?.user?.id;
+    const meRole: string = (meJson?.user?.role ?? "").toLowerCase();
+    dlog("User actual:", meId, "role:", meRole);
+
+    if (!meId) {
+      return NextResponse.json({ error: "unauthenticated", debug }, { status: 401 });
     }
 
-    // 3) Actualizar estado de la referencia original
+    // ⚠️ Lógica para determinar candidateId final
+    let finalCandidateId: string | null = null;
+    if (meRole === "candidate") {
+      finalCandidateId = meId;                      // el propio candidato
+      dlog("finalCandidateId <- meId (candidate)");
+    } else if (candidateIdFromBody) {
+      finalCandidateId = String(candidateIdFromBody); // headhunter u otro rol asignando candidato explícito
+      dlog("finalCandidateId <- candidateIdFromBody");
+    } else {
+      dlog("No candidateId disponible (ni role candidate ni candidateId en body)");
+      return NextResponse.json({ error: "candidate_id_required", debug }, { status: 400 });
+    }
+
+    // Si ya tiene candidate_id y no coincide, bloquear
+    if (found.candidate_id && found.candidate_id !== finalCandidateId) {
+      dlog("Referral ya tomada por otro user:", found.candidate_id);
+      return NextResponse.json({ error: "referral_already_claimed_by_other", debug }, { status: 409 });
+    }
+
+    // STEP 3: updateReferral con candidateId correcto
+    const variables = { id: found.id, candidateId: finalCandidateId, status: "accepted_by_candidate" };
+    dlog("UPDATE_REFERRAL variables:", JSON.stringify(variables));
+
     const updRes = await fetch(url, {
       method: "POST",
-      headers,
+      headers: baseHeaders,
       body: JSON.stringify({
         query: UPDATE_REFERRAL,
-        variables: { id: found.id, status: "accepted_by_candidate" },
-        operationName: "UpdateReferral",
+        variables,
+        operationName: "ClaimReferral",
       }),
       cache: "no-store",
     });
 
     const updRaw = await updRes.text();
+    dlog("UPDATE_REFERRAL RAW:", updRaw.slice(0, 800));
     const updJson: any = (() => { try { return JSON.parse(updRaw); } catch { return null; } })();
-    if (!updRes.ok) {
-      return NextResponse.json(
-        { error: `GraphQL HTTP ${updRes.status}`, details: updJson?.errors ?? null },
-        { status: 502 },
-      );
-    }
-    if (updJson?.errors?.length) {
-      return NextResponse.json(
-        { error: updJson.errors[0]?.message ?? "GraphQL error", details: updJson.errors },
-        { status: 500 },
-      );
+
+    if (!updRes.ok || updJson?.errors?.length) {
+      derror("Update referral error:", updJson?.errors);
+      return NextResponse.json({ error: "update_referral_failed", details: updJson?.errors, debug }, { status: 500 });
     }
 
-    // 4) Crear referencia "espejo" con candidateId
-    const crtRes = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        query: CREATE_REFERRAL,
-        variables: {
-          headhunterId: found.headhunter_id,
-          candidateId: userId,
-          jobOfferId: jobOfferId,
-          status: "accepted_by_candidate",
-        },
-        operationName: "CreateReferral",
-      }),
-      cache: "no-store",
-    });
-
-    const crtRaw = await crtRes.text();
-    const crtJson: any = (() => { try { return JSON.parse(crtRaw); } catch { return null; } })();
-    if (!crtRes.ok) {
-      // La creación "espejo" falló, pero el update de estado ya se hizo; devolvemos 200 con warning.
-      return NextResponse.json(
-        {
-          ok: true,
-          referral: updJson?.data?.updateReferral ?? null,
-          warning: "mirror_create_failed",
-          details: crtJson?.errors ?? null,
-        },
-        { status: 200 },
-      );
-    }
-    if (crtJson?.errors?.length) {
-      return NextResponse.json(
-        {
-          ok: true,
-          referral: updJson?.data?.updateReferral ?? null,
-          warning: "mirror_create_failed",
-          details: crtJson?.errors,
-        },
-        { status: 200 },
-      );
-    }
-
-    return NextResponse.json(
-      {
-        ok: true,
-        referral: updJson?.data?.updateReferral ?? null,
-        mirror: crtJson?.data?.createReferral ?? null,
-      },
-      { status: 200 },
-    );
+    dlog("OK updateReferral:", JSON.stringify(updJson?.data?.updateReferral));
+    return NextResponse.json({ ok: true, referral: updJson?.data?.updateReferral ?? null, debug }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "consume_referral_failed" },
-      { status: 500 },
-    );
+    derror("EXCEPTION:", e?.message ?? e);
+    return NextResponse.json({ error: e?.message ?? "consume_referral_failed", debug }, { status: 500 });
   }
 }

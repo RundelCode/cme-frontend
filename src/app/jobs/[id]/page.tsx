@@ -2,17 +2,17 @@ import Navbar from "../../../../components/navbar/navbar";
 import JobDetailClient from "./client";
 import styles from "./jobs.module.css";
 
-type PageProps = { params: { id: string } };
+type PageProps = {
+  params: Promise<{ id: string }>;
+};
 
-export default function JobDetailPage({ params }: PageProps) {
-  const { id } = params;
+export default async function JobDetailPage({ params }: PageProps) {
+  const { id } = await params;
 
   return (
-    <main className={styles.main}>
+    <main className={styles.page}>
       <Navbar />
-      <div className={styles.page}>
-        <JobDetailClient jobId={id} />
-      </div>
+      <JobDetailClient jobId={id} />
     </main>
   );
 }

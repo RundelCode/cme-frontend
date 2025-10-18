@@ -7,7 +7,6 @@ import { gqlRequest } from "../../../../lib/gql";
 
 export const dynamic = "force-dynamic";
 
-// Fallbacks si no hay var definida
 const GRAPHQL_ENDPOINT =
   process.env.GRAPHQL_ENDPOINT ??
   process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ??
