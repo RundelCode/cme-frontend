@@ -416,8 +416,6 @@ Este es tu codigo de referido: ${referralCode}
                       <Image
                         src={p.photo || "/images/placeholders/company.png"}
                         alt={p.name ?? p.profileId}
-                        width={48}
-                        height={48}
                         className={styles.avatar}
                       />
                       <div className={styles.personInfo}>

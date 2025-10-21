@@ -193,33 +193,7 @@ export default async function Navbar() {
 
         {isLogged && (
           <>
-            <div className={styles.category}>
-              <p className={styles.navTitle}>Procesos</p>
-              <Link href="/applications" className={styles.option}>
-                <Image
-                  className={styles.navIcon}
-                  src={ActivePositionsIcon}
-                  alt="Positions"
-                  width={320}
-                  height={320}
-                  priority
-                />
-                Posiciones Activas
-              </Link>
-              <Link href="/referrals/completed" className={styles.option}>
-                <Image
-                  className={styles.navIcon}
-                  src={CompletedIcon}
-                  alt="Completed"
-                  width={320}
-                  height={320}
-                  priority
-                />
-                Procesos Completados
-              </Link>
-            </div>
 
-            {/* Empresa: SOLO para company_admin, usando companyByAdmin(adminId) */}
             {isCompanyAdmin && (
               <div className={styles.category}>
                 <p className={styles.navTitle}>Empresa</p>
@@ -295,31 +269,59 @@ export default async function Navbar() {
 
             {/* Reclutadores: oculto para company_admin */}
             {!isCompanyAdmin && (
-              <div className={styles.category}>
-                <p className={styles.navTitle}>Reclutadores</p>
-                <Link href="#" className={styles.option}>
-                  <Image
-                    className={styles.navIcon}
-                    src={ReferralIcon}
-                    alt="Referrals"
-                    width={320}
-                    height={320}
-                    priority
-                  />
-                  Mis Referidos
-                </Link>
-                <Link href="#" className={styles.option}>
-                  <Image
-                    className={styles.navIcon}
-                    src={ReferralIcon}
-                    alt="TopRecruiters"
-                    width={320}
-                    height={320}
-                    priority
-                  />
-                  Mejores Reclutadores
-                </Link>
-              </div>
+              <>
+                <div className={styles.category}>
+                  <p className={styles.navTitle}>Procesos</p>
+                  <Link href="/applications" className={styles.option}>
+                    <Image
+                      className={styles.navIcon}
+                      src={ActivePositionsIcon}
+                      alt="Positions"
+                      width={320}
+                      height={320}
+                      priority
+                    />
+                    Posiciones Activas
+                  </Link>
+                  <Link href="/referrals/completed" className={styles.option}>
+                    <Image
+                      className={styles.navIcon}
+                      src={CompletedIcon}
+                      alt="Completed"
+                      width={320}
+                      height={320}
+                      priority
+                    />
+                    Procesos Completados
+                  </Link>
+                </div>
+
+                <div className={styles.category}>
+                  <p className={styles.navTitle}>Reclutadores</p>
+                  <Link href="#" className={styles.option}>
+                    <Image
+                      className={styles.navIcon}
+                      src={ReferralIcon}
+                      alt="Referrals"
+                      width={320}
+                      height={320}
+                      priority
+                    />
+                    Mis Referidos
+                  </Link>
+                  <Link href="#" className={styles.option}>
+                    <Image
+                      className={styles.navIcon}
+                      src={ReferralIcon}
+                      alt="TopRecruiters"
+                      width={320}
+                      height={320}
+                      priority
+                    />
+                    Mejores Reclutadores
+                  </Link>
+                </div>
+              </>
             )}
 
             <div className={styles.category}>

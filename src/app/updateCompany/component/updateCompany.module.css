@@ -165,8 +165,10 @@
 /* States */
 .loading {
     width: 100%;
-    display: grid;
-    place-items: center;
+    min-height: 400px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     color: #475467;
 }
 

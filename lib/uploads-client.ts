@@ -81,4 +81,5 @@ export async function uploadCoverGql(file: File): Promise<UploadResp> {
 
   const endpoint = `${UPLOADS_BASE}/uploads/self/cover`;
   return postFormDirect(endpoint, file);
-}
+} 
+ 

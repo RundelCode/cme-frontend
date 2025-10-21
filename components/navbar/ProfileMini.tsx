@@ -91,7 +91,7 @@ export default function ProfileMini({ name, email, imageUrl, role }: Props) {
             {(role === 'candidate' || role === 'headhunter') ? (
               <Link href="/profile/user" className={styles.menuItem} role="menuitem">Ver perfil</Link>
             ) : (
-              <Link href="/profile/company" className={styles.menuItem} role="menuitem">Ver perfil</Link>
+              <Link href="/profile/user" className={styles.menuItem} role="menuitem">Ver perfil</Link>
             )}
             <Link href="/settings" className={styles.menuItem} role="menuitem">Ajustes</Link>
 

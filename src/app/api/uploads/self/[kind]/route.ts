@@ -1,67 +1,62 @@
-// src/app/api/uploads/self/[kind]/route.ts
+// File: src/app/api/uploads/self/[kind]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-
 const UPLOADS_BASE = process.env.UPLOADS_BASE ?? "http://localhost:3015";
-const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "http://localhost:3000/graphql";
 
-// Helpers
-async function getUserIdFromSession(req: NextRequest): Promise<string | null> {
-  // 1) Intenta via GraphQL authMe con las cookies del request (lo más confiable)
-  const cookie = req.headers.get("cookie") ?? "";
-  const authz = req.headers.get("authorization") ?? "";
-
+// decodificador base64url sencillo (solo lectura del payload, no verifica firma)
+function decodeJwtPayload<T = any>(jwt: string): T | null {
   try {
-    const r = await fetch(GRAPHQL_ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json", cookie, authorization: authz },
-      body: JSON.stringify({ query: "query { authMe { id } }" }),
-      // importante: el endpoint de Next y GraphQL suelen ser mismo origen; si no, CORS server-side
-    });
-    const j = await r.json().catch(() => ({}));
-    const id = j?.data?.authMe?.id ?? null;
-    if (id) return id;
-  } catch { /* ignore */ }
-
-  // 2) (Fallback) decodifica un JWT si lo tuvieras en cookies específicas
-  const session = req.cookies.get("session_access")?.value ?? null;
-  const access = req.cookies.get("access_token")?.value ?? null;
-  const jwt = session || access || null;
-  if (jwt) {
-    try {
-      const [, b64] = jwt.split(".");
-      if (b64) {
-        const pad = "=".repeat((4 - (b64.length % 4)) % 4);
-        const base64 = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
-        const payload = JSON.parse(Buffer.from(base64, "base64").toString("utf8"));
-        const sub = payload?.sub ?? payload?.user_id ?? null;
-        if (sub) return String(sub);
-      }
-    } catch { /* ignore */ }
+    const [, b64] = jwt.split(".");
+    if (!b64) return null;
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const base64 = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(Buffer.from(base64, "base64").toString("utf8"));
+  } catch {
+    return null;
   }
+}
 
-  return null;
+function pickBestJwt(req: NextRequest) {
+  // Prioriza access_token sobre session_access
+  const access = req.cookies.get("access_token")?.value ?? null;
+  const session = req.cookies.get("session_access")?.value ?? null;
+
+  const accessPayload = access ? decodeJwtPayload<any>(access) : null;
+  const sessionPayload = session ? decodeJwtPayload<any>(session) : null;
+
+  // Si hay access_token válido, úsalo siempre
+  if (accessPayload?.sub || accessPayload?.user_id) {
+    return { jwt: access, payload: accessPayload, source: "access_token" };
+  }
+  // Si no hay access_token, cae a session_access
+  if (sessionPayload?.sub || sessionPayload?.user_id) {
+    return { jwt: session, payload: sessionPayload, source: "session_access" };
+  }
+  return { jwt: null as string | null, payload: null as any, source: null as string | null };
 }
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: { kind: string } }
+  ctx: { params: Promise<{ kind: string }> }
 ) {
   try {
-    const kind = (ctx.params?.kind || "").toLowerCase();
-    // ✅ añade 'cv' si también subes CV desde settings
+    const { kind: rawKind } = await ctx.params;
+    const kind = (rawKind || "").toLowerCase();
     if (!["avatar", "cover", "cv"].includes(kind)) {
       return NextResponse.json({ error: "kind inválido" }, { status: 400 });
     }
 
-    // 1) Resuelve userId de forma robusta
-    const userId = await getUserIdFromSession(req);
-    if (!userId) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    const { jwt, payload, source } = pickBestJwt(req);
+    if (!jwt) {
+      return NextResponse.json({ error: "No autenticado (sin token)" }, { status: 401 });
     }
 
-    // 2) Toma el form-data del cliente
+    const userId = payload?.sub ?? payload?.user_id ?? null;
+    if (!userId) {
+      return NextResponse.json({ error: "No se pudo extraer userId del token" }, { status: 401 });
+    }
+
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {
@@ -70,18 +65,14 @@ export async function POST(
     const fd = new FormData();
     fd.append("file", file, file.name);
 
-    // 3) Reenvía al microservicio, inyectando headers requeridos
-    const cookie = req.headers.get("cookie") ?? "";
-    const authz = req.headers.get("authorization") ?? "";
     const upstream = await fetch(`${UPLOADS_BASE}/uploads/self/${kind}`, {
       method: "POST",
       headers: {
+        // IMPORTANTES: estos son los que exige tu servicio NestJS
         "x-user-id": String(userId),
         "x-internal-gateway": "next-proxy",
-        // reenviamos credenciales si el MS las usa para algo adicional
-        cookie,
-        authorization: authz,
-        // ⚠️ NO fuerces content-type, deja que el fetch lo ponga con boundary.
+        // opcional, útil para debug: de dónde salió el token
+        "x-auth-source": source ?? "unknown",
       },
       body: fd,
     });
@@ -92,7 +83,7 @@ export async function POST(
       return new NextResponse(JSON.stringify(json), { status: upstream.status });
     } catch {
       return NextResponse.json(
-        { error: "Upstream no JSON", status: upstream.status, sample: text.slice(0, 200) },
+        { error: "Upstream no JSON", sample: text.slice(0, 180) },
         { status: 502 }
       );
     }

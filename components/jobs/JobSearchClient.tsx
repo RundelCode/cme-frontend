@@ -111,9 +111,9 @@ function JobCard({
         <div className={styles.companyRow}>
           <div className={styles.companyAvatar}>
             {logo ? (
-              <Image src={logo} alt={name} width={90} height={90} />
+              <Image src={logo} alt={name} className={styles.avatar} width={90} height={90} />
             ) : (
-              <Image src={PlaceholderCompany} alt={name} width={90} height={90} />
+              <Image src={PlaceholderCompany} className={styles.avatar} alt={name} width={90} height={90} />
             )}
           </div>
           <div className={styles.companyMeta}>

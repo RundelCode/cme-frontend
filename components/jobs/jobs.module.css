@@ -72,6 +72,7 @@
 
 .coverImg {
   object-fit: cover;
+  aspect-ratio: 1/1;
 }
 
 .body {
@@ -102,7 +103,11 @@
   box-shadow: 0 0 0 1px #e5e7eb;
   margin-top: -85px;
   z-index: 10;
-  object-fit: contain;
+}
+
+.avatar {
+  object-fit: cover;
+
 }
 
 .companyMeta {
@@ -279,6 +284,6 @@
   }
 }
 
-.modalClose{
+.modalClose {
   display: none;
 }
