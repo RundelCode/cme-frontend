@@ -246,28 +246,13 @@ export default function Client() {
     const canNext = offset + limit < total;
 
     /* ----- Modal handlers ----- */
-    async function openReferralsModal(job: JobItem) {
+    function openReferralsModal(job: JobItem) {
         setModalJob(job);
         setModalOpen(true);
-        setModalLoading(true);
         setModalError(null);
         setModalRefs([]);
         setModalPage(1);
         setExpandedReferralId(null);
-
-        try {
-            const resp = await gql<{ jobOffer: { id: string; title: string } | null; referrals: ReferralRow[] }>(
-                JOB_REFERRALS,
-                { jobId: job.id, limit: MODAL_LIMIT, offset: 0 }
-            );
-            // Filtrar las 'submitted'
-            const filtered = (resp?.referrals ?? []).filter(r => (r.status ?? '').toLowerCase() !== 'submitted');
-            setModalRefs(filtered);
-        } catch (e: any) {
-            setModalError(e?.message || 'No se pudieron cargar los referidos');
-        } finally {
-            setModalLoading(false);
-        }
     }
 
     function closeReferralsModal() {
@@ -279,27 +264,62 @@ export default function Client() {
         setExpandedReferralId(null);
     }
 
-    async function modalGoToPage(p: number) {
+    function modalGoToPage(p: number) {
         if (!modalJob) return;
-        const newOffset = (p - 1) * MODAL_LIMIT;
-        setModalLoading(true);
-        setModalError(null);
         setExpandedReferralId(null);
-
-        try {
-            const resp = await gql<{ referrals: ReferralRow[] }>(
-                JOB_REFERRALS,
-                { jobId: modalJob.id, limit: MODAL_LIMIT, offset: newOffset }
-            );
-            const filtered = (resp?.referrals ?? []).filter(r => (r.status ?? '').toLowerCase() !== 'submitted');
-            setModalRefs(filtered);
-            setModalPage(p);
-        } catch (e: any) {
-            setModalError(e?.message || 'No se pudieron cargar los referidos');
-        } finally {
-            setModalLoading(false);
-        }
+        setModalPage(p);
     }
+
+    /* ====== Cargar referidos cuando cambie el job/página ====== */
+    useEffect(() => {
+        if (!modalOpen || !modalJob?.id) return;
+
+        let alive = true;
+        const currentJobId = modalJob.id;
+        const newOffset = (modalPage - 1) * MODAL_LIMIT;
+
+        (async () => {
+            try {
+                setModalLoading(true);
+                setModalError(null);
+
+                const resp = await gql<{ referrals: ReferralRow[] }>(
+                    JOB_REFERRALS,
+                    { jobId: currentJobId, limit: MODAL_LIMIT, offset: newOffset }
+                );
+
+                if (!alive) return;
+
+                // 1) Filtra estados 'submitted'
+                let list = (resp?.referrals ?? []).filter(
+                    r => (r.status ?? '').toLowerCase() !== 'submitted'
+                );
+
+                // 2) Protección extra: si el backend no filtra por job, filtramos aquí
+                list = list.filter(r => (r.job_offer_id ?? '') === currentJobId);
+
+                // 3) Evita pisadas si cambió el job mientras llegaba la respuesta
+                if (currentJobId !== modalJob.id) return;
+
+                setModalRefs(list);
+
+                // (Opcional) Aviso si el backend no filtró
+                if ((resp?.referrals?.length ?? 0) > 0 && list.length === 0) {
+                    console.warn(
+                        '[JOB_REFERRALS] El backend devolvió referidos que no pertenecen a este job.',
+                        { requested: currentJobId, sample: resp?.referrals?.[0]?.job_offer_id }
+                    );
+                }
+            } catch (e: any) {
+                if (!alive) return;
+                setModalError(e?.message || 'No se pudieron cargar los referidos');
+            } finally {
+                if (alive) setModalLoading(false);
+            }
+        })();
+
+        return () => { alive = false; };
+    }, [modalOpen, modalJob?.id, modalPage]);
 
     /* ====== Helpers de flujo ====== */
     function linearIndex(status?: string | null) {
@@ -334,7 +354,7 @@ export default function Client() {
                     </p>
                 </div>
                 <div className={styles.headerActions}>
-                    <Link className={styles.primaryBtn} href="/company/jobs/new">+ Nueva oferta</Link>
+                    <Link className={styles.primaryBtn} href="/jobs/new">+ Nueva oferta</Link>
                 </div>
             </header>
 

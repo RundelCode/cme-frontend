@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 
 const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graphql";
 
-// --- GQL helper ---
 async function gql<T>(q: string, variables?: any) {
   const res = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
@@ -49,7 +48,6 @@ async function uploadSelf(kind: UploadKind, file: File) {
   return json as { url: string; bucket: string; path: string };
 }
 
-// --- Tipado del payload ---
 type CreateCompanyPayload = {
   name: string;
   email: string;
@@ -61,9 +59,9 @@ type CreateCompanyPayload = {
   companyRating?: number;
   boolVerified?: boolean;
   verifiedAt?: string | null;
-  profilePicture?: string | null; // logo
-  coverPhoto?: string | null;     // portada
-  adminId?: string;               // 👈 NUEVO
+  profilePicture?: string | null;
+  coverPhoto?: string | null;  
+  adminId?: string;            
 };
 
 export default function Client() {
@@ -71,7 +69,7 @@ export default function Client() {
 
   // --- Gate de rol + userId ---
   const [role, setRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null); // 👈 NEW
+  const [userId, setUserId] = useState<string | null>(null);
   const [authErr, setAuthErr] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -97,7 +95,6 @@ export default function Client() {
 
   const isCompanyAdmin = useMemo(() => (role ?? "").toLowerCase() === "company_admin", [role]);
 
-  // --- Form state ---
   const [form, setForm] = useState<CreateCompanyPayload>({
     name: "",
     email: "",
@@ -113,7 +110,6 @@ export default function Client() {
     coverPhoto: null,
   });
 
-  // --- Uploads (logo/cover) ---
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const logoPreview = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : undefined), [logoFile]);
@@ -166,20 +162,18 @@ export default function Client() {
 
     setLoading(true);
     try {
-      // 1) Subir primero portada y logo usando las rutas de usuario
       let coverUrl: string | undefined;
       let logoUrl: string | undefined;
 
       if (coverFile) {
-        const up = await uploadSelf("cover", coverFile); // /api/uploads/self/cover
+        const up = await uploadSelf("cover", coverFile);
         coverUrl = up.url;
       }
       if (logoFile) {
-        const up = await uploadSelf("avatar", logoFile); // /api/uploads/self/avatar
+        const up = await uploadSelf("avatar", logoFile);
         logoUrl = up.url;
       }
 
-      // 2) Construir payload final para crear empresa (👈 con adminId)
       const payload: CreateCompanyPayload = {
         name: form.name.trim(),
         email: form.email.trim(),
@@ -193,10 +187,9 @@ export default function Client() {
         verifiedAt: undefined,
         profilePicture: logoUrl ?? undefined,
         coverPhoto: coverUrl ?? undefined,
-        adminId: userId, // 👈 AQUÍ VA EL ID DEL ADMIN
+        adminId: userId,
       };
 
-      // 3) Crear la empresa
       const res = await fetch("/api/company/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -216,8 +209,6 @@ export default function Client() {
 
   function handleModalAccept() {
     setShowModal(false);
-    // Redirige al perfil de la empresa si quieres:
-    // if (created?.id) router.push(`/profile/company?id=${created.id}`);
     router.push("/");
   }
 
@@ -235,11 +226,9 @@ export default function Client() {
           ) : null}
 
           <form onSubmit={handleSubmit} className={styles.formGrid} aria-disabled={!isCompanyAdmin}>
-            {/* Portada + upload real */}
             <div className={styles.coverBlock}>
               <div className={styles.cover} aria-hidden="true">
                 {coverPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={coverPreview} alt="Cover preview" className={styles.coverImg} />
                 ) : (
                   <span className={styles.coverText}>Imagen de portada</span>
@@ -255,11 +244,9 @@ export default function Client() {
               />
             </div>
 
-            {/* Logo + upload real */}
             <div className={styles.logoRow}>
               <div className={styles.logoWrapper}>
                 {logoPreview ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={logoPreview} alt="Logo preview" className={styles.logoPreview} />
                 ) : (
                   <div className={styles.logoPlaceholder} />
@@ -279,7 +266,6 @@ export default function Client() {
               </div>
             </div>
 
-            {/* Campos */}
             <div className={styles.formField}>
               <label className={styles.label}>Nombre *</label>
               <input
@@ -395,7 +381,6 @@ export default function Client() {
         </div>
       </div>
 
-      {/* Modal de éxito */}
       {showModal && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
           <div className={styles.modalCard}>

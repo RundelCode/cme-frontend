@@ -4,6 +4,7 @@ const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graph
 import styles from "./updateProfile.module.css";
 import { PropagateLoader } from "react-spinners";
 
+/* ========== GraphQL helper ========== */
 async function gql<T>(q: string, variables?: any) {
   const res = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
@@ -19,9 +20,9 @@ async function gql<T>(q: string, variables?: any) {
   return json.data as T;
 }
 
+/* ========== Queries ========== */
 const AUTH_ME = `query { authMe { id email role } }`;
 
-// ✅ Pide subcampos para experience y education
 const MY_PROFILE = `
   query {
     myProfile {
@@ -35,26 +36,13 @@ const MY_PROFILE = `
       role
       phone
       about_me
-      experience {
-        role
-        company
-        start
-        end
-        description
-      }
-      education {
-        degree
-        institution
-        start
-        end
-        description
-      }
+      experience { role company start end description }
+      education { degree institution start end description }
       cv_url
     }
   }
 `;
 
-// ✅ También aquí devuelve subcampos
 const UPDATE_MY_PROFILE = `
   mutation UpdateMyProfile($input: UpdateMyProfileInput!) {
     updateMyProfile(input: $input) {
@@ -68,26 +56,14 @@ const UPDATE_MY_PROFILE = `
       role
       phone
       about_me
-      experience {
-        role
-        company
-        start
-        end
-        description
-      }
-      education {
-        degree
-        institution
-        start
-        end
-        description
-      }
+      experience { role company start end description }
+      education { degree institution start end description }
       cv_url
     }
   }
 `;
 
-// ---- Tipos ligeros para experiencia/educación ----
+/* ========== Tipos ligeros ========== */
 export type ExperienceItem = {
   role?: string;
   company?: string;
@@ -95,6 +71,7 @@ export type ExperienceItem = {
   end?: string;   // YYYY-MM o "present"
   description?: string;
 };
+
 export type EducationItem = {
   degree?: string;
   institution?: string;
@@ -105,6 +82,7 @@ export type EducationItem = {
 
 type UploadKind = "avatar" | "cover" | "cv";
 
+/* ========== Upload helper (usa proxy Next) ========== */
 async function uploadOneShot(kind: UploadKind, file: File) {
   const fd = new FormData();
   fd.append("file", file, file.name);
@@ -126,11 +104,20 @@ async function uploadOneShot(kind: UploadKind, file: File) {
   return json as { url: string; bucket: string; path: string };
 }
 
+/* ========== Utils ========== */
+function extractUserIdFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  const m = url.match(/\/users\/([0-9a-f-]{36})\//i);
+  return m ? m[1] : null;
+}
+
 export default function UpdateProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+
+  const [meId, setMeId] = useState<string | null>(null);
 
   const [fullName, setFullName] = useState("");
   const [occupation, setOccupation] = useState("");
@@ -138,7 +125,7 @@ export default function UpdateProfile() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
-  // ---- nuevos campos ----
+  // Nuevos campos
   const [phone, setPhone] = useState("");
   const [aboutMe, setAboutMe] = useState("");
   const [cvUrl, setCvUrl] = useState<string | null>(null);
@@ -150,20 +137,29 @@ export default function UpdateProfile() {
   const [cvFile, setCvFile] = useState<File | null>(null);
 
   // Previews
-  const avatarPreview = useMemo(() => (avatarFile ? URL.createObjectURL(avatarFile) : avatarUrl || undefined), [avatarFile, avatarUrl]);
-  const coverPreview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : coverUrl || undefined), [coverFile, coverUrl]);
+  const avatarPreview = useMemo(
+    () => (avatarFile ? URL.createObjectURL(avatarFile) : avatarUrl || undefined),
+    [avatarFile, avatarUrl]
+  );
+  const coverPreview = useMemo(
+    () => (coverFile ? URL.createObjectURL(coverFile) : coverUrl || undefined),
+    [coverFile, coverUrl]
+  );
 
+  /* ========== Carga inicial ========== */
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         setErr(null);
-        const auth = await gql<{ authMe: { id: string } }>(AUTH_ME);
-        if (!auth?.authMe?.id) throw new Error("No autenticado");
+
+        const auth = await gql<{ authMe: { id: string } | null }>(AUTH_ME);
+        const userId = auth?.authMe?.id ?? null;
+        if (!userId) throw new Error("No autenticado");
+        setMeId(userId);
 
         const me = await gql<{ myProfile: any }>(MY_PROFILE);
         const p = me?.myProfile;
-        console.log("🟦 CARGA myProfile:", p);
 
         setFullName(p?.full_name ?? "");
         setOccupation(p?.occupation ?? "");
@@ -184,22 +180,30 @@ export default function UpdateProfile() {
       }
     })();
 
+    // Limpieza de URLs blob
     return () => {
       try {
         if (avatarPreview?.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
         if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
       } catch { }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // no dependas de previews para evitar recargas
 
-  const addExp = () => setExperience((xs) => [...xs, { role: "", company: "", start: "", end: "", description: "" }]);
+  /* ========== Helpers para listas ========== */
+  const addExp = () =>
+    setExperience((xs) => [...xs, { role: "", company: "", start: "", end: "", description: "" }]);
   const delExp = (i: number) => setExperience((xs) => xs.filter((_, j) => j !== i));
-  const updExp = (i: number, patch: Partial<ExperienceItem>) => setExperience((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const updExp = (i: number, patch: Partial<ExperienceItem>) =>
+    setExperience((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
-  const addEdu = () => setEducation((xs) => [...xs, { degree: "", institution: "", start: "", end: "", description: "" }]);
+  const addEdu = () =>
+    setEducation((xs) => [...xs, { degree: "", institution: "", start: "", end: "", description: "" }]);
   const delEdu = (i: number) => setEducation((xs) => xs.filter((_, j) => j !== i));
-  const updEdu = (i: number, patch: Partial<EducationItem>) => setEducation((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const updEdu = (i: number, patch: Partial<EducationItem>) =>
+    setEducation((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
 
+  /* ========== Submit ========== */
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -207,10 +211,12 @@ export default function UpdateProfile() {
     setOk(null);
 
     try {
+      if (!meId) throw new Error("No autenticado");
+
       // 1) Subidas
-      let newCoverUrl = coverUrl;
-      let newAvatarUrl = avatarUrl;
-      let newCvUrl = cvUrl;
+      let newCoverUrl: string | null = coverUrl;
+      let newAvatarUrl: string | null = avatarUrl;
+      let newCvUrl: string | null = cvUrl;
 
       if (coverFile) {
         const up = await uploadOneShot("cover", coverFile);
@@ -229,12 +235,30 @@ export default function UpdateProfile() {
         newCvUrl = up.url;
       }
 
-      // 2) Construir input (si quieres “limpiar”, envía [] en lugar de undefined)
+      // 2) Sanea URLs: si apuntan a /users/{uuid}/..., {uuid} debe ser el mío
+      const avOwner = extractUserIdFromUrl(newAvatarUrl);
+      const cvOwner = extractUserIdFromUrl(newCvUrl);
+      const coOwner = extractUserIdFromUrl(newCoverUrl);
+
+      if (avOwner && avOwner !== meId) {
+        console.warn("⚠️ profilePicture pertenece a otro usuario. Se ignora en el PATCH.");
+        newAvatarUrl = null; // <- usar null, no undefined
+      }
+      if (coOwner && coOwner !== meId) {
+        console.warn("⚠️ coverPhoto pertenece a otro usuario. Se ignora en el PATCH.");
+        newCoverUrl = null; // <- usar null, no undefined
+      }
+      if (cvOwner && cvOwner !== meId) {
+        console.warn("⚠️ cvUrl pertenece a otro usuario. Se ignora en el PATCH.");
+        newCvUrl = null; // <- usar null, no undefined
+      }
+
+      // 3) Construye input para PATCH
       const input: any = {
         fullName: fullName || undefined,
         occupation: occupation || undefined,
         skills: skillsStr ? skillsStr.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
-        profilePicture: newAvatarUrl || undefined,
+        profilePicture: newAvatarUrl || undefined, // null -> undefined (no enviar)
         coverPhoto: newCoverUrl || undefined,
         phone: phone || undefined,
         aboutMe: aboutMe || undefined,
@@ -248,7 +272,7 @@ export default function UpdateProfile() {
       const resp = await gql<{ updateMyProfile: any }>(UPDATE_MY_PROFILE, { input });
       console.log("🟩 PATCH updateMyProfile resp:", resp?.updateMyProfile);
 
-      // 3) Sync estado local
+      // 4) Sync estado local
       setAvatarUrl(newAvatarUrl ?? null);
       setCoverUrl(newCoverUrl ?? null);
       setCvUrl(newCvUrl ?? null);
@@ -264,6 +288,7 @@ export default function UpdateProfile() {
     }
   };
 
+  /* ========== Render ========== */
   if (loading) return <div className={styles.loading}><PropagateLoader /></div> as any;
   if (err && !saving) return <div className={styles.error}>{err}</div> as any;
 
@@ -285,7 +310,12 @@ export default function UpdateProfile() {
           )}
           <label className={styles.coverBtn}>
             Cambiar portada
-            <input type="file" accept="image/*" className={styles.file} onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)} />
+            <input
+              type="file"
+              accept="image/*"
+              className={styles.file}
+              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+            />
           </label>
         </div>
 
@@ -301,7 +331,12 @@ export default function UpdateProfile() {
           </div>
           <label className={styles.avatarBtn}>
             Cambiar avatar
-            <input type="file" accept="image/*" className={styles.file} onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)} />
+            <input
+              type="file"
+              accept="image/*"
+              className={styles.file}
+              onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
+            />
           </label>
           <span className={styles.hint}>PNG/JPG recomendado 512x512+</span>
         </div>
@@ -310,27 +345,53 @@ export default function UpdateProfile() {
         <div className={styles.grid}>
           <div className={styles.field}>
             <label className={styles.label}>Nombre completo</label>
-            <input className={styles.input} value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Tu nombre" />
+            <input
+              className={styles.input}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Tu nombre"
+            />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Ocupación</label>
-            <input className={styles.input} value={occupation} onChange={(e) => setOccupation(e.target.value)} placeholder="Software Engineer" />
+            <input
+              className={styles.input}
+              value={occupation}
+              onChange={(e) => setOccupation(e.target.value)}
+              placeholder="Software Engineer"
+            />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Teléfono</label>
-            <input className={styles.input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+57 300 000 0000" />
+            <input
+              className={styles.input}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+57 300 000 0000"
+            />
           </div>
 
           <div className={styles.fieldWide}>
             <label className={styles.label}>Skills (separadas por coma)</label>
-            <input className={styles.input} value={skillsStr} onChange={(e) => setSkillsStr(e.target.value)} placeholder="React, NestJS, PostgreSQL" />
+            <input
+              className={styles.input}
+              value={skillsStr}
+              onChange={(e) => setSkillsStr(e.target.value)}
+              placeholder="React, NestJS, PostgreSQL"
+            />
           </div>
 
           <div className={styles.fieldWide}>
             <label className={styles.label}>Sobre mí</label>
-            <textarea className={styles.textarea} rows={4} value={aboutMe} onChange={(e) => setAboutMe(e.target.value)} placeholder="Resumen breve de tu perfil" />
+            <textarea
+              className={styles.textarea}
+              rows={4}
+              value={aboutMe}
+              onChange={(e) => setAboutMe(e.target.value)}
+              placeholder="Resumen breve de tu perfil"
+            />
           </div>
         </div>
 
