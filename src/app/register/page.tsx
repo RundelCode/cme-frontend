@@ -30,8 +30,6 @@ export default function Register() {
 
   const router = useRouter();
 
-  const handleGoogle = () => console.log('TODO: register con Google');
-  const handleFacebook = () => console.log('TODO: register con Facebook');
   const handleRegisterLink = (e: React.MouseEvent<HTMLAnchorElement>) => { e.preventDefault(); router.push("/login") };
 
   const phone = useMemo(() => {
@@ -114,21 +112,6 @@ export default function Register() {
         <div className={styles.registerFormContainer}>
           <Image className={styles.cmeLogo} src={CMELOGO} alt="Mi logo" width={250} height={250} priority />
           <h2 className={styles.subtitle}>Regístrate</h2>
-
-          <form onSubmit={(e) => e.preventDefault()} className={styles.registerForm}>
-            <button type="button" className={styles.socialMediaregisterButtion} onClick={handleGoogle}>
-              <Image className={styles.cmeLogo} src={Google} alt="GoogleIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
-              Continua con Google
-            </button>
-            <button type="button" className={styles.socialMediaregisterButtion} onClick={handleFacebook}>
-              <Image className={styles.cmeLogo} src={Facebook} alt="FacebookIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
-              Continua con Facebook
-            </button>
-          </form>
-
-          <div className={styles.divider}>
-            <div className={styles.line}></div><p>o</p><div className={styles.line}></div>
-          </div>
 
           <form onSubmit={handleregisterSubmit} className={styles.registerForm}>
             {formError && <div className={styles.formError} role="alert" aria-live="polite">{formError}</div>}

@@ -113,11 +113,6 @@ export default function Login() {
                             <Image className={styles.cmeLogo} src={Google} alt="GoogleIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
                             Continua con Google
                         </button>
-
-                        <button type="button" className={styles.socialMediaLoginButtion} onClick={handleFacebook}>
-                            <Image className={styles.cmeLogo} src={Facebook} alt="FacebookIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
-                            Continua con Facebook
-                        </button>
                     </form>
 
                     <div className={styles.divider}>

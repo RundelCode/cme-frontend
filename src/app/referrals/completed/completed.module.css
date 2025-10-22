@@ -6,9 +6,8 @@
 
 .main {
   margin-left: var(--nav-w, 18%);
-  min-height: 100dvh;
+  min-height: calc(100% - 32px);
   padding: 36px 16px 60px;
-
   display: flex;
   flex-direction: column;
   align-items: center;     /* Centro el bloque, el contenido interno va left */
@@ -38,6 +37,7 @@
   place-items: center;
   padding: 40px;
   color: #475467;
+  min-height: 55vh;
 }
 
 .error {
