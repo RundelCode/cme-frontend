@@ -315,7 +315,7 @@ export default async function Navbar() {
 
                 <div className={styles.category}>
                   <p className={styles.navTitle}>Reclutadores</p>
-                  <Link href="#" className={styles.option}>
+                  <Link href="/referrals/active" className={styles.option}>
                     <Image
                       className={styles.navIcon}
                       src={ReferralIcon}
@@ -325,17 +325,6 @@ export default async function Navbar() {
                       priority
                     />
                     Mis Referidos
-                  </Link>
-                  <Link href="#" className={styles.option}>
-                    <Image
-                      className={styles.navIcon}
-                      src={ReferralIcon}
-                      alt="TopRecruiters"
-                      width={320}
-                      height={320}
-                      priority
-                    />
-                    Mejores Reclutadores
                   </Link>
                 </div>
                 <div className={styles.category}>
@@ -358,7 +347,7 @@ export default async function Navbar() {
 
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>
-              <Link href="#" className={styles.option}>
+              <Link href="/notifications" className={styles.option}>
                 <Image
                   className={styles.navIcon}
                   src={NotificationsIcon}

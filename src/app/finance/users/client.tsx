@@ -156,7 +156,7 @@ export default function FinanceUsersPage() {
             ) : err ? (
                 <div className={styles.error}>Error: {err}</div>
             ) : !hasItems ? (
-                <div className={styles.empty}>Aún no tienes pagos como usuario.</div>
+                <div className={styles.empty}>Aún no tienes pagos registrados.</div>
             ) : (
                 <div className={styles.tableWrap}>
                     <table className={styles.table}>

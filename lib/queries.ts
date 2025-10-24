@@ -179,28 +179,15 @@ export const SEARCH_PROFILES_MIN = `
   }
 `;
 
-export const CREATE_REFERRAL = `
-  mutation CreateReferral(
-    $headhunterId: ID!,
-    $jobOfferId: ID!,
-    $candidateId: ID,
-    $status: String,
-    $referralCode: String
-  ) {
+export const CREATE_REFERRAL = /* GraphQL */ `
+  mutation CreateReferral($headhunterId: ID!, $jobOfferId: ID!, $candidateId: ID) {
     createReferral(
-      headhunterId: $headhunterId,
-      jobOfferId: $jobOfferId,
-      candidateId: $candidateId,
-      status: $status,
-      referralCode: $referralCode
+      headhunterId: $headhunterId
+      jobOfferId: $jobOfferId
+      candidateId: $candidateId
     ) {
       id
       referral_code
-      status
-      created_at
-      headhunter_id
-      candidate_id
-      job_offer_id
     }
   }
 `;

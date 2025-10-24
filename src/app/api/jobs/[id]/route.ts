@@ -20,9 +20,14 @@ type Job = {
   status: string;
 };
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  _req: Request,
+  ctx: { params: Promise<{ id: string }> }
+) {
   try {
-    const data = await gqlServer<{ jobOffer: Job }>(JOB_BY_ID, { id: params.id });
+    const { id } = await ctx.params;
+
+    const data = await gqlServer<{ jobOffer: Job }>(JOB_BY_ID, { id });
     const job = data?.jobOffer ?? null;
 
     let company: Company | null = null;
@@ -30,8 +35,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       company = await getCompanyServer(job.company_id).catch(() => null);
     }
 
-    return NextResponse.json({ job, company });
-  } catch (e) {
-    return NextResponse.json({ job: null, company: null }, { status: 500 });
+
+    return NextResponse.json({ job, company }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { job: null, company: null, error: e?.message || "job_fetch_error" },
+      { status: 500 }
+    );
   }
 }

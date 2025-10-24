@@ -151,6 +151,54 @@ function humanReferralStatus(s?: string | null) {
     return s ? (map[s] ?? s) : '—';
 }
 
+/* 📩 Crear notificación para candidato (best-effort) */
+async function createNotificationForCandidate({
+    candidateId,
+    jobTitle,
+    newStatus,
+    jobId
+}: {
+    candidateId: string;
+    jobTitle: string;
+    newStatus: string;
+    jobId?: string;
+}) {
+    // Valida UUID rápido (evita 400 del backend)
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(candidateId)) {
+        console.warn('[notif] invalid candidateId, skipping', candidateId);
+        return;
+    }
+
+    const rawTitle = `Actualización en tu proceso para "${jobTitle}"`;
+    const rawMessage = `El estado de tu referencia ha cambiado a: ${humanReferralStatus(newStatus)}.`;
+    const body = {
+        userId: candidateId,
+        title: rawTitle.slice(0, 180),
+        message: rawMessage.slice(0, 5000),
+        notificationType: 'recommendation',
+        channel: 'system',
+        relatedId: jobId ?? undefined,
+    };
+
+    try {
+        const res = await fetch('/api/notifications', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const txt = await res.text();
+        let json: any; try { json = txt ? JSON.parse(txt) : null; } catch { json = txt; }
+        if (!res.ok) {
+            console.warn('[notif] create failed', res.status, json);
+        } else {
+            console.log('[notif] created', json);
+        }
+    } catch (e) {
+        console.warn('[notif] create error', e);
+    }
+}
+
 export default function Client() {
     const [auth, setAuth] = useState<AuthMe | null>(null);
     const [company, setCompany] = useState<Company | null>(null);
@@ -303,7 +351,6 @@ export default function Client() {
 
                 setModalRefs(list);
 
-                // (Opcional) Aviso si el backend no filtró
                 if ((resp?.referrals?.length ?? 0) > 0 && list.length === 0) {
                     console.warn(
                         '[JOB_REFERRALS] El backend devolvió referidos que no pertenecen a este job.',
@@ -337,6 +384,17 @@ export default function Client() {
             // Optimistic update
             setModalRefs(prev => prev.map(r => r.id === referralId ? { ...r, status: newStatus } : r));
             await gql(UPDATE_REFERRAL_STATUS, { id: referralId, status: newStatus });
+
+            // Crear notificación al candidato (best-effort, sin romper flujo)
+            const ref = modalRefs.find(r => r.id === referralId);
+            if (ref?.candidate_id && modalJob?.title) {
+                await createNotificationForCandidate({
+                    candidateId: ref.candidate_id,
+                    jobTitle: modalJob.title,
+                    newStatus,
+                    jobId: modalJob.id
+                });
+            }
         } catch (e: any) {
             setModalError(e?.message || 'No se pudo actualizar el estado');
         } finally {

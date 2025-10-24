@@ -1,0 +1,99 @@
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+
+const REFERRALS_BASE =
+    process.env.REFERRALS_BASE_URL ??
+    process.env.API_GATEWAY_URL ??
+    "http://localhost:3007"; // ajusta al servicio que expose /referrals
+
+const PROFILES_BASE = process.env.PROFILES_BASE_URL ?? "http://localhost:3001";
+
+function buildAuthHeader(req: NextRequest): string | undefined {
+    const fromHeader = req.headers.get("authorization");
+    if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+
+    const token = req.cookies.get("access_token")?.value;
+    if (token && token.trim() !== "") return `Bearer ${token}`;
+
+    const cookieHeader = req.headers.get("cookie") ?? "";
+    const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+    if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+    return undefined;
+}
+
+async function fetchJson(url: string, init: RequestInit) {
+    const res = await fetch(url, init);
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const msg = data?.message || data?.error || `upstream_error (${res.status})`;
+        throw new Error(msg);
+    }
+    return data;
+}
+
+/**
+ * GET /api/referrals?from=ISO&to=ISO
+ * - Obtiene el userId con /profiles/me
+ * - Llama al servicio de referrals con headhunterId=<userId>
+ */
+export async function GET(req: NextRequest) {
+    try {
+        const url = new URL(req.url);
+        const from = url.searchParams.get("from");
+        const to = url.searchParams.get("to");
+
+        const authorization = buildAuthHeader(req);
+        const cookie = req.headers.get("cookie") ?? "";
+
+        // 1) Identidad
+        const me = await fetchJson(`${PROFILES_BASE}/profiles/me`, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                ...(authorization ? { authorization } : {}),
+                cookie,
+            },
+            cache: "no-store",
+        });
+
+        const userId: string | undefined = me?.id;
+        if (!userId) {
+            return NextResponse.json(
+                { total: 0, items: [], error: "No autenticado (sin userId)" },
+                { status: 401 }
+            );
+        }
+
+        // 2) Referencias del usuario
+        const qs = new URLSearchParams();
+        qs.set("headhunterId", userId);
+        if (from) qs.set("from", from);
+        if (to) qs.set("to", to);
+        // sin límite: ver todas
+        qs.set("all", "true");
+
+        const target = `${REFERRALS_BASE}/referrals?${qs.toString()}`;
+        const referrals = await fetchJson(target, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                ...(authorization ? { authorization } : {}),
+                cookie,
+            },
+            cache: "no-store",
+        });
+
+        return NextResponse.json(referrals);
+    } catch (e: any) {
+        const msg = e?.message || "referrals_proxy_error";
+        const isAuth = /unauthorized|forbidden|token|auth/i.test(msg);
+        return NextResponse.json(
+            { total: 0, items: [], error: msg },
+            { status: isAuth ? 401 : 500 }
+        );
+    }
+}
+
+export async function OPTIONS() {
+    return NextResponse.json({}, { status: 200 });
+}

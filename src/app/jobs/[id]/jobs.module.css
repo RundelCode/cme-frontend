@@ -200,7 +200,7 @@
   place-items: center;
   padding: 40px;
   color: #152148;
-  min-height: 160px;
+  min-height: 80vh;
 }
 
 .error {

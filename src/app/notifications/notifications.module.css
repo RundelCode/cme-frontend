@@ -1,0 +1,644 @@
+/* ========== Page shell ========== */
+.page {
+    width: 100%;
+    min-height: 100dvh;
+}
+
+.main {
+    margin-left: var(--nav-w, 18%);
+    min-height: calc(100% - 16px);
+    padding: 36px 16px 60px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.pageHeader {
+    text-align: center;
+    width: 100%;
+}
+
+.title {
+    font-size: 26px;
+    font-weight: 800;
+    margin: 0;
+    color: #101828;
+}
+
+.subtitle {
+    margin: 4px 0 0;
+    color: #475467;
+}
+
+/* ========== States ========== */
+.loading {
+    display: grid;
+    place-items: center;
+    padding: 40px;
+    color: #475467;
+    min-height: 55vh;
+}
+
+.error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+    padding: 10px 12px;
+    border-radius: 10px;
+}
+
+.empty {
+    background: #f8fafc;
+    border: 1px dashed #e5e7eb;
+    color: #64748b;
+    padding: 16px;
+    border-radius: 12px;
+}
+
+/* ========== Sections ========== */
+.section {
+    width: min(820px, 95vw);
+    display: grid;
+    gap: 14px;
+}
+
+.sectionTitle {
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0;
+    color: #0f172a;
+    text-align: left;
+}
+
+.list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: stretch;
+    flex-wrap: wrap;
+    flex-direction: row;
+    gap: 14px;
+}
+
+.card {
+    width: calc(45% - 20px);
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 10px 30px rgba(16, 24, 40, .08);
+    border: 1px solid #e5e7eb;
+    gap: 14px;
+    position: relative;
+}
+
+/* estado “unread” eleva el contraste */
+.cardUnread {
+    border-color: #c7d2fe;
+    box-shadow: 0 10px 30px rgba(55, 48, 163, .12);
+}
+
+/* Punto indicador unread */
+.unreadDot {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: #152148;
+    box-shadow: 0 0 0 2px #eef2ff;
+}
+
+/* ========== Media (avatar / icono) ========== */
+.media {
+    width: 56px;
+    height: 56px;
+}
+
+.iconCircle {
+    width: 56px;
+    height: 56px;
+    border-radius: 9999px;
+    display: grid;
+    place-items: center;
+    background: #eef2ff;
+    color: #3730a3;
+    font-weight: 800;
+    box-shadow: 0 0 0 1px #e5e7eb inset;
+    font-size: 20px;
+}
+
+/* ========== Content ========== */
+.content {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.rowTop {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.leftBlock {
+    display: grid;
+    gap: 4px;
+    height: 100%;
+    width: 100%;
+}
+
+.nTitle {
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.nMessage {
+    color: #475467;
+    line-height: 1.35;
+}
+
+.metaRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.metaItem {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.metaKey {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.metaValue {
+    font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+    font-size: 12px;
+}
+
+.rowBottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.date {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.link {
+    color: #1f3bb3;
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.link:hover {
+    text-decoration: underline;
+}
+
+/* ========== Pills genéricas ========== */
+.pill {
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid transparent;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+/* ========== Status pills (queued | sent | failed) ========== */
+.pillQueued {
+    background: #fef9c3;
+    color: #92400e;
+    border-color: #fde68a;
+}
+
+.pillSent {
+    background: #e6f4ea;
+    color: #137333;
+    border-color: #b7e1c1;
+}
+
+.pillFailed {
+    background: #fee2e2;
+    color: #991b1b;
+    border-color: #fecaca;
+}
+
+/* ========== Type badge (job_offer, recommendation, payment, system_message) ========== */
+.typeBadge {
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 800;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.typeJobOffer {
+    background: #ecfeff;
+    color: #0e7490;
+    border-color: #a5f3fc;
+}
+
+.typeRecommendation {
+    background: #eef2ff;
+    color: #3730a3;
+    border-color: #c7d2fe;
+}
+
+.typePayment {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #bbf7d0;
+}
+
+.typeSystem {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb;
+}
+
+/* ========== Channel badge (email / push / sms / whatsapp, por si expandes) ========== */
+.channelBadge {
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid #e5e7eb;
+    color: #374151;
+    background: #f9fafb;
+}
+
+.channelEmail {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+}
+
+.channelPush {
+    background: #f5f3ff;
+    color: #6d28d9;
+    border-color: #ddd6fe;
+}
+
+.channelSms {
+    background: #ecfeff;
+    color: #0e7490;
+    border-color: #a5f3fc;
+}
+
+.channelWhatsapp {
+    background: #e6f4ea;
+    color: #137333;
+    border-color: #b7e1c1;
+}
+
+/* ========== Actions ========== */
+.actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn {
+    appearance: none;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111827;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: #1B295B;
+}
+
+.btnPrimary {
+    border-color: #1B295B;
+    background: #1B295B;
+    color: #fff;
+}
+
+.btnPrimary:hover {
+    filter: brightness(0.95);
+}
+
+/* ========== Filters / Toolbar ========== */
+.toolbar {
+    width: min(820px, 95vw);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.search {
+    flex: 1 1 280px;
+    position: relative;
+}
+
+.searchInput {
+    width: 100%;
+    height: 36px;
+    padding: 0 36px 0 36px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: #fff;
+    color: #111827;
+    font-size: 14px;
+    outline: none;
+}
+
+.searchInput::placeholder {
+    color: #9ca3af;
+}
+
+.searchIcon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    translate: 0 -50%;
+    font-size: 16px;
+    color: #9ca3af;
+}
+
+.clearBtn {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    translate: 0 -50%;
+    border: 0;
+    background: transparent;
+    color: #9ca3af;
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    border-radius: 8px;
+}
+
+.clearBtn:hover {
+    background: #f3f4f6;
+}
+
+/* ========== Form fields ========== */
+.filters {
+    width: min(820px, 95vw);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+.field {
+    width: 40%;
+    display: grid;
+    gap: 6px;
+}
+
+.label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 700;
+}
+
+.input,
+.select,
+.textarea {
+    width: 100%;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111827;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    transition: box-shadow .15s ease, border-color .15s ease;
+}
+
+.input,
+.select {
+    height: 36px;
+    padding: 0 12px;
+}
+
+.textarea {
+    padding: 10px 12px;
+    min-height: 90px;
+    resize: vertical;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+    border-color: #c7d2fe;
+    box-shadow: 0 0 0 3px #eef2ff;
+}
+
+.input[disabled],
+.select[disabled],
+.textarea[disabled] {
+    background: #f9fafb;
+    color: #9ca3af;
+    cursor: not-allowed;
+}
+
+/* Inline tiny field (ej. límite/página) */
+.fieldInline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.smallInput {
+    width: 84px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+/* Helper / error text */
+.help {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.errorText {
+    font-size: 12px;
+    color: #b91c1c;
+}
+
+/* ========== Icon button (compact) ========== */
+.iconBtn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111827;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+}
+
+.iconBtn:hover {
+    background: #f9fafb;
+}
+
+/* ========== Badges (reutilizables) ========== */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    background: #f9fafb;
+}
+
+/* ========== Pagination ========== */
+.pagination {
+    width: min(820px, 95vw);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.pageGroup {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pageBtn {
+    appearance: none;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+    color: #111827;
+    padding: 6px 10px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.pageBtn:hover {
+    background: #1B295B;
+}
+
+.pageBtn[disabled] {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.pageLabel {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.pageSizeSelect {
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    font-size: 13px;
+}
+
+/* ========== Read toggle (switch simple) ========== */
+.switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+}
+
+.switch input {
+    position: absolute;
+    opacity: 0;
+}
+
+.slider {
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    background: #e5e7eb;
+    transition: background .2s ease;
+}
+
+.slider::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 18px;
+    height: 18px;
+    border-radius: 9999px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .08);
+    transition: transform .2s ease;
+}
+
+.switch input:checked+.slider {
+    background: #1f3bb3;
+}
+
+.switch input:checked+.slider::after {
+    transform: translateX(18px);
+}
+
+/* ========== Responsive tweaks ========== */
+@media (max-width: 720px) {
+    .filters {
+        grid-template-columns: 1fr;
+    }
+
+    .toolbar {
+        width: 100%;
+    }
+}
+
+/* ========== Utilities ========== */
+.hidden {
+    display: none !important;
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+.break {
+    word-break: break-word;
+}
+

@@ -1,0 +1,241 @@
+/* Page shell */
+.page {
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.main {
+  margin-left: var(--nav-w, 18%);
+  min-height: calc(100% - 16px);
+  padding: 36px 16px 60px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;     /* Centro el bloque, el contenido interno va left */
+  gap: 20px;
+}
+
+.pageHeader {
+  text-align: center;      /* Título y subtítulo centrados */
+  width: 100%;
+}
+
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+  color: #101828;
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: #475467;
+}
+
+/* States */
+.loading {
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  color: #475467;
+  min-height: 55vh;
+}
+
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.empty {
+  background: #f8fafc;
+  border: 1px dashed #e5e7eb;
+  color: #64748b;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+/* Sections */
+.section {
+  width: min(820px, 95vw);
+  display: grid;
+  gap: 14px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  color: #0f172a;
+  text-align: left;        /* Título de sección alineado a la izquierda */
+}
+
+/* List / Card */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, .08);
+  border: 1px solid #e5e7eb;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+}
+
+/* Media (avatar/logo) */
+.media {
+  width: 56px;
+  height: 56px;
+}
+
+.avatarImg {
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px #e5e7eb inset;
+  background: #f3f4f6;
+}
+
+.avatarFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: #e5e7eb;
+  color: #334155;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px #e5e7eb inset;
+}
+
+/* Content */
+.content {
+  display: grid;
+  gap: 10px;
+}
+
+.rowTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.companyBlock {
+  display: grid;
+  gap: 2px;
+}
+
+.companyName {
+  font-weight: 800;
+  color: #111827;
+}
+
+.companySub {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.jobBlock {
+  display: grid;
+  gap: 4px;
+}
+
+.jobTitle {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.jobMeta {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.rowBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metaRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.metaLabel {
+  font-size: 12px;
+  color: #6b7280;
+  min-width: 70px;
+}
+
+.mono {
+  font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.link {
+  color: #1f3bb3;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Pills */
+.pill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid transparent;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.pillOk {
+  background: #e6f4ea;
+  color: #137333;
+  border-color: #b7e1c1;
+}
+
+.pillInfo {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
+.pillWarn {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #fecaca;
+}
+
+.pillMuted {
+  background: #f3f4f6;
+  color: #374151;
+  border-color: #e5e7eb;
+}

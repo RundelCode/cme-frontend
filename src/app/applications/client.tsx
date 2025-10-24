@@ -87,7 +87,7 @@ async function gql<T = any>(query: string, variables?: any) {
   });
   const raw = await res.text();
   let data: any;
-  try { data = raw ? JSON.parse(raw) : null; } catch { throw new Error(`GraphQL non-JSON: ${raw?.slice(0,200)}`); }
+  try { data = raw ? JSON.parse(raw) : null; } catch { throw new Error(`GraphQL non-JSON: ${raw?.slice(0, 200)}`); }
   if (!res.ok || data?.errors?.length) {
     const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
     throw new Error(msg);
@@ -119,14 +119,21 @@ export default function Client() {
         const candidateId = me?.authMe?.id;
         if (!candidateId) throw new Error('No autorizado');
 
+        // 1) Traer aplicaciones y referrals en paralelo
         const [appsResp, refsResp] = await Promise.all([
           gql<{ applications: Application[] }>(APPLICATIONS_Q, { candidateId, limit: 50, offset: 0 }),
           gql<{ referralsByCandidate: Referral[] }>(REFERRALS_BY_CANDIDATE, { candidateId, limit: 50, offset: 0 }),
         ]);
 
-        const applications = appsResp.applications ?? [];
+        const applicationsRaw = appsResp.applications ?? [];
         const referrals = refsResp.referralsByCandidate ?? [];
 
+        // ✅ 2) FILTRAR ANTES DE EXPANDIR:
+        //    Si existe una referral para el mismo job_offer_id, NO mostramos la application
+        const referredJobIds = new Set(referrals.map(r => r.job_offer_id));
+        const applications = applicationsRaw.filter(a => !referredJobIds.has(a.job_offer_id));
+
+        // 3) Expandir (pidiendo job y company) SOLO lo que quedó tras el filtro
         const companyCache = new Map<string, CompanyMin | null>();
 
         const appsExpanded: AppItem[] = await Promise.all(
@@ -181,7 +188,7 @@ export default function Client() {
     return () => { alive = false; };
   }, []);
 
-  /** FILTROS solicitados:
+  /** FILTROS extra en UI:
    * - Applications: mostrar solo NO aceptadas (accepted === false)
    * - Referrals: mostrar solo las que NO están en 'hired'
    */
@@ -206,7 +213,7 @@ export default function Client() {
 
         {!loading && !err && (
           <>
-            {/* Intereses (Applications NO aceptadas) */}
+            {/* Intereses (Applications NO aceptadas y ya filtradas por solapamiento con referrals) */}
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Ofertas a las que mostré interés</h2>
               {appsFiltered.length === 0 ? (
@@ -345,7 +352,7 @@ function humanStatus(s?: string) {
 }
 function statusClass(s?: string, css?: any) {
   switch (s) {
-    case 'hired': return css.pillOk;            // aunque no las mostramos, dejo la clase por consistencia
+    case 'hired': return css.pillOk;
     case 'shortlist':
     case 'reviewing': return css.pillInfo;
     case 'declined_by_candidate':
