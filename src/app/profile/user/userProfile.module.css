@@ -50,7 +50,6 @@
   background: #eef2f7;
 }
 
-/* INFO + AVATAR */
 .infoSection {
   position: relative;
   display: flex;
@@ -204,31 +203,31 @@
   background: #f3f4f6;
 }
 
-
-.ErrorCard {
-  width: 40%;
-  max-width: 400px;
+.errorCard {
+  width: 50%;
   height: auto;
-  min-height: 150px;
-  background-color: #FFFFFF;
+  min-height: 300px;
+  background-color: #FFF;
   padding: 20px;
   display: flex;
   justify-content: center;
   align-items: center;
   flex-direction: column;
+  gap: 10px;
+}
+
+.errorCard h2 {
+  font-size: 30px;
   text-align: center;
 }
 
-/* ====== LAYOUT DE CONTENIDO INTERNO (2 columnas) ====== */
 .bodyGrid {
   display: grid;
   grid-template-columns: 2fr 1fr;
-  /* izquierda contenido, derecha sidebar */
   gap: 24px;
   padding: 0 24px 24px 24px;
 }
 
-/* caja/sección visual como tus .section actuales */
 .sectionBox {
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -241,7 +240,6 @@
   font-size: 1rem;
 }
 
-/* timeline de experiencia/educación */
 .timeline {
   display: flex;
   flex-direction: column;
@@ -289,9 +287,7 @@
   font-size: 0.95rem;
 }
 
-/* sidebar de detalles (recicla tu estilo) */
 .sidebarBox {
-  /* contenedor derecho */
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -320,7 +316,6 @@
   margin: 0;
 }
 
-/* chip/link de CV */
 .cvLink {
   display: inline-flex;
   align-items: center;
@@ -335,7 +330,6 @@
   font-size: 0.85rem;
 }
 
-/* utilidades */
 .mt8 {
   margin-top: 8px;
 }
@@ -344,7 +338,87 @@
   margin-top: 12px;
 }
 
-/* ====== RESPONSIVO ====== */
+.gridCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .gridCards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.infoCard {
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, .08);
+  border: 1px solid #e5e7eb;
+  display: grid;
+  gap: 8px;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cardLeft {
+  display: grid;
+  gap: 2px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.cardSubtitle {
+  margin: 0;
+  color: #475467;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.datePill {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  background: #f9fafb;
+  white-space: nowrap;
+}
+
+.cardDesc {
+  margin: 4px 0 0;
+  color: #374151;
+  line-height: 1.45;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.emptyCard {
+  background: #f8fafc;
+  border: 1px dashed #e5e7eb;
+  color: #64748b;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.eduPill {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+
 @media (max-width: 1024px) {
   .bodyGrid {
     grid-template-columns: 1fr;

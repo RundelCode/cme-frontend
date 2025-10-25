@@ -1,29 +1,5 @@
-// middleware.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-
-/** Rutas públicas que nunca deben bloquearse */
-const PUBLIC_PREFIXES = [
-  "/",
-  "/auth",
-  "/login",
-  "/register",
-  "/jobs",
-  "/profiles",
-  "/search",
-];
-
-/** Bypass para recursos estáticos y APIs */
-function isBypassedPath(pathname: string) {
-  return (
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico") ||
-    pathname.startsWith("/images") ||
-    pathname.startsWith("/public") ||
-    pathname.startsWith("/api") ||        // <- muy importante: NO tocar APIs
-    pathname === "/"
-  );
-}
 
 function readAccessToken(req: NextRequest): string | null {
   const raw =
@@ -39,46 +15,55 @@ function readAccessToken(req: NextRequest): string | null {
 }
 
 export function middleware(req: NextRequest) {
-  const url = req.nextUrl;
-  const pathname = url.pathname;
+  const { nextUrl } = req;
+  const { pathname, search } = nextUrl;
 
-  // 0) Nunca interceptar APIs ni estáticos
-  if (isBypassedPath(pathname)) {
-    return NextResponse.next();
-  }
-
-  // 1) Páginas públicas: siempre dejar pasar
-  if (PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
-    return NextResponse.next();
-  }
-
-  // 2) Verificar cookie de sesión
   const token = readAccessToken(req);
+
   if (token) {
-    // (opcional) header para testear si el middleware corre
     const res = NextResponse.next();
     res.headers.set("x-mw", "hit");
     return res;
   }
 
-  // 3) Redirigir a login con ?next
+  // ❌ No autenticado -> redirigir a /login?next=<ruta original>
   const loginUrl = new URL("/login", req.url);
-  loginUrl.searchParams.set("next", pathname + (url.search || ""));
+  loginUrl.searchParams.set("next", pathname + (search || ""));
   return NextResponse.redirect(loginUrl);
 }
 
+
 export const config = {
   matcher: [
+    "/applications",
     "/applications/:path*",
-    "/company/:path*",
-    "/createCompany/:path*",
-    "/finance/:path*",
-    "/notifications/:path*",
-    "/profile/:path*",
+
+    "/dashboard",
     "/dashboard/:path*",
+
+    "/notifications",
+    "/notifications/:path*",
+
+    "/profile",
+    "/profile/:path*",
+
+    "/profiles/me",
     "/profiles/me/:path*",
+
+    "/referrals",
     "/referrals/:path*",
+
+    "/settings",
     "/settings/:path*",
+
+    "/company",
+    "/company/:path*",
+    "/createCompany",
+    "/createCompany/:path*",
+    "/updateCompany",
     "/updateCompany/:path*",
+
+    "/finance",
+    "/finance/:path*",
   ],
 };

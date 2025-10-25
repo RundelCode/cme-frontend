@@ -37,7 +37,7 @@ export default function AuthCallback() {
   return (
     <div className={styles.container}>
       <div>
-        <PropagateLoader color="#15204856" />
+        <PropagateLoader color="#152048" />
       </div>
     </div>
   );

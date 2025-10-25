@@ -426,7 +426,7 @@ export default function Client() {
                 <div className={styles.empty}>
                     Aún no has publicado ofertas.
                     <div style={{ marginTop: 12 }}>
-                        <Link className={styles.primaryBtn} href="/company/jobs/new">Crear primera oferta</Link>
+                        <Link className={styles.primaryBtn} href="/jobs/new">Crear primera oferta</Link>
                     </div>
                 </div>
             ) : (

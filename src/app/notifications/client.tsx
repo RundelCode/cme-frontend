@@ -208,24 +208,6 @@ export default function Client() {
                                                         </span>
                                                     )}
                                                 </div>
-
-                                                <div className={styles.actions}>
-                                                    {!n.read_at && (
-                                                        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => markRead(n.id)}>
-                                                            Marcar como leída
-                                                        </button>
-                                                    )}
-                                                    {n.notification_type === 'payment' && n.related_id && (
-                                                        <Link className={styles.btn} href={`/payments/${n.related_id}`}>
-                                                            Ver pago
-                                                        </Link>
-                                                    )}
-                                                    {n.notification_type === 'job_offer' && n.related_id && (
-                                                        <Link className={styles.btn} href={`/jobs/${n.related_id}`}>
-                                                            Ver oferta
-                                                        </Link>
-                                                    )}
-                                                </div>
                                             </div>
                                         </li>
                                     );

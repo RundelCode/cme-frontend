@@ -14,6 +14,7 @@ import NotificationsIcon from "../../public/images/icons/Nav/notifications.png";
 import ReferralIcon from "../../public/images/icons/Nav/referral.png";
 import UserIcon from "../../public/images/icons/Nav/Users.png";
 import ProfileMini from "./ProfileMini";
+import { getOriginFromHeaders } from "../../lib/getOrigin";
 
 export const dynamic = "force-dynamic";
 
@@ -72,8 +73,20 @@ async function getAuthAndProfile() {
   const hdrs = await nextHeaders();
   const cookieHeader = (await nextCookies()).toString();
 
+  const serverLogout = async () => {
   try {
-    // 1) Sesión
+    const origin = await getOriginFromHeaders();
+    await fetch(`${origin}/api/logout`, {
+      method: "POST",
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.error("server logout error", e);
+  }
+};
+
+  try {
+    // 1) authMe
     const authData = await gqlRequest<AuthMeResp>(
       GRAPHQL_ENDPOINT,
       AUTH_ME,
@@ -81,10 +94,15 @@ async function getAuthAndProfile() {
       hdrs,
       cookieHeader
     );
-    const isLogged = !!authData?.authMe?.id;
-    const authMe = authData?.authMe ?? null;
 
-    // 2) Perfil (opcional)
+    if (!authData?.authMe?.id) {
+      // no logueado; no hace falta logout
+      return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
+    }
+
+    const authMe = authData.authMe;
+
+    // 2) myProfile
     let profile: ProfileType["myProfile"] = null;
     try {
       const p = await gqlRequest<ProfileType>(
@@ -95,16 +113,17 @@ async function getAuthAndProfile() {
         cookieHeader
       );
       profile = p.myProfile ?? null;
-    } catch {
-      profile = null;
+    } catch (err) {
+      console.warn("⚠️ Token probablemente expirado (myProfile). Logout server-side…");
+      await serverLogout();
+      return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
     }
 
-    // 3) Rol resuelto
-    const rawRole = profile?.role ?? authMe?.role ?? "";
+    // 3) rol y 4) empresa
+    const rawRole = profile?.role ?? authMe.role ?? "";
     const resolvedRole = normalizeRole(rawRole);
     const isCompanyAdmin = resolvedRole === "company_admin";
 
-    // 4) Si es admin de empresa, consultar su empresa por adminId (authMe.id)
     let adminCompany: CompanyLite | null = null;
     if (isCompanyAdmin && authMe?.id) {
       try {
@@ -121,17 +140,15 @@ async function getAuthAndProfile() {
       }
     }
 
-    return { isLogged, profile, authMe, adminCompany, resolvedRole };
-  } catch {
-    return {
-      isLogged: false,
-      profile: null,
-      authMe: null as AuthMeResp["authMe"],
-      adminCompany: null as CompanyLite | null,
-      resolvedRole: "" as string,
-    };
+    return { isLogged: true, profile, authMe, adminCompany, resolvedRole };
+  } catch (err) {
+    console.warn("⚠️ Falló auth inicial. Logout server-side…");
+    await serverLogout(); // <- solo limpiará si había cookie
+    return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
   }
 }
+
+
 
 export default async function Navbar() {
   const { isLogged, profile, authMe, adminCompany, resolvedRole } =

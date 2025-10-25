@@ -51,28 +51,28 @@ function ReferModal({
   jobTitle,
   jobUrl,
   onClose,
+  disabled,
 }: {
   open: boolean;
   jobId: string;
   jobTitle: string;
   jobUrl: string;
   onClose: () => void;
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"list" | "add">("list");
 
-  // Paginación
   const [page, setPage] = useState(0);
   const [limit, setLimit] = useState(10);
 
-  // 1) Applications (base)
   const {
     data: appsData,
     error: appsError,
     isLoading: appsLoading,
     mutate,
   } = useSWR(
-    open && mode === "list"
+    open && mode === "list" && !disabled
       ? `/api/applications?jobOfferId=${jobId}&limit=${limit}&offset=${page * limit}`
       : null,
     fetcher,
@@ -84,7 +84,6 @@ function ReferModal({
     }
   );
 
-  // Base people
   const peopleBasic: Array<{
     profileId: string;
     name: string | null;
@@ -108,7 +107,6 @@ function ReferModal({
     return [];
   }, [appsData]);
 
-  // 2) Perfiles solo cuando hay applications
   const ids = useMemo(
     () => Array.from(new Set(peopleBasic.map((p) => p.profileId).filter(Boolean))),
     [peopleBasic]
@@ -120,7 +118,7 @@ function ReferModal({
     error: profilesError,
     isLoading: profilesLoading,
   } = useSWR(
-    open && mode === "list" && idsKey
+    open && mode === "list" && idsKey && !disabled
       ? `/api/profiles?ids=${encodeURIComponent(idsKey)}`
       : null,
     fetcher,
@@ -132,12 +130,10 @@ function ReferModal({
     }
   );
 
-  // 3) Estado combinado
   const needProfiles = !appsLoading && !appsError && !!idsKey;
   const loadingAll = appsLoading || (needProfiles && profilesLoading);
   const anyError = appsError || profilesError;
 
-  // 4) Fusionar perfiles
   const profileMap: Record<
     string,
     { name?: string | null; photo?: string | null; occupation?: string | null; reputation?: number | null }
@@ -150,29 +146,17 @@ function ReferModal({
       const last =
         p.last_name ?? p.lastName ?? p.family_name ?? p.familyName ?? null;
       const joined = [first, last].filter(Boolean).join(" ").trim() || null;
-
       const emailLocal =
         typeof p.email === "string" && p.email.includes("@")
           ? p.email.split("@")[0]
           : null;
-
       const name =
-        p.full_name ??
-        p.fullName ??
-        p.name ??
-        joined ??
-        p.username ??
-        emailLocal ??
-        null;
-
+        p.full_name ?? p.fullName ?? p.name ?? joined ?? p.username ?? emailLocal ?? null;
       const photo =
         p.profile_picture ?? p.profilePicture ?? p.avatar ?? p.photo ?? null;
-
       const occupation = p.occupation ?? p.title ?? p.headline ?? null;
-
       const reputation =
         p.reputation_score ?? p.reputationScore ?? p.reputation ?? null;
-
       if (p.id) map[p.id] = { name, photo, occupation, reputation };
     }
     return map;
@@ -193,7 +177,6 @@ function ReferModal({
     });
   }, [peopleBasic, profileMap, ids.length]);
 
-  // ===== Mensajería / referidos =====
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [genLoading, setGenLoading] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
@@ -240,7 +223,6 @@ function ReferModal({
     );
   }
 
-  // Helper: crear notificación tras referir (best-effort, no rompe el flujo)
   async function createNotificationAfterReferral(params: {
     candidateId: string;
     jobId: string;
@@ -250,7 +232,6 @@ function ReferModal({
   }) {
     const { candidateId, jobId, jobTitle, jobUrl, payload } = params;
 
-    // 1) Extraer datos del payload (robusto a distintas formas)
     const referralCode =
       payload?.code ??
       payload?.referral_code ??
@@ -258,13 +239,8 @@ function ReferModal({
       payload?.data?.referral_code ??
       null;
 
-    const referralId =
-      payload?.id ??
-      payload?.referral?.id ??
-      payload?.data?.id ??
-      null;
+    const referralId = payload?.id ?? payload?.referral?.id ?? payload?.data?.id ?? null;
 
-    // 2) Construir título/mensaje (respetando límites del backend)
     const rawTitle = `Has sido referido a "${jobTitle ?? ""}"`.trim();
     const codeLine = referralCode
       ? `Tu código de referido es: ${referralCode}.`
@@ -272,28 +248,14 @@ function ReferModal({
     const rawMessage = `${codeLine}
 Para más detalles, visita: ${jobUrl}`.trim();
 
-    // Límites del DTO: title <= 180, message <= 5000
     const title = rawTitle.slice(0, 180);
     const message = rawMessage.slice(0, 5000);
 
-    // 3) Validaciones rápidas antes de enviar
     const uuidRe =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    if (!uuidRe.test(candidateId)) {
-      console.warn(
-        "[notif] create aborted: candidateId no es UUID válido",
-        candidateId
-      );
-      return;
-    }
-    if (!title || !message) {
-      console.warn(
-        "[notif] create aborted: faltan title o message",
-        { title, messageLen: message.length }
-      );
-      return;
-    }
+    if (!uuidRe.test(candidateId)) return;
+    if (!title || !message) return;
 
     const body = {
       userId: candidateId,
@@ -307,47 +269,19 @@ Para más detalles, visita: ${jobUrl}`.trim();
       related_id: referralId || jobId,
     };
 
-    const t0 = performance.now?.() ?? Date.now();
     try {
-      console.groupCollapsed("[notif] POST /api/notifications");
-      console.log("payload →", body);
-
       const res = await fetch("/api/notifications", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(body),
       });
-
-      const text = await res.text().catch(() => "");
-      let json: any = null;
-      try {
-        json = text ? JSON.parse(text) : null;
-      } catch {
-        /* noop */
-      }
-
-      console.log("status:", res.status);
-      if (!res.ok) {
-        console.error("[notif] create failed", res.status, text || json);
-        // No interrumpe el flujo principal, solo deja el log
-        return;
-      }
-
-      console.log("response:", json);
-    } catch (e) {
-      console.error("[notif] create error", e);
-    } finally {
-      const t1 = performance.now?.() ?? Date.now();
-      console.log("elapsed ms:", Math.round(t1 - t0));
-      console.groupEnd?.();
+      if (!res.ok) return;
+      await res.text().catch(() => "");
+    } catch {
+      /* noop */
     }
   }
 
-
-  // ===== /api/referrals: ENVIAR jobOfferId (no jobId) =====
   async function handleGenerateCode() {
     setGenLoading(true);
     setGenError(null);
@@ -355,7 +289,7 @@ Para más detalles, visita: ${jobUrl}`.trim();
       const res = await fetch(`/api/referrals`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ jobOfferId: jobId }), // <- FIX
+        body: JSON.stringify({ jobOfferId: jobId }),
       });
 
       const raw = await res.text();
@@ -364,7 +298,6 @@ Para más detalles, visita: ${jobUrl}`.trim();
 
       if (res.status === 401) throw new Error("No autorizado. Inicia sesión para continuar.");
       if (!res.ok || !payload?.code) {
-        console.error("[/api/referrals] generate", res.status, raw);
         throw new Error(payload?.message || payload?.error || "No se pudo generar el código. Intenta nuevamente.");
       }
 
@@ -386,20 +319,16 @@ Para más detalles, visita: ${jobUrl}`.trim();
       const res = await fetch(`/api/referrals`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ jobOfferId: jobId, candidateId }), // <- FIX
+        body: JSON.stringify({ jobOfferId: jobId, candidateId }),
       });
 
       const raw = await res.text();
       let payload: any = null;
       try { payload = raw ? JSON.parse(raw) : null; } catch { }
 
-      if (res.status === 401) {
-        router.push(`/login?next=/jobs/${jobId}`);
-        return;
-      }
+      if (res.status === 401) return;
 
       if (!res.ok) {
-        console.error("[/api/referrals] refer", res.status, raw);
         const msg = String(payload?.error || payload?.message || "");
         if (/already|exists|conflict|409|23505/i.test(msg)) {
           setReferError("Ya existe una referencia para este candidato en esta oferta.");
@@ -410,15 +339,11 @@ Para más detalles, visita: ${jobUrl}`.trim();
       }
 
       const code =
-        payload?.code ??
-        payload?.referral_code ??
-        payload?.referral?.referral_code ??
-        null;
+        payload?.code ?? payload?.referral_code ?? payload?.referral?.referral_code ?? null;
 
       const codeLine = code ? ` Código: ${code}.` : "";
       setReferMsg(`Referencia creada correctamente.${codeLine}`);
 
-      // 🔔 Crear notificación para el candidato (best-effort)
       await createNotificationAfterReferral({
         candidateId,
         jobId,
@@ -427,7 +352,6 @@ Para más detalles, visita: ${jobUrl}`.trim();
         payload,
       });
 
-      // Refrescar lista de interesados
       mutate?.();
     } catch (e: any) {
       setReferError(e?.message || "Error creando la referencia.");
@@ -465,7 +389,21 @@ Este es tu codigo de referido: ${referralCode}
 
   if (!open) return null;
 
-  // Loader único
+  if (disabled) {
+    return (
+      <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+        <div className={styles.modalCard}>
+          <div className={styles.text}>
+            Esta acción no está disponible para tu rol.
+          </div>
+          <div className={styles.modalActions}>
+            <button className={styles.secundaryBtn} onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loadingAll) {
     return (
       <div className={styles.modalOverlay} role="dialog" aria-modal="true">
@@ -491,7 +429,7 @@ Este es tu codigo de referido: ${referralCode}
     );
   }
 
-  const peopleFinal = people.map((p) => ({
+  const peopleFinal = (people || []).map((p) => ({
     ...p,
     name: p.name ?? `ID ${short(p.profileId)}`,
   }));
@@ -579,7 +517,6 @@ Este es tu codigo de referido: ${referralCode}
                   ))}
                 </ul>
 
-                {/* Pager */}
                 <div className={styles.pager}>
                   <div className={styles.pageSize}>
                     <label className={styles.small} htmlFor="psize">
@@ -708,8 +645,16 @@ export default function JobDetailClient({ jobId }: Props) {
     jobId ? `/api/jobs/${jobId}` : null,
     fetcher
   );
+
   const { data: meData } = useSWR(`/api/me`, fetcher);
-  const userId: string | null = meData?.user?.id ?? null;
+  const userId: string | null = meData?.user?.id ?? meData?.id ?? null;
+  const role: string | null =
+    meData?.user?.role ??
+    meData?.role ??
+    meData?.profile?.role ??
+    null;
+
+  const isCompanyAdmin = role === "company_admin";
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalTitle, setModalTitle] = useState("");
@@ -779,6 +724,10 @@ export default function JobDetailClient({ jobId }: Props) {
   const loc = job.location ?? company?.location ?? "—";
 
   async function showInterest() {
+    if (isCompanyAdmin) {
+      openModal("No disponible", "Esta acción no está disponible para tu rol.");
+      return;
+    }
     if (!userId) {
       router.push(`/login?next=/jobs/${jobId}`);
       return;
@@ -844,6 +793,7 @@ export default function JobDetailClient({ jobId }: Props) {
         jobTitle={job.title}
         jobUrl={absJobUrl || `/jobs/${job.id}`}
         onClose={() => setReferOpen(false)}
+        disabled={isCompanyAdmin}
       />
 
       <div className={styles.modal}>
@@ -913,24 +863,26 @@ export default function JobDetailClient({ jobId }: Props) {
             </div>
           )}
 
-          <div className={styles.actions}>
-            <button
-              className={styles.primaryBtn}
-              onClick={showInterest}
-              disabled={submitting}
-              aria-busy={submitting}
-            >
-              {submitting ? "Enviando..." : "Mostrar Interes"}
-            </button>
+          {!isCompanyAdmin && (
+            <div className={styles.actions}>
+              <button
+                className={styles.primaryBtn}
+                onClick={showInterest}
+                disabled={submitting}
+                aria-busy={submitting}
+              >
+                {submitting ? "Enviando..." : "Mostrar Interes"}
+              </button>
 
-            <button
-              type="button"
-              className={styles.secundaryBtn}
-              onClick={() => setReferOpen(true)}
-            >
-              Referir
-            </button>
-          </div>
+              <button
+                type="button"
+                className={styles.secundaryBtn}
+                onClick={() => setReferOpen(true)}
+              >
+                Referir
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

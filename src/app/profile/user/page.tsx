@@ -182,7 +182,7 @@ export default async function Page() {
               <div className={styles.identity}>
                 <h2 className={styles.name}>
                   {profile.full_name || profile.email.split("@")[0] || "Usuario"}
-                </h2> 
+                </h2>
               </div>
             </div>
             {/* Sobre mí */}
@@ -222,73 +222,68 @@ export default async function Page() {
                 <div className={styles.detailRow}>
                   <dt>Teléfono</dt><dd>{profile.phone ?? "—"}</dd>
                 </div>
-                <div className={styles.detailRow}>
-                  <dt>Rol</dt><dd>{profile.role ?? "—"}</dd>
-                </div>
               </dl>
             </div>
             {/* Experiencia */}
             <div className={styles.section}>
               <h3>Experiencia</h3>
+
               {hasValidExperience(profile.experience) ? (
-                <dl className={styles.detailList}>
-                  {profile.experience!.map((it, i) => (
-                    <div className={styles.detailRow} key={`exp-${i}`}>
-                      <dt>
-                        <strong>{it.role || "—"}</strong>
-                        {it.company ? ` ${it.company}` : ""}
-                      </dt>
-                      <dd>
-                        {(it.start || "")}{it.end ? ` – ${it.end}` : ""}
-                        {it.description ? <><br />{it.description}</> : null}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className={styles.gridCards}>
+                  {profile.experience!.map((it, i) => {
+                    const left = (it.start || "").trim();
+                    const right = (it.end || "").trim();
+                    const dates = left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
+                    return (
+                      <div className={styles.infoCard} key={`exp-${i}`}>
+                        <div className={styles.cardTop}>
+                          <div className={styles.cardLeft}>
+                            <h4 className={styles.cardTitle}>{it.role || "—"}</h4>
+                            {it.company ? <p className={styles.cardSubtitle}>{it.company}</p> : null}
+                          </div>
+                          <span className={styles.datePill}>{dates}</span>
+                        </div>
+                        {it.description ? <p className={styles.cardDesc}>{it.description}</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <p className={styles.muted}>Aún no has añadido experiencia.</p>
+                <div className={styles.emptyCard}>Sin experiencia registrada.</div>
               )}
             </div>
+
 
             {/* Educación */}
             <div className={styles.section}>
               <h3>Educación</h3>
+
               {hasValidEducation(profile.education) ? (
-                <dl className={styles.detailList}>
-                  {profile.education!.map((it, i) => (
-                    <div className={styles.detailRow} key={`edu-${i}`}>
-                      <dt>
-                        <strong>{it.degree || ""}</strong>
-                        {it.institution ? ` — ${it.institution}` : ""}
-                      </dt>
-                      <dd>
-                        {(it.start || "")}{it.end ? ` – ${it.end}` : ""}
-                        {it.description ? <><br />{it.description}</> : null}
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
+                <div className={styles.gridCards}>
+                  {profile.education!.map((it, i) => {
+                    const left = (it.start || "").trim();
+                    const right = (it.end || "").trim();
+                    const dates = left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
+                    return (
+                      <div className={styles.infoCard} key={`edu-${i}`}>
+                        <div className={styles.cardTop}>
+                          <div className={styles.cardLeft}>
+                            <h4 className={styles.cardTitle}>{it.degree || "—"}</h4>
+                            {it.institution ? <p className={styles.cardSubtitle}>{it.institution}</p> : null}
+                          </div>
+                          <span className={`${styles.datePill} ${styles.eduPill}`}>{dates}</span>
+                        </div>
+                        {it.description ? <p className={styles.cardDesc}>{it.description}</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                <p className={styles.muted}>Aún no has añadido educación.</p>
+                <div className={styles.emptyCard}>Sin educación registrada.</div>
               )}
             </div>
 
-            {/* CV */}
-            <div className={styles.section}>
-              <h3>Currículum</h3>
-              {profile.cv_url ? (
-                <a
-                  href={profile.cv_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={styles.skill}
-                >
-                  Ver CV (PDF)
-                </a>
-              ) : (
-                <p className={styles.muted}>Aún no subes tu CV.</p>
-              )}
-            </div>
+
           </div>
         )}
       </div>

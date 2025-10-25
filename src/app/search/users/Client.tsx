@@ -123,7 +123,7 @@ export default function UserSearchClient() {
                                 </div>
 
                                 <div>
-                                    {u.occupation ?? "—"} · {u.role ?? "—"} ({u.status ?? "—"})
+                                    {u.occupation ?? "—"}
                                 </div>
 
                                 {u.reputation_score != null && (

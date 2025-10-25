@@ -153,7 +153,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     "Content-Type": "application/json",
                     "x-debug": "1",
                 },
-                // 👉 FIX: enviar candidateId al backend
                 body: JSON.stringify({ jobOfferId: jobId, code, candidateId: userId }),
             });
 
@@ -170,11 +169,28 @@ export default function JobDetailClient({ jobId }: Props) {
                         : json?.error === "candidate_id_required"
                             ? "No se detectó el candidato. Inicia sesión como candidato o reintenta."
                             : json?.error || "No se pudo validar el código.";
-                if (json?.debug) console.log("[consume.debug]", json.debug);
                 throw new Error(readable);
             }
 
-            if (json?.debug) console.log("[consume.debug]", json.debug);
+            // ✅ Aquí obtén el headhunter_id del backend (ajústalo si viene con otro nombre)
+            const headhunterId = json?.referral?.headhunter_id;
+            const jobTitle = json?.referral?.job_title ?? job?.title ?? "una oferta";
+
+            if (headhunterId) {
+                await fetch("/api/notifications", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", Accept: "application/json" },
+                    body: JSON.stringify({
+                        userId: headhunterId,
+                        title: "Tu candidato aceptó la referencia 🎉",
+                        message: `El candidato ha usado tu código para la oferta "${jobTitle}".`,
+                        notificationType: "recommendation",
+                        channel: "system",
+                        relatedId: jobId,
+                    }),
+                });
+            }
+
             setCodeOpen(false);
             openInfo("¡Código aplicado!", "Tu recomendación ha sido asociada con éxito.");
         } catch (e: any) {
