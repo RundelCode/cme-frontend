@@ -1,27 +1,28 @@
 // src/app/api/company/[id]/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 const COMPANIES_BASE =
     process.env.COMPANIES_BASE_URL ?? "http://localhost:3009";
 
-function buildAuthHeader(req: NextRequest): string | undefined {
+function buildAuthHeader(req: Request): string | undefined {
     const fromHeader = req.headers.get("authorization");
     if (fromHeader && fromHeader.trim() !== "") return fromHeader;
 
-    const token = req.cookies.get("access_token")?.value;
-    if (token && token.trim() !== "") return `Bearer ${token}`;
-
+    // En App Router, cookies vienen en header "cookie" (no hay req.cookies aquí)
     const cookieHeader = req.headers.get("cookie") ?? "";
     const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
     if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
     return undefined;
 }
 
-export async function GET(req: NextRequest, context: any) {
+export async function GET(
+    req: Request,
+    context: { params: { id: string } } // <- esta forma es válida en Next 15
+) {
     try {
-        const id = context?.params?.id as string | undefined;
+        const id = context.params?.id;
         if (!id) {
             return NextResponse.json({ error: "missing_company_id" }, { status: 400 });
         }
