@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "../companyProfile.module.css";
+import { Target } from "lucide-react";
 
 const GQL =
   process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ??
@@ -104,20 +105,10 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
               <span className={styles.dot}>·</span>
               <span className={styles.tag}>{o.status ?? "—"}</span>
             </div>
-            <a className={styles.offerLink} href={`/job?id=${o.id}`}>Ver oferta</a>
+            <a className={styles.offerLink} href={`/jobs/${o.id}`} target="_blank">Ver oferta</a>
           </li>
         ))}
       </ul>
-
-      <div className={styles.offersPager}>
-        <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-          Anterior
-        </button>
-        <span>Página {page + 1} / {Math.max(1, Math.ceil(total / limit))}</span>
-        <button disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
-          Siguiente
-        </button>
-      </div>
     </div>
   );
 }

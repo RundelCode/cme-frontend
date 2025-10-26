@@ -1,3 +1,4 @@
+// src/app/api/company/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -18,9 +19,12 @@ function buildAuthHeader(req: NextRequest): string | undefined {
     return undefined;
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: any) {
     try {
-        const { id } = context.params;
+        const id = context?.params?.id as string | undefined;
+        if (!id) {
+            return NextResponse.json({ error: "missing_company_id" }, { status: 400 });
+        }
 
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
@@ -38,9 +42,7 @@ export async function GET(req: NextRequest, context: { params: { id: string } })
         const data = await upstream.json().catch(() => null);
         if (!upstream.ok) {
             const msg =
-                data?.error ||
-                data?.message ||
-                `companies_upstream_${upstream.status}`;
+                data?.error || data?.message || `companies_upstream_${upstream.status}`;
             return NextResponse.json({ error: msg }, { status: upstream.status });
         }
 
