@@ -48,7 +48,6 @@ export async function getCompanyServer(id: string): Promise<Company> {
 
   const json = await res.json().catch(() => ({}));
   if (process.env.NEXT_DEBUG_PAGES) {
-    console.log("[getCompanyServer] status:", res.status, "body:", json);
   }
 
   if (!res.ok || !json?.company) {
@@ -77,7 +76,6 @@ export async function searchCompaniesServer(input: SearchCompaniesInput = {}): P
 
   const json = await res.json().catch(() => ({}));
   if (process.env.NEXT_DEBUG_PAGES) {
-    console.log("[searchCompaniesServer] status:", res.status, "body:", json);
   }
 
   if (!res.ok || !json?.items) {

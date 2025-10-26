@@ -1,67 +1,95 @@
-// /app/api/create-preference/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { randomUUID } from 'crypto';
 
 export const runtime = 'nodejs';
 
-function safeLen(v?: string) { return v ? `${v.length}` : '0'; }
+function toUpper(s?: string) {
+  return (s ?? '').toString().trim().toUpperCase();
+}
 
 export async function POST(req: NextRequest) {
-    console.log('\n===== [API /create-preference] START =====');
-    try {
-        const accessToken = process.env.MP_ACCESS_TOKEN || '';
-        console.log('Timestamp:', new Date().toISOString());
-        console.log('Env MP_ACCESS_TOKEN length:', safeLen(accessToken));
-        if (!accessToken) {
-            return NextResponse.json({ error: 'Missing MP_ACCESS_TOKEN' }, { status: 500 });
-        }
-
-        // ⚠️ Comprador de prueba de CO distinto al vendedor
-        const buyerEmail = 'test_user_XXXXXXXX@testuser.com';
-
-        const payload = {
-            items: [
-                {
-                    id: 'item-001',
-                    title: 'Producto de prueba',
-                    quantity: 1,
-                    unit_price: 10000,
-                    currency_id: 'COP', // Colombia
-                },
-            ],
-            payer: { email: buyerEmail },
-            back_urls: {
-                success: 'http://localhost:3000/?status=success',
-                failure: 'http://localhost:3000/?status=failure',
-                pending: 'http://localhost:3000/?status=pending',
-            },
-        };
-
-        console.log('Request body (sanitized):', {
-            items: payload.items.map(({ id, title, quantity, unit_price, currency_id }) => ({ id, title, quantity, unit_price, currency_id })),
-            payer: { email: payload.payer.email },
-            back_urls: payload.back_urls,
-        });
-
-        const client = new MercadoPagoConfig({ accessToken, options: { timeout: 10_000 } });
-        const preference = new Preference(client);
-
-        const r = await preference.create({
-            body: payload,
-            requestOptions: { idempotencyKey: randomUUID() },
-        });
-
-        const init_point = (r as any)?.init_point || (r as any)?.sandbox_init_point || null;
-        const preference_id = (r as any)?.id;
-
-        console.log('SDK MP response:', { preference_id, init_point, site_id: (r as any)?.site_id });
-        console.log('===== [API /create-preference] END =====\n');
-
-        return NextResponse.json({ init_point, preference_id });
-    } catch (err) {
-        console.error('[MP create preference]', err);
-        console.log('===== [API /create-preference] END =====\n');
-        return NextResponse.json({ error: 'Error al crear la preferencia' }, { status: 500 });
+  try {
+    const accessToken = process.env.MP_ACCESS_TOKEN || '';
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Missing MP_ACCESS_TOKEN' }, { status: 500 });
     }
+
+    // Body opcional: { amount, currency, title }
+    const body = await req.json().catch(() => ({} as any));
+    const rawAmount = Number(body?.amount);
+    const rawCurrency = toUpper(body?.currency);
+    const rawTitle = (body?.title ?? '').toString().trim();
+
+    // Saneamos/decidimos si usamos dinámico o fallback
+    const hasDynamic =
+      Number.isFinite(rawAmount) && rawAmount > 0 && !!rawCurrency;
+
+    // Currency y monto saneados
+    const currency_id = hasDynamic ? rawCurrency : 'COP';
+    let unit_price = hasDynamic ? rawAmount : 10000;
+
+    // Reglas de redondeo (MP maneja centavos; COP no usa decimales)
+    if (currency_id === 'COP') {
+      unit_price = Math.round(unit_price); // sin decimales
+    } else {
+      unit_price = Math.round(unit_price * 100) / 100; // máx 2 decimales
+    }
+
+    // Título del item
+    const title =
+      (hasDynamic && rawTitle) ? rawTitle.slice(0, 255)
+      : (hasDynamic ? `Fee contratación` : 'Producto de prueba');
+
+    // URL base para back_urls
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+
+    const buyerEmail = 'test_user_XXXXXXXX@testuser.com'; // MP sandbox
+
+    const payload = {
+      items: [
+        {
+          id: 'fee-001',
+          title,
+          quantity: 1,
+          unit_price,
+          currency_id,
+        },
+      ],
+      payer: { email: buyerEmail },
+      back_urls: {
+        success: `${baseUrl}/?status=success`,
+        failure: `${baseUrl}/?status=failure`,
+        pending: `${baseUrl}/?status=pending`,
+      },
+    };
+
+    console.log('[MP][create-preference] using payload:', {
+      title,
+      unit_price,
+      currency_id,
+      hasDynamic,
+      sentByClient: {
+        amount: body?.amount,
+        currency: body?.currency,
+        title: rawTitle,
+      },
+    });
+
+    const client = new MercadoPagoConfig({ accessToken, options: { timeout: 10_000 } });
+    const preference = new Preference(client);
+
+    const r = await preference.create({
+      body: payload,
+      requestOptions: { idempotencyKey: randomUUID() },
+    });
+
+    const init_point = (r as any)?.init_point || (r as any)?.sandbox_init_point || null;
+    const preference_id = (r as any)?.id;
+
+    return NextResponse.json({ init_point, preference_id });
+  } catch (err) {
+    console.error('[MP create preference] ERROR:', err);
+    return NextResponse.json({ error: 'Error al crear la preferencia' }, { status: 500 });
+  }
 }

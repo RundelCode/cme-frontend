@@ -10,9 +10,6 @@ export default function AuthCallback() {
       const access_token = fragment.get("access_token");
       const refresh_token = fragment.get("refresh_token");
 
-      console.log("[callback] access_token (client):", access_token);
-      console.log("[callback] refresh_token (client):", refresh_token);
-
       if (!access_token) {
         console.error("[callback] no access_token in hash");
         return window.location.replace("/login");

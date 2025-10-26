@@ -278,7 +278,6 @@ Para más detalles, visita: ${jobUrl}`.trim();
       if (!res.ok) return;
       await res.text().catch(() => "");
     } catch {
-      /* noop */
     }
   }
 
@@ -637,7 +636,6 @@ Este es tu codigo de referido: ${referralCode}
   );
 }
 
-// ===== Página principal del Job =====
 export default function JobDetailClient({ jobId }: Props) {
   const router = useRouter();
 

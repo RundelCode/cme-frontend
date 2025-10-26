@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
       accept: "application/json",
     };
 
-    // auth opcional (público; si hay token, se reenvía)
     const auth = req.headers.get("authorization");
     if (auth) headers["authorization"] = auth;
 
@@ -30,13 +29,6 @@ export async function POST(req: NextRequest) {
     const xCorrId = req.headers.get("x-correlation-id");
     if (xReqId) headers["x-request-id"] = xReqId;
     if (xCorrId) headers["x-correlation-id"] = xCorrId;
-
-    // 🔎 LOG de variables que mandamos al GraphQL
-    console.log("[profiles/search] → variables", {
-      input: {
-        ...input,
-      },
-    });
 
     const gqlRes = await fetch(url, {
       method: "POST",
@@ -53,7 +45,6 @@ export async function POST(req: NextRequest) {
     try {
       data = JSON.parse(raw);
     } catch {
-      // noop
     }
 
     if (!gqlRes.ok) {
@@ -72,7 +63,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ✅ OK
     return NextResponse.json({ items: data?.data?.searchProfiles ?? [] });
   } catch (e: any) {
     console.error("[profiles/search] Proxy error:", e);

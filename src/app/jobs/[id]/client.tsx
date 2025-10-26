@@ -20,7 +20,6 @@ function short(id: string) {
     return `${id.slice(0, 4)}…${id.slice(-4)}`;
 }
 
-/* ======= Modal simple de información ======= */
 function InfoModal({
     open,
     title,
@@ -48,7 +47,6 @@ function InfoModal({
     );
 }
 
-/* ======= Modal para ingresar código ======= */
 function CodeModal({
     open,
     onCancel,
@@ -122,7 +120,6 @@ export default function JobDetailClient({ jobId }: Props) {
 
     const { data, error, isLoading } = useSWR(jobId ? `/api/jobs/${jobId}` : null, fetcher);
     const { data: meData } = useSWR(`/api/me`, fetcher);
-    // Mantengo tu estructura actual: meData?.user?.id
     const userId: string | null = meData?.user?.id ?? null;
 
     const [infoOpen, setInfoOpen] = useState(false);
@@ -172,7 +169,6 @@ export default function JobDetailClient({ jobId }: Props) {
                 throw new Error(readable);
             }
 
-            // ✅ Aquí obtén el headhunter_id del backend (ajústalo si viene con otro nombre)
             const headhunterId = json?.referral?.headhunter_id;
             const jobTitle = json?.referral?.job_title ?? job?.title ?? "una oferta";
 
@@ -264,7 +260,6 @@ export default function JobDetailClient({ jobId }: Props) {
             />
 
             <div className={styles.card}>
-                {/* Cover */}
                 <div className={styles.coverBox}>
                     {companyCover ? (
                         <Image src={companyCover} alt="" fill className={styles.coverImg} priority />
@@ -273,7 +268,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     )}
                 </div>
 
-                {/* Header compacto */}
                 <div className={styles.headerRow}>
                     <div className={styles.logoWrapper}>
                         {companyLogo ? (
@@ -312,7 +306,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     </div>
                 </div>
 
-                {/* Skills */}
                 {Array.isArray(job.skills) && job.skills.length > 0 && (
                     <div className={styles.skills}>
                         {job.skills.map((s) => (
@@ -323,7 +316,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     </div>
                 )}
 
-                {/* Descripción */}
                 {job.description && (
                     <div className={styles.section}>
                         <h3 className={styles.sectionTitle}>Descripción</h3>
@@ -331,7 +323,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     </div>
                 )}
 
-                {/* Requisitos */}
                 {job.requirements && (
                     <div className={styles.section}>
                         <h3 className={styles.sectionTitle}>Requisitos</h3>
@@ -339,7 +330,6 @@ export default function JobDetailClient({ jobId }: Props) {
                     </div>
                 )}
 
-                {/* CTA */}
                 <div className={styles.actions}>
                     <button
                         type="button"

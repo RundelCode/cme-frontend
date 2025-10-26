@@ -3,7 +3,6 @@
   min-height: 100dvh;
 }
 
-/* Contenedor principal */
 .main {
   margin-left: var(--nav-w, 18%);
   min-height: 100vh;
@@ -15,7 +14,6 @@
   background: #f6f8ff;
 }
 
-/* Contenedor del formulario (sin sidebar) */
 .card {
   width: 70%;
   max-width: 1100px;
@@ -26,11 +24,10 @@
   box-shadow: 0 0.625rem 1.875rem rgba(16, 24, 40, .08);
   overflow: hidden;
   margin: 40px 0;
-  padding: 20px; /* ahora sí tiene padding porque no es grid */
+  padding: 20px; 
 }
 
-/* ======= Responsivo ======= */
-@media (max-width: 56.25em) { /* ~900px */
+@media (max-width: 56.25em) { 
   .card {
     width: 95%;
     margin: 24px 0;
@@ -38,7 +35,7 @@
   }
 }
 
-@media (max-width: 37.5em) { /* ~600px */
+@media (max-width: 37.5em) {
   .card {
     width: 96%;
     padding: 14px;

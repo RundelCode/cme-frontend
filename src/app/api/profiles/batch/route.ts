@@ -1,4 +1,3 @@
-// src/app/api/profiles/batch/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -17,7 +16,6 @@ function buildAuthHeader(req: NextRequest): string | undefined {
     return undefined;
 }
 
-// Igual a tu helper, pero guardando el cuerpo crudo para debug
 async function fetchJsonDebug(url: string, init: RequestInit) {
     const res = await fetch(url, init);
     const raw = await res.text().catch(() => "");
@@ -27,7 +25,6 @@ async function fetchJsonDebug(url: string, init: RequestInit) {
     if (!res.ok) {
         const msg = data?.message || data?.error || `upstream_error (${res.status})`;
         const detail = { url, status: res.status, headers: Object.fromEntries(res.headers), raw: raw?.slice(0, 500) };
-        // Log en server (se ve en la consola de Next)
         console.error("[profiles/batch] Upstream error:", msg, detail);
         throw new Error(msg);
     }
@@ -44,7 +41,6 @@ export async function POST(req: NextRequest) {
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        // 1) Intento POST batch upstream
         try {
             const url = `${PROFILES_BASE}/profiles/batch`;
             debug.postUrl = url;
@@ -65,7 +61,6 @@ export async function POST(req: NextRequest) {
             debug.postErr = e?.message || String(e);
         }
 
-        // 2) Fallback GET ?ids=...
         try {
             const url = `${PROFILES_BASE}/profiles?ids=${encodeURIComponent(ids.join(","))}`;
             debug.getUrl = url;
@@ -84,7 +79,6 @@ export async function POST(req: NextRequest) {
             debug.getErr = e?.message || String(e);
         }
 
-        // 3) Último fallback: N requests /profiles/:id
         try {
             debug.nRequests = ids.length;
             const results = await Promise.allSettled(
@@ -106,7 +100,6 @@ export async function POST(req: NextRequest) {
                 .filter(Boolean);
 
             if (profiles.length === 0) {
-                // No conseguimos nada: devolvemos detalle para que lo veas en el cliente
                 return NextResponse.json(
                     { profiles: [], error: "no_profiles_from_upstream", debug },
                     { status: 502 }

@@ -6,7 +6,6 @@ const PAYMENTS_BASE =
     process.env.API_GATEWAY_URL ??
     "http://localhost:3005";
 
-// Para resolver el userId:
 const PROFILES_BASE = process.env.PROFILES_BASE_URL ?? "http://localhost:3001";
 
 function buildAuthHeader(req: NextRequest): string | undefined {
@@ -32,11 +31,6 @@ async function fetchJson(url: string, init: RequestInit) {
     return data;
 }
 
-/**
- * GET /api/finance/users?from=ISO&to=ISO
- * - Resuelve el userId con /profiles/me
- * - Llama a /payments con headhunterId=<userId> (sin paginar, all=true)
- */
 export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
@@ -46,7 +40,6 @@ export async function GET(req: NextRequest) {
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        // 1) Perfil ⇒ userId
         const me = await fetchJson(`${PROFILES_BASE}/profiles/me`, {
             method: "GET",
             headers: {
@@ -65,7 +58,6 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // 2) Llamar a payments con headhunterId explícito (sin límite/offset ⇒ all=true)
         const qs = new URLSearchParams();
         qs.set("headhunterId", userId);
         qs.set("all", "true");

@@ -12,7 +12,6 @@ export default function Client({ }: Props) {
     return (
         <div className={styles.main}>
             <div className={styles.card}>
-                {/* Sidebar */}
                 <aside className={styles.settingNav}>
                     <h2 className={styles.navTitle}>Ajustes</h2>
 
@@ -26,18 +25,10 @@ export default function Client({ }: Props) {
                             >
                                 Editar mi perfil
                             </button>
-
-                            <button
-                                onClick={() => setActive(2)}
-                                className={`${styles.option} ${active === 2 ? styles.optionActive : ''}`}
-                            >
-                                Prueba
-                            </button>
                         </div>
                     </div>
                 </aside>
 
-                {/* Pane derecho */}
                 <section className={styles.activeOption}>
                     <div className={styles.contentWrap}>
                         {active === 1 && <UpdateProfile />}

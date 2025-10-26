@@ -7,7 +7,6 @@ import Link from "next/link";
 
 const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graphql";
 
-/* =================== GQL helper =================== */
 async function gql<T>(q: string, variables?: any) {
   const res = await fetch(GRAPHQL_ENDPOINT, {
     method: "POST",
@@ -29,7 +28,6 @@ async function gql<T>(q: string, variables?: any) {
   }
   return json.data as T;
 }
-/* ================================================== */
 
 const AUTH_ME = `query { authMe { id email role } }`;
 
@@ -43,7 +41,6 @@ const COMPANY_BY_ADMIN = `query ($adminId: ID!) {
   }
 }`;
 
-/* Mutation */
 const CREATE_JOB = `
 mutation CreateJob($input: CreateJobInput!) {
   createJob(input: $input) {
@@ -63,7 +60,6 @@ mutation CreateJob($input: CreateJobInput!) {
 }
 `;
 
-/* ====== Tarifas (PDF) ====== */
 type FeeQuote = { bracket: string; feeLabel: string; feeValue: number; feePercent?: number };
 function computeCmeFeeUSD(salaryUSD: number): FeeQuote {
   if (!salaryUSD || salaryUSD <= 0) return { bracket: "—", feeLabel: "—", feeValue: 0 };
@@ -74,7 +70,6 @@ function computeCmeFeeUSD(salaryUSD: number): FeeQuote {
   return { bracket: "≥ 5,001", feeLabel: "12% del monto", feeValue: Math.round(salaryUSD * 0.12), feePercent: 12 };
 }
 
-/* ====== Enum y normalizadores (REST) ====== */
 type EmploymentType = "full-time" | "part-time" | "services-agreement";
 type LocationType = "remote" | "on_site" | "hybrid";
 
@@ -94,7 +89,6 @@ function normalizeLocationType(v: string | null | undefined): LocationType {
   return "remote";
 }
 
-/* ====== Enums GraphQL (identificadores) ====== */
 type EmploymentTypeGQL = "FULL_TIME" | "PART_TIME" | "SERVICES_AGREEMENT";
 type LocationTypeGQL = "REMOTE" | "ON_SITE" | "HYBRID";
 
@@ -113,7 +107,6 @@ function toGQLEnumLocation(v: LocationType): LocationTypeGQL {
   }
 }
 
-/* ====== Tipos ====== */
 type CreateJobInputPayload = {
   companyId: string;
   title: string;
@@ -148,7 +141,6 @@ type CompanyLite = {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-/* ====== Builder de variables para GraphQL (snake_case + enums) ====== */
 function buildCreateJobVariables(input: CreateJobInputPayload) {
   return {
     input: {
@@ -169,7 +161,6 @@ function buildCreateJobVariables(input: CreateJobInputPayload) {
 export default function Client() {
   const router = useRouter();
 
-  /* --------- Auth & empresa --------- */
   const [role, setRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [authErr, setAuthErr] = useState<string | null>(null);
@@ -212,7 +203,6 @@ export default function Client() {
     })();
   }, [isCompanyAdmin, userId]);
 
-  /* --------- Form state --------- */
   const [form, setForm] = useState<FormState>({
     companyId: "",
     title: "",
@@ -224,7 +214,6 @@ export default function Client() {
     currency: "USD",
   });
 
-  // Al cargar la empresa, setea companyId en el form (solo una vez)
   useEffect(() => {
     if (adminCompany?.id && UUID_RE.test(adminCompany.id)) {
       setForm((f) => ({ ...f, companyId: adminCompany.id }));
@@ -249,7 +238,6 @@ export default function Client() {
       if (key === "salary") setSalaryInput(String(value ?? ""));
     };
 
-  /* --------- Submit --------- */
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<any | null>(null);
@@ -273,7 +261,6 @@ export default function Client() {
       return;
     }
 
-    // Validación básica
     const companyId = (adminCompany.id || "").trim();
     const titleTrim = (form.title || "").trim();
     const descTrim = (form.description || "").trim();
@@ -291,11 +278,9 @@ export default function Client() {
       return;
     }
 
-    // Normaliza enums (REST) → luego convertimos a enums GQL identificadores
     const employmentType = normalizeEmploymentType(form.employmentType);
     const locationType = normalizeLocationType(form.locationType);
 
-    // Parseos on-submit
     const skills = (skillsText || "")
       .split(",")
       .map((s) => s.trim())

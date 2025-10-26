@@ -92,7 +92,6 @@ async function getAuthAndProfile() {
       try {
         const q = await gqlRequest<ProfileQuery>(GRAPHQL_ENDPOINT, MY_PROFILE, {}, hdrs, cookieHeader);
         profile = q.myProfile ?? null;
-        console.log("Perfil", profile);
       } catch {
         profile = null;
       }
@@ -147,7 +146,6 @@ export default async function Page() {
 
         {isLogged && profile && (
           <div className={styles.card}>
-            {/* Cover */}
             <div className={styles.coverContainer}>
               {profile.cover_photo ? (
                 <Image
@@ -162,7 +160,6 @@ export default async function Page() {
               )}
             </div>
 
-            {/* Header */}
             <div className={styles.infoSection}>
               <div className={styles.avatarWrap}>
                 {profile.profile_picture ? (
@@ -185,7 +182,6 @@ export default async function Page() {
                 </h2>
               </div>
             </div>
-            {/* Sobre mí */}
             <div className={styles.section}>
               <h3>Sobre mí</h3>
               {profile.about_me && profile.about_me.trim().length ? (
@@ -195,7 +191,6 @@ export default async function Page() {
               )}
             </div>
 
-            {/* Skills */}
             <div className={styles.section}>
               <h3>Habilidades</h3>
               {profile.skills?.length ? (
@@ -224,7 +219,6 @@ export default async function Page() {
                 </div>
               </dl>
             </div>
-            {/* Experiencia */}
             <div className={styles.section}>
               <h3>Experiencia</h3>
 
@@ -253,8 +247,6 @@ export default async function Page() {
               )}
             </div>
 
-
-            {/* Educación */}
             <div className={styles.section}>
               <h3>Educación</h3>
 

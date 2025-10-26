@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const COMPANIES_BASE = process.env.COMPANIES_BASE_URL ?? "http://localhost:3009";
+export const runtime = "nodejs";
+
+const COMPANIES_BASE =
+    process.env.COMPANIES_BASE_URL ?? "http://localhost:3009";
 
 function buildAuthHeader(req: NextRequest): string | undefined {
     const fromHeader = req.headers.get("authorization");
@@ -15,15 +18,14 @@ function buildAuthHeader(req: NextRequest): string | undefined {
     return undefined;
 }
 
-export async function GET(
-    req: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
     try {
+        const { id } = context.params;
+
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        const upstream = await fetch(`${COMPANIES_BASE}/companies/${params.id}`, {
+        const upstream = await fetch(`${COMPANIES_BASE}/companies/${id}`, {
             method: "GET",
             headers: {
                 Accept: "application/json",
@@ -35,11 +37,13 @@ export async function GET(
 
         const data = await upstream.json().catch(() => null);
         if (!upstream.ok) {
-            const msg = data?.error || data?.message || `companies_upstream_${upstream.status}`;
+            const msg =
+                data?.error ||
+                data?.message ||
+                `companies_upstream_${upstream.status}`;
             return NextResponse.json({ error: msg }, { status: upstream.status });
         }
 
-        // normaliza por si tu servicio devuelve claves con snake_case
         const company = {
             id: data?.id,
             name: data?.name ?? data?.company_name ?? null,
@@ -60,6 +64,6 @@ export async function GET(
     }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(_req: Request) {
     return NextResponse.json({}, { status: 200 });
 }

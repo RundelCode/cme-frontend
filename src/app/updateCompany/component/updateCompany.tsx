@@ -91,19 +91,16 @@ function normalizeRole(role: unknown): string {
 }
 
 export default function UpdateCompany() {
-  // Auth / rol
   const [authLoading, setAuthLoading] = useState(true);
   const [authErr, setAuthErr] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [role, setRole] = useState<string>('');
 
-  // Carga empresa
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
-  // Form
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -126,7 +123,6 @@ export default function UpdateCompany() {
     [coverFile, coverUrl]
   );
 
-  // Auth/role
   useEffect(() => {
     (async () => {
       try {
@@ -149,7 +145,6 @@ export default function UpdateCompany() {
     })();
   }, []);
 
-  // Cargar empresa del admin
   useEffect(() => {
     if (!meId || role !== 'company_admin') return;
     (async () => {
@@ -181,7 +176,6 @@ export default function UpdateCompany() {
     })();
   }, [meId, role]);
 
-  // Limpieza de previews blob
   useEffect(() => {
     return () => {
       try { if (logoPreview?.startsWith('blob:')) URL.revokeObjectURL(logoPreview); } catch { }
@@ -202,7 +196,6 @@ export default function UpdateCompany() {
         throw new Error('Ingresa un email válido.');
       }
 
-      // Subidas opcionales
       let newCoverUrl = coverUrl;
       let newLogoUrl = logoUrl;
 
@@ -226,10 +219,6 @@ export default function UpdateCompany() {
         coverPhoto: newCoverUrl || undefined,
       };
 
-
-      // 🔎 log visible en el navegador para verificar lo que se envía
-      console.debug('[UpdateCompany] vars =>', { id: companyId, input });
-
       const resp = await gql<{ updateCompany: any }>(UPDATE_COMPANY, {
         id: companyId,
         input,
@@ -246,7 +235,6 @@ export default function UpdateCompany() {
     }
   };
 
-  // Render states
   if (authLoading) {
     return (
       <div className={styles.loading}>
@@ -272,7 +260,6 @@ export default function UpdateCompany() {
     ) as any;
   }
 
-  // UI
   return (
     <>
       <header className={styles.header}>
@@ -283,10 +270,8 @@ export default function UpdateCompany() {
       </header>
 
       <form onSubmit={onSubmit} className={styles.form}>
-        {/* Cover */}
         <div className={styles.coverBox}>
           {coverPreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={coverPreview} alt="Cover" className={styles.coverImg} />
           ) : (
             <div className={styles.coverPlaceholder}>Imagen de portada</div>
@@ -302,11 +287,9 @@ export default function UpdateCompany() {
           </label>
         </div>
 
-        {/* Logo */}
         <div className={styles.avatarRow}>
           <div className={styles.avatarWrap}>
             {logoPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={logoPreview} alt="Logo" className={styles.avatar} />
             ) : (
               <div className={styles.avatarFallback} />
@@ -324,7 +307,6 @@ export default function UpdateCompany() {
           <span className={styles.hint}>PNG/JPG recomendado 512x512+</span>
         </div>
 
-        {/* Campos */}
         <div className={styles.grid}>
           <div className={styles.field}>
             <label className={styles.label}>Nombre</label>
@@ -391,11 +373,9 @@ export default function UpdateCompany() {
           </div>
         </div>
 
-        {/* Estados */}
         {err && <div className={styles.error}>{err}</div>}
         {ok && <div className={styles.ok}>{ok}</div>}
 
-        {/* Acciones */}
         <div className={styles.actions}>
           <button type="submit" className={styles.primaryBtn} disabled={saving || !companyId}>
             {saving ? 'Guardando…' : 'Guardar cambios'}

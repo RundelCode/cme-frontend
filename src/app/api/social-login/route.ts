@@ -1,4 +1,3 @@
-// /src/app/api/social-login/route.ts
 import { NextResponse } from "next/server";
 
 type GraphQLResponse = { data?: any; errors?: any };
@@ -22,7 +21,6 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
     const incomingToken = body?.access_token ?? null;
     const incomingRefresh = body?.refresh_token ?? null;
-    console.log("[/api/social-login] access_token completo:", incomingToken);
     if (!incomingToken) {
       console.error("[/api/social-login] no access_token recibido");
       return NextResponse.json({ error: "No access_token" }, { status: 400 });
@@ -89,11 +87,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "no session" }, { status: 500 });
     }
 
-    // 👇 Log del token que devuelve el backend
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[DEBUG] Session access_token:", session.access_token);
-      console.log("[DEBUG] Session refresh_token:", session.refresh_token);
-    }
 
     const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
     const isProd = process.env.NODE_ENV === "production";
@@ -126,13 +119,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 👇 Confirmar que las cookies se guardan correctamente
-    if (process.env.NODE_ENV !== "production") {
-      console.log("[DEBUG] Cookies set:", {
-        access_token: res.cookies.get("access_token"),
-        refresh_token: res.cookies.get("refresh_token"),
-      });
-    }
 
     return res;
   } catch (err: any) {

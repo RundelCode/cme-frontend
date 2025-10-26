@@ -69,7 +69,6 @@ async function gql(req: NextRequest, query: string, variables?: any, debug = fal
   return payload;
 }
 
-/** GET /api/notifications/:id */
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const debug = req.nextUrl.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
   try {
@@ -82,7 +81,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-/** PATCH /api/notifications/:id  (actualizar status/readAt) */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const debug = req.nextUrl.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
   try {

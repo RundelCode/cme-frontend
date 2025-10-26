@@ -44,7 +44,6 @@ function directionLabel(d: PaymentDirection) {
     return '—';
 }
 
-/** Rango completo UTC para el mes YYYY-MM */
 function getMonthRange(ym: string): { from: string; to: string } | null {
     const m = /^(\d{4})-(\d{2})$/.exec(ym);
     if (!m) return null;
@@ -64,7 +63,6 @@ function getDefaultMonth(): string {
 }
 
 export default function FinanceUsersPage() {
-    // mes actual por defecto (cámbialo a '' si prefieres sin filtro inicial)
     const [month, setMonth] = useState<string>(getDefaultMonth()); // YYYY-MM
     const [data, setData] = useState<PaymentsResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -125,7 +123,6 @@ export default function FinanceUsersPage() {
 
     useEffect(() => {
         fetchPayments();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [qs]);
 
     const hasItems = (data?.items?.length ?? 0) > 0;
@@ -134,7 +131,6 @@ export default function FinanceUsersPage() {
         <div className={styles.container}>
             <h1 className={styles.title}>Finanzas · Pagos a usuarios</h1>
 
-            {/* Filtro por mes */}
             <div className={styles.filters}>
                 <div className={styles.inputGroup}>
                     <label htmlFor="month">Mes</label>

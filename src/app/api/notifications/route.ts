@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-/** --------------------------------
- *  GraphQL (solo para GET / list)
- * --------------------------------*/
 const NOTIFS_Q = `
   query Notifications($userId: ID, $status: String, $notificationType: String, $limit: Int, $offset: Int) {
     notifications(userId: $userId, status: $status, notificationType: $notificationType, limit: $limit, offset: $offset) {
@@ -60,11 +57,7 @@ async function gql(req: NextRequest, query: string, variables?: any) {
     return data?.data;
 }
 
-/** --------------------------------
- *  REST (para POST directo)
- * --------------------------------*/
 function resolveNotifsBase(origin: string) {
-    // Debe apuntar a tu notification-service (p.ej. http://localhost:3007)
     return process.env.NOTIFS_URL?.trim() || "http://localhost:3007";
 }
 
@@ -74,10 +67,8 @@ export async function GET(req: NextRequest) {
         const limit = Number(sp.get("limit") ?? "25");
         const offset = Number(sp.get("offset") ?? "0");
         const status = sp.get("status") || null;
-        // el cliente puede mandar ?type= → mapeamos a notificationType para GQL
         const notificationType = sp.get("type") || sp.get("notificationType") || null;
 
-        // resolvemos el userId del usuario logueado
         const me = await gql(req, AUTH_ME);
         const userId: string | null = me?.authMe?.id ?? null;
         if (!userId) {
@@ -88,7 +79,6 @@ export async function GET(req: NextRequest) {
         const items = data?.notifications ?? [];
         return NextResponse.json({ items }, { status: 200 });
     } catch (e: any) {
-        // Log en servidor
         console.error("[/api/notifications][GET] fail:", e?.message, e?.__debug ?? "");
         return NextResponse.json(
             { items: [], error: e?.message || "notifications_load_failed", __debug: e?.__debug ?? null },
@@ -97,17 +87,12 @@ export async function GET(req: NextRequest) {
     }
 }
 
-/**
- * POST /api/notifications
- * Crea notificación DIRECTO al REST (evita gateway, que está descartando el body).
- */
 export async function POST(req: NextRequest) {
     const origin = req.nextUrl.origin;
     const base = resolveNotifsBase(origin);
     try {
         const body = await req.json().catch(() => ({}));
 
-        // Normalizamos/aseguramos los campos que exige el REST:
         const payload = {
             userId: body.userId ?? body.user_id,
             title: body.title,
@@ -117,10 +102,7 @@ export async function POST(req: NextRequest) {
             relatedId: body.relatedId ?? body.related_id ?? null,
         };
 
-        // Logs server-side
-        console.log("[/api/notifications][POST] payload →", payload);
 
-        // Validación rápida en el edge por mensajes más claros
         if (!payload.userId || !payload.title || !payload.message || !payload.notificationType) {
             const msg = "Missing required fields (userId, title, message, notificationType)";
             console.warn("[/api/notifications][POST] 400:", msg);
@@ -131,7 +113,6 @@ export async function POST(req: NextRequest) {
             "content-type": "application/json",
             accept: "application/json",
         };
-        // Si tu REST usa auth por cookies/headers, pásalos:
         const auth = req.headers.get("authorization");
         const cookie = req.headers.get("cookie");
         if (auth) headers.authorization = auth;
@@ -155,7 +136,6 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // OK
         return NextResponse.json({ notification: data }, { status: 201 });
     } catch (e: any) {
         console.error("[/api/notifications][POST] fail:", e?.message);

@@ -78,8 +78,6 @@ export default function Register() {
         }),
       });
 
-      console.log(role)
-
       const text = await res.text();
       let json: any = null;
       try { json = text ? JSON.parse(text) : null; }

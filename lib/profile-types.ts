@@ -1,6 +1,4 @@
-// lib/profile-types.ts
 
-// 👇 OJO: estos valores deben ser EXACTAMENTE los que expone GraphQL
 export type ProfileSortBy = "createdAt" | "updatedAt" | "reputation" | "name";
 export type ProfileSortOrder = "ASC" | "DESC";
 

@@ -4,9 +4,8 @@ import { NextResponse } from "next/server";
 const PAYMENTS_BASE =
   process.env.PAYMENTS_BASE_URL ??
   process.env.API_GATEWAY_URL ??
-  "http://localhost:3005"; // Payment Service
+  "http://localhost:3005";
 
-// Endpoints auxiliares para resolver companyId del admin autenticado:
 const PROFILES_BASE = process.env.PROFILES_BASE_URL ?? "http://localhost:3001";
 const COMPANIES_BASE = process.env.COMPANIES_BASE_URL ?? "http://localhost:3009";
 
@@ -42,7 +41,6 @@ export async function GET(req: NextRequest) {
     const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
 
-    // 1) Perfil ⇒ userId
     const me = await fetchJson(`${PROFILES_BASE}/profiles/me`, {
       method: "GET",
       headers: {

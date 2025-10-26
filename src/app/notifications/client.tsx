@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import styles from './notifications.module.css';
-import Link from 'next/link';
 import { PropagateLoader } from 'react-spinners';
 
 type Notification = {
@@ -24,9 +23,8 @@ export default function Client() {
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
 
-    // filtros & paginación
     const [status, setStatus] = useState<string>('');
-    const [notificationType, setNotificationType] = useState<string>(''); // <- FIX nombre
+    const [notificationType, setNotificationType] = useState<string>('');
     const [limit, setLimit] = useState(25);
     const [offset, setOffset] = useState(0);
 
@@ -38,20 +36,19 @@ export default function Client() {
             limit: String(limit),
             offset: String(offset),
             ...(status ? { status } : {}),
-            ...(notificationType ? { notificationType } : {}), // <- FIX clave correcta
+            ...(notificationType ? { notificationType } : {}),
         }).toString();
 
         const res = await fetch(`/api/notifications?${qs}`, { cache: 'no-store' });
         const raw = await res.text();
 
         let data: any = null;
-        try { data = raw ? JSON.parse(raw) : null; } catch { /* ignore */ }
+        try { data = raw ? JSON.parse(raw) : null; } catch {}
 
         if (!res.ok) {
             setErr(data?.error || `HTTP ${res.status}`);
             setItems([]);
         } else {
-            // backend devuelve { items: [...] }
             setItems(data?.items ?? []);
         }
 
@@ -60,7 +57,6 @@ export default function Client() {
 
     useEffect(() => {
         load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [limit, offset, status, notificationType]);
 
     const canPrev = offset > 0;
@@ -109,7 +105,6 @@ export default function Client() {
             alert(data?.error || 'No se pudo marcar como leída');
             return;
         }
-        // refrescar localmente
         setItems(prev =>
             prev.map(n =>
                 n.id === id
@@ -127,7 +122,6 @@ export default function Client() {
                     <p className={styles.subtitle}>Todas las notificaciones que has recibido.</p>
                 </header>
 
-                {/* Filtros estilados */}
                 <div className={styles.filters}>
                     <label className={styles.field}>
                         <span className={styles.label}>Estado</span>
@@ -215,7 +209,6 @@ export default function Client() {
                             </ul>
                         )}
 
-                        {/* Paginación estilada */}
                         <div className={styles.pagination}>
                             <div className={styles.pageGroup}>
                                 <button

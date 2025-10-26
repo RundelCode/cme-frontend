@@ -7,26 +7,19 @@ const UPLOADS_BASE =
 
 export type UploadResp = { url: string; bucket: string; path: string };
 
-// Este client usa las COOKIES de Supabase (gracias a auth-helpers)
-// y funciona dentro de componentes "use client".
 const supabase = createClientComponentClient();
 
 async function getAccessToken(): Promise<string> {
-  console.log('[uploads-client] 🔑 Obteniendo sesión (cookies)…');
   const { data, error } = await supabase.auth.getSession();
-  console.log('[uploads-client] session data:', data);
-  console.log('[uploads-client] session error:', error);
 
   if (error) throw new Error(error.message || 'No se pudo obtener la sesión');
 
   const token = data?.session?.access_token;
-  console.log('[uploads-client] 🪙 Access Token:', token ? '(existe)' : '(no existe)');
   if (!token) throw new Error('No autenticado');
   return token;
 }
 
 async function postFormDirect(endpoint: string, file: File): Promise<UploadResp> {
-  console.log(`[uploads-client] 📤 Subiendo archivo a ${endpoint}`);
   const token = await getAccessToken();
 
   const fd = new FormData();
@@ -40,14 +33,11 @@ async function postFormDirect(endpoint: string, file: File): Promise<UploadResp>
     },
   });
 
-  console.log('[uploads-client] 📡 Response status:', res.status);
 
   let json: any = null;
   try {
     json = await res.json();
-    console.log('[uploads-client] 📥 Response JSON:', json);
   } catch (err) {
-    console.log('[uploads-client] ⚠️ Error parseando JSON:', err);
   }
 
   if (!res.ok) {

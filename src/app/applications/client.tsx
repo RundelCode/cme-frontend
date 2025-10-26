@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import styles from './applications.module.css';
 import Link from 'next/link';
-import { PropagateLoader } from 'react-spinners'; // ← loader
+import { PropagateLoader } from 'react-spinners';
 
 const AUTH_ME = `query { authMe { id email role } }`;
 
@@ -119,7 +119,6 @@ export default function Client() {
         const candidateId = me?.authMe?.id;
         if (!candidateId) throw new Error('No autorizado');
 
-        // 1) Traer aplicaciones y referrals en paralelo
         const [appsResp, refsResp] = await Promise.all([
           gql<{ applications: Application[] }>(APPLICATIONS_Q, { candidateId, limit: 50, offset: 0 }),
           gql<{ referralsByCandidate: Referral[] }>(REFERRALS_BY_CANDIDATE, { candidateId, limit: 50, offset: 0 }),
@@ -128,12 +127,9 @@ export default function Client() {
         const applicationsRaw = appsResp.applications ?? [];
         const referrals = refsResp.referralsByCandidate ?? [];
 
-        // ✅ 2) FILTRAR ANTES DE EXPANDIR:
-        //    Si existe una referral para el mismo job_offer_id, NO mostramos la application
         const referredJobIds = new Set(referrals.map(r => r.job_offer_id));
         const applications = applicationsRaw.filter(a => !referredJobIds.has(a.job_offer_id));
 
-        // 3) Expandir (pidiendo job y company) SOLO lo que quedó tras el filtro
         const companyCache = new Map<string, CompanyMin | null>();
 
         const appsExpanded: AppItem[] = await Promise.all(
@@ -188,10 +184,6 @@ export default function Client() {
     return () => { alive = false; };
   }, []);
 
-  /** FILTROS extra en UI:
-   * - Applications: mostrar solo NO aceptadas (accepted === false)
-   * - Referrals: mostrar solo las que NO están en 'hired'
-   */
   const appsFiltered = useMemo(() => apps.filter(a => !a.application.accepted), [apps]);
   const refsFiltered = useMemo(() => refs.filter(r => (r.referral.status || '').toLowerCase() !== 'hired'), [refs]);
 
@@ -207,13 +199,12 @@ export default function Client() {
 
         {loading && (
           <div className={styles.loading}>
-            <PropagateLoader />  {/* loader lindo */}
+            <PropagateLoader />
           </div>
         )}
 
         {!loading && !err && (
           <>
-            {/* Intereses (Applications NO aceptadas y ya filtradas por solapamiento con referrals) */}
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Ofertas a las que mostré interés</h2>
               {appsFiltered.length === 0 ? (
@@ -272,7 +263,6 @@ export default function Client() {
               )}
             </section>
 
-            {/* Estado (Referrals que NO están en 'hired') */}
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Estado de mis postulaciones</h2>
               {refsFiltered.length === 0 ? (

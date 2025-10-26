@@ -26,7 +26,6 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
-  // ❌ No autenticado -> redirigir a /login?next=<ruta original>
   const loginUrl = new URL("/login", req.url);
   loginUrl.searchParams.set("next", pathname + (search || ""));
   return NextResponse.redirect(loginUrl);

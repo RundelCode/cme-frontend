@@ -88,7 +88,6 @@ export const SEARCH_COMPANIES = `
 `;
 
 
-// lib/queries.ts
 export const SEARCH_PROFILES = `
   query SearchProfiles($input: SearchProfilesInput) {
     searchProfiles(input: $input) {
@@ -179,7 +178,7 @@ export const SEARCH_PROFILES_MIN = `
   }
 `;
 
-export const CREATE_REFERRAL = /* GraphQL */ `
+export const CREATE_REFERRAL = `
   mutation CreateReferral($headhunterId: ID!, $jobOfferId: ID!, $candidateId: ID) {
     createReferral(
       headhunterId: $headhunterId

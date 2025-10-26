@@ -115,7 +115,6 @@ export default async function MyCompanyPage() {
 
         {me && company && (
           <div className={styles.card}>
-            {/* Cover */}
             <div className={styles.coverContainer}>
               {company.coverPhoto ? (
                 <Image
@@ -130,7 +129,6 @@ export default async function MyCompanyPage() {
               )}
             </div>
 
-            {/* Header: avatar + identidad + rating */}
             <div className={styles.infoSection}>
               <div className={styles.avatarWrap}>
                 {company.profilePicture ? (
@@ -172,13 +170,11 @@ export default async function MyCompanyPage() {
               </div>
             </div>
 
-            {/* Descripción */}
             <div className={styles.section}>
               <h3>Descripción</h3>
               <p>{company.description || "Sin descripción"}</p>
             </div>
 
-            {/* Detalles */}
             <div className={styles.section}>
               <h3>Detalles</h3>
               <dl className={styles.detailList}>

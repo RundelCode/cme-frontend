@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 const REFERRALS_BASE =
     process.env.REFERRALS_BASE_URL ??
     process.env.API_GATEWAY_URL ??
-    "http://localhost:3007"; // ajusta al servicio que expose /referrals
+    "http://localhost:3007";
 
 const PROFILES_BASE = process.env.PROFILES_BASE_URL ?? "http://localhost:3001";
 
@@ -31,11 +31,6 @@ async function fetchJson(url: string, init: RequestInit) {
     return data;
 }
 
-/**
- * GET /api/referrals?from=ISO&to=ISO
- * - Obtiene el userId con /profiles/me
- * - Llama al servicio de referrals con headhunterId=<userId>
- */
 export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
@@ -45,7 +40,6 @@ export async function GET(req: NextRequest) {
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        // 1) Identidad
         const me = await fetchJson(`${PROFILES_BASE}/profiles/me`, {
             method: "GET",
             headers: {
@@ -64,12 +58,10 @@ export async function GET(req: NextRequest) {
             );
         }
 
-        // 2) Referencias del usuario
         const qs = new URLSearchParams();
         qs.set("headhunterId", userId);
         if (from) qs.set("from", from);
         if (to) qs.set("to", to);
-        // sin límite: ver todas
         qs.set("all", "true");
 
         const target = `${REFERRALS_BASE}/referrals?${qs.toString()}`;

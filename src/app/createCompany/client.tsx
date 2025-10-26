@@ -1,4 +1,3 @@
-// File: src/app/createCompany/Client.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -67,7 +66,6 @@ type CreateCompanyPayload = {
 export default function Client() {
   const router = useRouter();
 
-  // --- Gate de rol + userId ---
   const [role, setRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [authErr, setAuthErr] = useState<string | null>(null);

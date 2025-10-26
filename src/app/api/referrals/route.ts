@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CREATE_REFERRAL } from "../../../../lib/queries";
 
-/** Resuelve el endpoint GQL desde env o como ruta relativa */
 function resolveGraphqlUrl(req: NextRequest) {
   const env =
     process.env.GRAPHQL_URL ||
@@ -12,7 +11,6 @@ function resolveGraphqlUrl(req: NextRequest) {
     : env;
 }
 
-/** Extrae access token de Authorization o cookies (incluye supabase-auth-token JSON) */
 function extractAccessToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization");
   if (auth?.toLowerCase().startsWith("bearer ")) {
@@ -21,37 +19,33 @@ function extractAccessToken(req: NextRequest): string | null {
   }
   const cookie = req.headers.get("cookie") ?? "";
 
-  // sb-access-token / access_token directos
   const m1 = cookie.match(/(?:^|;\s*)sb-access-token=([^;]+)/i);
   if (m1?.[1]) return decodeURIComponent(m1[1]);
 
   const m2 = cookie.match(/(?:^|;\s*)access_token=([^;]+)/i);
   if (m2?.[1]) return decodeURIComponent(m2[1]);
 
-  // supabase-auth-token (JSON con access_token)
   const m3 = cookie.match(/(?:^|;\s*)supabase-auth-token=([^;]+)/i);
   if (m3?.[1]) {
     try {
       const val = decodeURIComponent(m3[1]);
       const parsed = JSON.parse(val);
       if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) {
-        return parsed[0]; // ["access_token", ...] (formato viejo)
+        return parsed[0];
       }
       if (parsed && typeof parsed === "object" && typeof parsed.access_token === "string") {
         return parsed.access_token;
       }
-    } catch { /* noop */ }
+    } catch {}
   }
   return null;
 }
 
-/** Decodifica JWT (sin verificar) y saca id del payload */
 function decodeUserIdFromJwt(token: string | null): string | null {
   if (!token) return null;
   const parts = token.split(".");
   if (parts.length < 2) return null;
   try {
-    // Buffer solo existe en runtime Node. En Edge podrías usar atob/Uint8Array, pero este route es Node por defecto.
     const json = Buffer
       .from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64")
       .toString("utf8");
@@ -67,7 +61,6 @@ function decodeUserIdFromJwt(token: string | null): string | null {
   }
 }
 
-/** Fallback 1: pide /api/me y usa user.id | authMe.id | me.id */
 async function getUserIdFromMe(req: NextRequest): Promise<string | null> {
   try {
     const meUrl = new URL("/api/me", req.nextUrl.origin).toString();
@@ -90,7 +83,6 @@ async function getUserIdFromMe(req: NextRequest): Promise<string | null> {
   }
 }
 
-/** Fallback 2: AUTH_ME contra GraphQL */
 async function getUserIdFromGraphql(req: NextRequest): Promise<string | null> {
   const url = resolveGraphqlUrl(req);
   try {
@@ -127,7 +119,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "jobOfferId_required" }, { status: 400 });
     }
 
-    // --- Resolver headhunterId de forma robusta (me -> gql -> jwt) ---
     let headhunterId: string | null = await getUserIdFromMe(req);
     if (!headhunterId) headhunterId = await getUserIdFromGraphql(req);
     if (!headhunterId) {
@@ -141,7 +132,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // --- Armar request a GraphQL ---
     const url = resolveGraphqlUrl(req);
     const headers: Record<string, string> = {
       "content-type": "application/json",
@@ -161,14 +151,6 @@ export async function POST(req: NextRequest) {
       jobOfferId,
     };
     if (candidateId !== undefined) variables.candidateId = candidateId;
-
-    // LOGS útiles (no sensibles)
-    console.log("[/api/referrals] createReferral ->", {
-      gql: url,
-      headhunterId,
-      jobOfferId,
-      hasCandidateId: candidateId != null,
-    });
 
     const gqlRes = await fetch(url, {
       method: "POST",

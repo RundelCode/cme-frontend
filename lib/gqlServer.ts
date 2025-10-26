@@ -30,12 +30,6 @@ export class GqlServerError extends Error {
   }
 }
 
-/**
- * Ejecuta una operación GraphQL desde el servidor (Route Handlers/Server Actions)
- * - Propaga cookies y Authorization del usuario actual.
- * - Lee el endpoint de:
- *   GRAPHQL_ENDPOINT || GRAPHQL_URL || NEXT_PUBLIC_GRAPHQL_URL
- */
 export async function gqlServer<T>(
   query: string,
   variables?: Record<string, unknown>,
@@ -66,8 +60,6 @@ export async function gqlServer<T>(
   });
 
   if (process.env.NEXT_DEBUG_GQL) {
-    console.log("[gqlServer] endpoint:", endpoint);
-    console.log("[gqlServer] variables:", variables);
   }
 
   const controller = new AbortController();
@@ -101,7 +93,6 @@ export async function gqlServer<T>(
   }
 
   if (process.env.NEXT_DEBUG_GQL) {
-    console.log("[gqlServer] status:", res.status);
     if (json.errors?.length) {
       console.error("[gqlServer] errors:", JSON.stringify(json.errors, null, 2));
     }

@@ -3,7 +3,6 @@
   min-height: 100dvh;
 }
 
-/* Contenedor principal */
 .main {
   margin-left: var(--nav-w, 18%);
   min-height: 100dvh;
@@ -12,7 +11,6 @@
   align-items: center;
   justify-content: center;
   gap: 2rem;
-  /* relativo */
 }
 
 .card {
@@ -40,7 +38,6 @@
 .navTitle {
   margin: 0;
   font-size: 1.125rem;
-  /* 18px */
   font-weight: 800;
   color: #101828;
 }
@@ -49,30 +46,25 @@
   display: flex;
   flex-direction: column;
   gap: 0.875rem;
-  /* 14px aprox */
 }
 
 .optionSection {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
-  /* 10px aprox */
 }
 
 .sectionLabel {
   font-size: 0.75rem;
-  /* 12px */
   font-weight: 700;
   color: #8f8f8f;
   text-transform: uppercase;
   letter-spacing: .02em;
 }
 
-/* Botón de opción: alto relativo y paddings en % */
 .option {
   width: 100%;
   min-height: 2.25rem;
-  /* ~36px */
   border: none;
   padding-inline: 2.5%;
   display: flex;
@@ -97,7 +89,6 @@
   box-shadow: inset 0 0 0 1px #c7d2fe;
 }
 
-/* Pane derecho (contenido) */
 .activeOption {
   background: #fff;
   min-height: 60vh;
@@ -109,7 +100,6 @@
   overflow: auto;
 }
 
-/* Contenedor interior: ancho flexible y alineado a la izquierda */
 .contentWrap {
   width: 96%;
   max-width: 100%;
@@ -129,14 +119,11 @@
   font-weight: 600;
 }
 
-/* Compatibilidad con tu CSS previo */
 .options,
 .optionSection {
   width: 100%;
 }
 
-/* ======= Responsivo ======= */
-/* <= ~900px (56.25em con root 16px) */
 @media (max-width: 56.25em) {
   .main {
     justify-content: flex-start;
@@ -146,7 +133,6 @@
   .card {
     width: 95%;
     grid-template-columns: 1fr;
-    /* stack */
   }
 
   .settingNav {
@@ -169,7 +155,6 @@
   }
 }
 
-/* <= ~600px (37.5em) */
 @media (max-width: 37.5em) {
   .option {
     min-height: 2.125rem;

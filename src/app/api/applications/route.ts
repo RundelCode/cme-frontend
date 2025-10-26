@@ -32,7 +32,6 @@ type ApplicationsResp = {
   }>;
 };
 
-// --- util: obtener una cookie desde el header Cookie ---
 function getCookieValue(cookieHeader: string, name: string): string | null {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(/;\s*/);
@@ -72,7 +71,6 @@ export async function GET(req: Request) {
       );
     }
 
-    // —— Cookies y Authorization a partir de req.headers ——
     const cookieHeader = req.headers.get("cookie") ?? "";
     const access = getCookieValue(cookieHeader, "access_token") ?? "";
 
@@ -82,7 +80,6 @@ export async function GET(req: Request) {
     });
     if (access) h.set("Authorization", `Bearer ${access}`);
 
-    // 1) Obtener applications
     const apps = await gqlRequest<ApplicationsResp>(
       ENDPOINT,
       APPLICATIONS,
@@ -106,7 +103,6 @@ export async function GET(req: Request) {
       });
     }
 
-    // 2) Intentar obtener perfiles por ids (searchProfiles), con fallback a profile(id)
     let profilesById = new Map<
       string,
       {
@@ -193,7 +189,6 @@ export async function GET(req: Request) {
       profilesById = new Map(results);
     }
 
-    // 3) Merge + orden por reputación
     const people = items.map((a) => {
       const p = profilesById.get(a.candidate_id);
       return {
@@ -241,7 +236,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // —— Cookies y Authorization desde req.headers ——
     const cookieHeader = req.headers.get("cookie") ?? "";
     const access = getCookieValue(cookieHeader, "access_token") ?? "";
 
@@ -251,7 +245,6 @@ export async function POST(req: Request) {
     });
     if (access) h.set("Authorization", `Bearer ${access}`);
 
-    // quién soy
     const me = await gqlRequest<AuthMeResp>(
       ENDPOINT,
       AUTH_ME,
@@ -264,7 +257,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // crear application
     const data = await gqlRequest<CreateApplicationResp>(
       ENDPOINT,
       CREATE_APPLICATION,

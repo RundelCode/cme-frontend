@@ -57,28 +57,24 @@ function statusLabel(s: string | null | undefined) {
     }
 
 
-/** Devuelve el rango completo (UTC) para un mes YYYY-MM */
 function getMonthRange(ym: string): { from: string; to: string } | null {
-    // ym esperado: "YYYY-MM"
     const m = /^(\d{4})-(\d{2})$/.exec(ym);
     if (!m) return null;
     const y = Number(m[1]);
-    const mon = Number(m[2]); // 1..12
+    const mon = Number(m[2]);
     if (mon < 1 || mon > 12) return null;
 
-    // Desde: primer día del mes 00:00:00.000 UTC
     const fromDate = new Date(Date.UTC(y, mon - 1, 1, 0, 0, 0, 0));
-    // Hasta: último día del mes 23:59:59.999 UTC
     const toDate = new Date(Date.UTC(y, mon, 0, 23, 59, 59, 999));
 
     return {
-        from: fromDate.toISOString(), // el backend acepta ISO completo
+        from: fromDate.toISOString(),
         to: toDate.toISOString(),
     };
 }
 
 export default function Page() {
-    const [month, setMonth] = useState<string>(''); // ej. "2025-07"
+    const [month, setMonth] = useState<string>('');
     const [data, setData] = useState<PaymentsResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [err, setErr] = useState<string | null>(null);
@@ -124,7 +120,6 @@ export default function Page() {
 
     useEffect(() => {
         fetchPayments();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [qs]);
 
     const hasItems = (data?.items?.length ?? 0) > 0;
@@ -133,7 +128,6 @@ export default function Page() {
         <div className={styles.container}>
             <h1 className={styles.title}>Finanzas · Recibos de pago</h1>
 
-            {/* Filtro por mes */}
             <div className={styles.filters}>
                 <div className={styles.inputGroup}>
                     <label htmlFor="month">Mes</label>
@@ -148,7 +142,6 @@ export default function Page() {
                 </div>
             </div>
 
-            {/* Contenido */}
             {loading ? (
                 <div className={styles.loading}>
                     <PropagateLoader />

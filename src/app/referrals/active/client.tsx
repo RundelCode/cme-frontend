@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styles from './active.module.css';
 import { PropagateLoader } from 'react-spinners';
 
-// ==== GraphQL ====
 const AUTH_ME = `query { authMe { id email role } }`;
 
 const REFERRALS_BY_HEADHUNTER = `
@@ -47,7 +46,6 @@ const GET_COMPANY_MIN = `
   }
 `;
 
-// ==== Tipos mínimos ====
 type Referral = {
     id: string;
     headhunter_id: string;
@@ -84,7 +82,6 @@ type ProfileLite = {
     profile_picture?: string | null;
 };
 
-// ==== Utils ====
 async function gql<T = any>(query: string, variables?: any) {
     const res = await fetch('/api/graphql', {
         method: 'POST',
@@ -163,14 +160,12 @@ function initials(name?: string | null) {
     return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '•';
 }
 
-// ==== Página ====
 export default function MyReferralsPage() {
     const [month, setMonth] = useState<string>(getDefaultMonth());
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [items, setItems] = useState<Referral[]>([]);
 
-    // caches de enriquecimiento
     const [profiles, setProfiles] = useState<Record<string, ProfileLite>>({});
     const [companies, setCompanies] = useState<Record<string, CompanyMin>>({});
     const [jobs, setJobs] = useState<Record<string, JobMin>>({});
@@ -182,25 +177,21 @@ export default function MyReferralsPage() {
                 setLoading(true);
                 setErr(null);
 
-                // 1) Me
                 const me = await gql<{ authMe: { id: string } | null }>(AUTH_ME);
                 const headhunterId = me?.authMe?.id;
                 if (!headhunterId) throw new Error('No autenticado');
 
-                // 2) Referrals por headhunter
                 const r = await gql<{ referralsByHeadhunter: Referral[] }>(
                     REFERRALS_BY_HEADHUNTER,
                     { headhunterId, limit: 200, offset: 0 }
                 );
                 const refs = r?.referralsByHeadhunter ?? [];
 
-                // 3) Enriquecer: jobs + companies + perfiles
                 const jobIds = Array.from(new Set(refs.map((x) => x.job_offer_id)));
                 const candIds = Array.from(
                     new Set(refs.map((x) => x.candidate_id).filter(Boolean))
                 ) as string[];
 
-                // jobs + companies
                 const companyCache = new Map<string, CompanyMin | null>();
                 const jobsMap: Record<string, JobMin> = {};
                 const companiesMap: Record<string, CompanyMin> = {};
@@ -226,16 +217,13 @@ export default function MyReferralsPage() {
                             }
                         }
                     } catch {
-                        /* noop */
                     }
                 }
 
-                // perfiles — primero POST /api/profiles/batch, luego fallback GET /api/profiles?ids=...
                 const profilesMap: Record<string, ProfileLite> = {};
                 if (candIds.length) {
                     let loaded = false;
 
-                    // 1) POST /batch
                     try {
                         const r1 = await fetch(`/api/profiles/batch`, {
                             method: 'POST',
@@ -250,7 +238,6 @@ export default function MyReferralsPage() {
                         }
                     } catch { }
 
-                    // 2) Fallback GET ?ids=...
                     if (!loaded) {
                         try {
                             const q = encodeURIComponent(candIds.join(','));
@@ -264,7 +251,6 @@ export default function MyReferralsPage() {
                         } catch { }
                     }
 
-                    // 3) Último fallback: GraphQL (si tu schema lo soporta)
                     if (!loaded) {
                         try {
                             const query = `
@@ -307,7 +293,6 @@ export default function MyReferralsPage() {
         };
     }, []);
 
-    // Filtro por mes (cliente)
     const monthRange = useMemo(() => getMonthRange(month), [month]);
     const filtered = useMemo(() => {
         if (!monthRange) return items;
@@ -356,7 +341,6 @@ export default function MyReferralsPage() {
 
                                 return (
                                     <li className={styles.card} key={r.id}>
-                                        {/* Media / logo */}
                                         <div className={styles.media}>
                                             {company?.profilePicture ? (
                                                 <img
@@ -372,9 +356,7 @@ export default function MyReferralsPage() {
                                             )}
                                         </div>
 
-                                        {/* Content */}
                                         <div className={styles.content}>
-                                            {/* row top: empresa + estado */}
                                             <div className={styles.rowTop}>
                                                 <div className={styles.companyBlock}>
                                                     <div className={styles.companyName}>
@@ -395,7 +377,6 @@ export default function MyReferralsPage() {
                                                 </span>
                                             </div>
 
-                                            {/* job */}
                                             <div className={styles.jobBlock}>
                                                 <div className={styles.jobTitle}>
                                                     {job?.title ?? 'Oferta'}
@@ -411,7 +392,6 @@ export default function MyReferralsPage() {
                                                 </div>
                                             </div>
 
-                                            {/* bottom row */}
                                             <div className={styles.rowBottom}>
                                                 <div className={styles.metaRow}>
                                                     <span className={styles.metaLabel}>Referido</span>
@@ -441,7 +421,6 @@ export default function MyReferralsPage() {
                                                         </span>
                                                     )}
                                                     <span>•</span>
-                                                    {/* SIEMPRE mostramos “Chatear” (WhatsApp) */}
                                                     <a
                                                         className={styles.link}
                                                         href={chatHref}

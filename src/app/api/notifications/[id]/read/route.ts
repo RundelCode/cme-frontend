@@ -1,4 +1,3 @@
-// app/api/notifications/[id]/read/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
 async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Promise<T> {
@@ -15,7 +14,7 @@ async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Pr
 
     const raw = await res.text();
     let data: any = null;
-    try { data = raw ? JSON.parse(raw) : null; } catch { /* ignore */ }
+    try { data = raw ? JSON.parse(raw) : null; } catch {}
     if (!res.ok || data?.errors?.length) {
         const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
         throw new Error(msg);
@@ -23,7 +22,6 @@ async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Pr
     return data.data as T;
 }
 
-// PATCH /api/notifications/:id/read
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
     try {
         const id = params?.id;

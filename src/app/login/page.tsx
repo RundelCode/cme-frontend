@@ -20,12 +20,9 @@ export default function Login() {
     const [loading, setLoading] = useState(false);
 
     const router = useRouter();
-    const handleFacebook = () => {
-        console.log('TODO: login con Facebook');
-    };
+
     const handleForgotPassword = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
         e.preventDefault();
-        console.log('TODO: flujo de recuperación de contraseña');
     };
     const handleRegister = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
         e.preventDefault();
@@ -42,7 +39,6 @@ export default function Login() {
         if (error) {
             console.error('Error iniciando OAuth:', error);
         } else {
-            console.log('redirecting to provider...');
         }
     }
 
@@ -107,7 +103,6 @@ export default function Login() {
                     />
                     <h2 className={styles.subtitle}>BIENVENIDO</h2>
 
-                    {/* Social */}
                     <form onSubmit={(e) => e.preventDefault()} className={styles.loginForm}>
                         <button type="button" className={styles.socialMediaLoginButtion} onClick={signInWithGoogle}>
                             <Image className={styles.cmeLogo} src={Google} alt="GoogleIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
@@ -121,9 +116,7 @@ export default function Login() {
                         <div className={styles.line}></div>
                     </div>
 
-                    {/* Formulario de credenciales */}
                     <form onSubmit={handleLoginSubmit} className={styles.loginForm}>
-                        {/* MENSAJE DE ERROR (solo si existe) */}
                         {formError && (
                             <div className={styles.formError} role="alert" aria-live="polite">
                                 {formError}

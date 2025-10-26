@@ -70,7 +70,6 @@
     display: none;
 }
 
-/* Avatar */
 .avatarRow {
     display: flex;
     align-items: center;
@@ -120,7 +119,6 @@
     color: #6b7280;
 }
 
-/* Form grid */
 .grid {
     width: 100%;
     display: grid;
@@ -161,7 +159,6 @@
     box-shadow: 0 0 0 2px #15214820;
 }
 
-/* States */
 .loading {
     width: 100%;
     display: grid;
@@ -237,7 +234,6 @@
     background: #f3f4f6;
 }
 
-/* Textarea (Sobre mí, descripciones) */
 .textarea {
     padding: 10px 12px;
     border: 1px solid rgba(0, 0, 0, .15);
@@ -255,7 +251,6 @@
     box-shadow: 0 0 0 2px #15214820;
 }
 
-/* Secciones (Experiencia / Educación / CV) */
 .section {
     width: 100%;
     margin-top: 10px;
@@ -275,7 +270,6 @@
     color: #101828;
 }
 
-/* Botón pequeño de añadir (+ Añadir) */
 .smallBtn {
     padding: 6px 10px;
     border-radius: 8px;
@@ -291,14 +285,12 @@
     background: #f3f4f6;
 }
 
-/* Texto tenue “Sin registros” */
 .muted {
     margin: 0 2px 8px;
     color: #6b7280;
     font-size: 13px;
 }
 
-/* Tarjeta contenedora de cada item (exp/edu) */
 .card {
     width: calc(100% - 20px);
     border: 1px solid #e5e7eb;
@@ -309,7 +301,6 @@
     box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
 }
 
-/* Fila dentro de la tarjeta (inputs en línea) */
 .cardRow {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -317,13 +308,11 @@
     margin-bottom: 8px;
 }
 
-/* Alineación a la derecha (botón eliminar) */
 .rowRight {
     display: flex;
     justify-content: flex-end;
 }
 
-/* Botón eliminar */
 .dangerBtn {
     padding: 8px 12px;
     border-radius: 8px;
@@ -340,7 +329,6 @@
     background: #fee2e2;
 }
 
-/* Link “Ver CV actual” */
 .link {
     display: inline-flex;
     align-items: center;
@@ -360,12 +348,10 @@
     background: #f3f4f6;
 }
 
-/* Margen utilitario */
 .mb8 {
     margin-bottom: 8px;
 }
 
-/* ===== Responsivo ===== */
 @media (max-width: 768px) {
     .grid {
         grid-template-columns: 1fr;

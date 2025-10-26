@@ -34,7 +34,6 @@ const CREATE_COMPANY = `
   }
 `;
 
-// ---- Helpers ----
 function isValidEmail(email: unknown): email is string {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -98,11 +97,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1) Leer body
     const body = await req.json();
     const input = body?.input ?? {};
 
-    // 2) Validación mínima (name + email obligatorios por tu schema)
     if (!assertString(input?.name)) {
       return NextResponse.json(
         { error: "Campo 'name' es obligatorio" },
@@ -116,21 +113,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3) Reusar cabeceras de autenticación (igual que tu ejemplo)
     const authorization = req.headers.get("authorization") ?? "";
     const cookie = req.headers.get("cookie") ?? "";
 
     const headers = { authorization, cookie };
 
-    // 4) Regla de negocio: "un usuario → una empresa"
-    //    Estrategia: buscamos por q = email y comparamos exacto por email.
-    //    (Tu resolver pasa tal cual los params al servicio /companies/search.)
     {
       const pre = await gqlFetch<{
         searchCompanies: Array<{ id: string; email: string }>;
       }>(endpoint, {
         query: SEARCH_COMPANIES,
-        variables: { input: { q: input.email, limit: 10, offset: 0 } }, // limit/offset no existen en el input GraphQL, los ignora si backend no los soporta
+        variables: { input: { q: input.email, limit: 10, offset: 0 } }, 
         headers,
       });
 
@@ -151,7 +144,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 5) Crear la empresa
     const created = await gqlFetch<{
       createCompany: Record<string, any>;
     }>(endpoint, {

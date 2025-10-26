@@ -77,7 +77,6 @@ export function useJobSearch(initial: {
       maxSalary: f.maxSalary === "" ? undefined : f.maxSalary,
       orderBy: f.orderBy,
     } as const;
-    console.log(`${TAG} buildInput ->`, input);
     return input;
   };
 
@@ -88,7 +87,6 @@ export function useJobSearch(initial: {
 
       const input = buildInput(f);
       const started = performance.now();
-      console.log(`${TAG} run() →`, { input, limit: l, offset: o });
 
       try {
         const data = await gql<JobSearchResponse>(JOB_SEARCH, { input, limit: l, offset: o });
@@ -99,7 +97,6 @@ export function useJobSearch(initial: {
         }
 
         const dur = Math.round(performance.now() - started);
-        console.log(`${TAG} response (${dur}ms) → total:`, jobSearch.total, "items:", jobSearch.items.length);
 
         setItems(jobSearch.items);
         setTotal(jobSearch.total ?? 0);
@@ -114,12 +111,10 @@ export function useJobSearch(initial: {
   );
 
   useEffect(() => {
-    console.log(`${TAG} mount →`, { filters, limit, offset });
     run();
   }, []);
 
   const submit = async (nextFilters: Filters) => {
-    console.log(`${TAG} submit() →`, nextFilters);
     setFilters(nextFilters);
     setOffset(0);
     await run(nextFilters, limit, 0);
@@ -127,7 +122,6 @@ export function useJobSearch(initial: {
 
   const goToPage = async (page: number) => {
     const o = page * limit;
-    console.log(`${TAG} goToPage(${page}) → offset:`, o);
     setOffset(o);
     await run(filters, limit, o);
   };

@@ -1,4 +1,3 @@
-// apps/web/app/api/referrals/consume/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 function resolveGraphqlUrl(req: NextRequest) {
@@ -10,7 +9,7 @@ function resolveGraphqlUrl(req: NextRequest) {
   return env;
 }
 
-const LIST_REFERRALS = /* GraphQL */ `
+const LIST_REFERRALS =`
   query ListReferrals($limit: Int!, $offset: Int!, $jobOfferId: ID, $status: String) {
     referrals(limit: $limit, offset: $offset, jobOfferId: $jobOfferId, status: $status) {
       id
@@ -24,7 +23,7 @@ const LIST_REFERRALS = /* GraphQL */ `
   }
 `;
 
-const UPDATE_REFERRAL = /* GraphQL */ `
+const UPDATE_REFERRAL =`
   mutation ClaimReferral($id: ID!, $candidateId: ID!, $status: String!) {
     updateReferral(id: $id, candidateId: $candidateId, status: $status) {
       id
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
     req.nextUrl.searchParams.get("debug") === "1";
 
   const debug: string[] = [];
-  const dlog = (...a: any[]) => { if (debugEnabled) debug.push(a.map(String).join(" ")); console.log("[consume]", ...a); };
+  const dlog = (...a: any[]) => { if (debugEnabled) debug.push(a.map(String).join(" "));};
   const derror = (...a: any[]) => { if (debugEnabled) debug.push("ERROR: " + a.map(String).join(" ")); console.error("[consume]", ...a); };
 
   try {
@@ -64,7 +63,6 @@ export async function POST(req: NextRequest) {
     if (auth) baseHeaders["authorization"] = auth;
     if (cookie) baseHeaders["cookie"] = cookie;
 
-    // STEP 1: listar referrals
     dlog("Listando referrals por job:", jobOfferId);
     const listRes = await fetch(url, {
       method: "POST",
@@ -93,7 +91,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "referral_not_found_for_offer", debug }, { status: 404 });
     }
 
-    // STEP 2: /api/me para saber rol e id
     const meUrl = new URL("/api/me", req.nextUrl.origin).toString();
     dlog("Consultando /api/me:", meUrl);
     const meRes = await fetch(meUrl, { method: "GET", headers: { cookie, authorization: auth }, cache: "no-store" });
@@ -109,26 +106,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthenticated", debug }, { status: 401 });
     }
 
-    // ⚠️ Lógica para determinar candidateId final
     let finalCandidateId: string | null = null;
     if (meRole === "candidate") {
-      finalCandidateId = meId;                      // el propio candidato
+      finalCandidateId = meId;                     
       dlog("finalCandidateId <- meId (candidate)");
     } else if (candidateIdFromBody) {
-      finalCandidateId = String(candidateIdFromBody); // headhunter u otro rol asignando candidato explícito
+      finalCandidateId = String(candidateIdFromBody);
       dlog("finalCandidateId <- candidateIdFromBody");
     } else {
       dlog("No candidateId disponible (ni role candidate ni candidateId en body)");
       return NextResponse.json({ error: "candidate_id_required", debug }, { status: 400 });
     }
 
-    // Si ya tiene candidate_id y no coincide, bloquear
     if (found.candidate_id && found.candidate_id !== finalCandidateId) {
       dlog("Referral ya tomada por otro user:", found.candidate_id);
       return NextResponse.json({ error: "referral_already_claimed_by_other", debug }, { status: 409 });
     }
 
-    // STEP 3: updateReferral con candidateId correcto
     const variables = { id: found.id, candidateId: finalCandidateId, status: "accepted_by_candidate" };
     dlog("UPDATE_REFERRAL variables:", JSON.stringify(variables));
 

@@ -14,7 +14,6 @@ export async function GET() {
     const cookieStore = await nextCookies();
     const cookieHeader = cookieStore.toString();
 
-    // 👇 lee el access_token httpOnly y construye Authorization
     const access = cookieStore.get("access_token")?.value;
     const authHeader = access ? `Bearer ${access}` : undefined;
 

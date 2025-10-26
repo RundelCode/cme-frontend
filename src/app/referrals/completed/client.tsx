@@ -47,7 +47,6 @@ const GET_COMPANY_MIN = `
   }
 `;
 
-/** ==== Tipos mínimos ==== */
 type JobMin = {
   id: string; company_id: string; title: string;
   location?: string; employment_type?: string; status?: string; created_at?: string;
@@ -82,7 +81,6 @@ function initials(name?: string | null) {
   return parts.map(p => p[0]?.toUpperCase() ?? '').join('') || '•';
 }
 
-// Estados considerados “finalizados”
 const FINAL_SET = new Set(['hired', 'rejected', 'declined_by_candidate']);
 
 export default function CompletedReferralsPage() {
@@ -101,15 +99,12 @@ export default function CompletedReferralsPage() {
         const candidateId = me?.authMe?.id;
         if (!candidateId) throw new Error('No autorizado');
 
-        // Traemos todas las referrals del candidato (un solo query).
-        // Filtramos en cliente porque el resolver admite un único status.
         const r = await gql<{ referralsByCandidate: Referral[] }>(
           REFERRALS_BY_CANDIDATE,
           { candidateId, limit: 100, offset: 0 },
         );
         const referrals = r.referralsByCandidate ?? [];
 
-        // Expandir job + company con cache
         const companyCache = new Map<string, CompanyMin | null>();
         const expanded: RefItem[] = await Promise.all(
           referrals.map(async (ref) => {
@@ -142,7 +137,6 @@ export default function CompletedReferralsPage() {
     return () => { alive = false; };
   }, []);
 
-  // Solo finalizadas
   const refsFinalized = useMemo(
     () => refs.filter(r => FINAL_SET.has((r.referral.status || '').toLowerCase())),
     [refs]
@@ -237,7 +231,6 @@ export default function CompletedReferralsPage() {
   );
 }
 
-/** Helpers visuales */
 function humanStatus(s?: string) {
   const map: Record<string, string> = {
     submitted: 'Enviado',

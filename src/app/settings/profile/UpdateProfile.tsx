@@ -18,15 +18,6 @@ async function gql<T>(q: string, variables?: any) {
   try { json = raw ? JSON.parse(raw) : null; } catch { }
 
   if (!res.ok || json?.errors?.length) {
-    console.groupCollapsed(
-      `🟥 GraphQL error (${res.status} ${res.statusText}) in ${Date.now() - started}ms`
-    );
-    console.log("endpoint:", GRAPHQL_ENDPOINT);
-    console.log("request.variables:", variables);
-    console.log("response.headers:", Object.fromEntries(res.headers.entries()));
-    console.log("response.raw:", raw);
-    console.log("response.json:", json);
-    console.groupEnd();
     throw new Error(
       json?.errors?.map((e: any) => e?.message).filter(Boolean).join(" | ") ||
       json?.message ||
@@ -36,7 +27,6 @@ async function gql<T>(q: string, variables?: any) {
   return (json?.data ?? null) as T;
 }
 
-/* ========== Queries ========== */
 const AUTH_ME = `query { authMe { id email role } }`;
 
 const MY_PROFILE = `
@@ -79,26 +69,24 @@ const UPDATE_MY_PROFILE = `
   }
 `;
 
-/* ========== Tipos ========== */
 export type ExperienceItem = {
   role?: string;
   company?: string;
-  start?: string; // YYYY-MM
-  end?: string;   // YYYY-MM o "present"
+  start?: string;
+  end?: string;
   description?: string;
 };
 
 export type EducationItem = {
   degree?: string;
   institution?: string;
-  start?: string; // YYYY-MM
-  end?: string;   // YYYY-MM o "present"
+  start?: string;
+  end?: string;
   description?: string;
 };
 
 type UploadKind = "avatar" | "cover" | "cv";
 
-/* ========== Upload helper (proxy Next) ========== */
 async function uploadOneShot(kind: UploadKind, file: File) {
   const fd = new FormData();
   fd.append("file", file, file.name);
@@ -116,11 +104,9 @@ async function uploadOneShot(kind: UploadKind, file: File) {
     console.error("🟥 uploadOneShot error:", { kind, json });
     throw new Error(msg);
   }
-  console.log("🟩 uploadOneShot ok:", { kind, json });
   return json as { url: string; bucket: string; path: string };
 }
 
-/* ========== Utils ========== */
 const belongsToMe = (url: string | null | undefined, me: string | null) => {
   if (!url || !me) return true;
   const m = url.match(/\/users\/([0-9a-f-]{36})\//i);
@@ -130,7 +116,6 @@ const belongsToMe = (url: string | null | undefined, me: string | null) => {
 const hasContent = (obj: Record<string, unknown>) =>
   Object.values(obj).some(v => typeof v === "string" && v.trim() !== "");
 
-/* Filtra items vacíos; si queda vacío, devuelve undefined para NO enviar el campo */
 function normalizeList<T extends Record<string, unknown>>(list: T[] | null | undefined): T[] | undefined {
   if (!Array.isArray(list)) return undefined;
   const cleaned = list
@@ -148,9 +133,8 @@ function normalizeList<T extends Record<string, unknown>>(list: T[] | null | und
   return cleaned.length ? cleaned : undefined;
 }
 
-/* ========== Validaciones suaves ========== */
-const reE164 = /^\+[1-9]\d{7,14}$/;          // + y 8–15 dígitos
-const reYYYYMM = /^\d{4}-(0[1-9]|1[0-2])$/;   // YYYY-MM
+const reE164 = /^\+[1-9]\d{7,14}$/;
+const reYYYYMM = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 function compareYYYYMM(a: string, b: string) {
   const [ya, ma] = a.split("-").map(Number);
@@ -162,7 +146,6 @@ export default function UpdateProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Mensajes globales "ligeros"
   const [formError, setFormError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
 
@@ -182,11 +165,9 @@ export default function UpdateProfile() {
   const [experience, setExperience] = useState<ExperienceItem[]>([]);
   const [education, setEducation] = useState<EducationItem[]>([]);
 
-  // Flags de "end = present"
   const [expPresent, setExpPresent] = useState<boolean[]>([]);
   const [eduPresent, setEduPresent] = useState<boolean[]>([]);
 
-  // Errores por fila (inline)
   const [expRowErrors, setExpRowErrors] = useState<string[]>([]);
   const [eduRowErrors, setEduRowErrors] = useState<string[]>([]);
 
@@ -194,7 +175,6 @@ export default function UpdateProfile() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [cvFile, setCvFile] = useState<File | null>(null);
 
-  // Previews
   const avatarPreview = useMemo(
     () => (avatarFile ? URL.createObjectURL(avatarFile) : avatarUrl || undefined),
     [avatarFile, avatarUrl]
@@ -204,7 +184,6 @@ export default function UpdateProfile() {
     [coverFile, coverUrl]
   );
 
-  /* ========== Carga inicial ========== */
   useEffect(() => {
     (async () => {
       try {
@@ -266,10 +245,8 @@ export default function UpdateProfile() {
         if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
       } catch { }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ========== Helpers listas ========== */
   const addExp = () => {
     setExperience((xs) => [...xs, { role: "", company: "", start: "", end: "", description: "" }]);
     setExpPresent((xs) => [...xs, false]);
@@ -298,7 +275,6 @@ export default function UpdateProfile() {
     setEducation((xs) => xs.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   };
 
-  // Toggles “presente” SIN usar estado obsoleto
   const toggleExpPresent = (i: number) => {
     setExpPresent(prev => {
       const nx = [...prev];
@@ -322,7 +298,6 @@ export default function UpdateProfile() {
     });
   };
 
-  // Validación inline por fila (se ejecuta en submit; no borra el formulario)
   function validateRows() {
     const expErrs = experience.map(() => "");
     const eduErrs = education.map(() => "");
@@ -358,7 +333,6 @@ export default function UpdateProfile() {
     return !hasAny;
   }
 
-  /* ========== Submit ========== */
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -368,7 +342,6 @@ export default function UpdateProfile() {
     try {
       if (!meId) throw new Error("No autenticado");
 
-      // Validación suave
       if (phone.trim() && !reE164.test(phone.trim())) {
         setFormError("El teléfono debe estar en formato internacional E.164, por ejemplo: +573001234567.");
         setSaving(false);
@@ -384,7 +357,6 @@ export default function UpdateProfile() {
       let newAvatarUrl: string | null = avatarUrl;
       let newCvUrl: string | null = cvUrl;
 
-      // Subidas nuevas
       if (coverFile) {
         const up = await uploadOneShot("cover", coverFile);
         newCoverUrl = up.url;
@@ -403,12 +375,10 @@ export default function UpdateProfile() {
         newCvUrl = up.url;
       }
 
-      // Ownership checks
       if (newAvatarUrl && !belongsToMe(newAvatarUrl, meId)) newAvatarUrl = null;
       if (newCoverUrl && !belongsToMe(newCoverUrl, meId)) newCoverUrl = null;
       if (newCvUrl && !belongsToMe(newCvUrl, meId)) newCvUrl = null;
 
-      // Normaliza skills -> undefined si vacío
       const skillsArr =
         skillsStr
           ? skillsStr.split(",").map((s) => s.trim()).filter(Boolean)
@@ -429,16 +399,14 @@ export default function UpdateProfile() {
         skills: skillsArr,
         profilePicture: newAvatarUrl ?? undefined,
         coverPhoto: newCoverUrl ?? undefined,
-        cvUrl: cleanCvUrl,                  // << NUNCA "", solo URL válida o undefined
+        cvUrl: cleanCvUrl,                
         phone: phone || undefined,
         aboutMe: aboutMe || undefined,
-        experience: expClean,               // undefined si no hay items
-        education: eduClean,                // idem
+        experience: expClean, 
+        education: eduClean, 
       };
 
-      console.log("🟨 PATCH updateMyProfile input:", input);
       const resp = await gql<{ updateMyProfile: any }>(UPDATE_MY_PROFILE, { input });
-      console.log("🟩 PATCH updateMyProfile resp:", resp?.updateMyProfile);
 
       setAvatarUrl(newAvatarUrl ?? null);
       setCoverUrl(newCoverUrl ?? null);
@@ -457,7 +425,6 @@ export default function UpdateProfile() {
     }
   };
 
-  /* ========== Render ========== */
   if (loading) {
     return <div className={styles.loading}><PropagateLoader /></div> as any;
   }
@@ -470,10 +437,8 @@ export default function UpdateProfile() {
       </header>
 
       <form onSubmit={onSubmit} className={styles.form} noValidate>
-        {/* Cover */}
         <div className={styles.coverBox}>
           {coverPreview ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={coverPreview} alt="Cover" className={styles.coverImg} />
           ) : (
             <div className={styles.coverPlaceholder}>Imagen de portada</div>
@@ -489,11 +454,9 @@ export default function UpdateProfile() {
           </label>
         </div>
 
-        {/* Avatar */}
         <div className={styles.avatarRow}>
           <div className={styles.avatarWrap}>
             {avatarPreview ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={avatarPreview} alt="Avatar" className={styles.avatar} />
             ) : (
               <div className={styles.avatarFallback} />
@@ -511,7 +474,6 @@ export default function UpdateProfile() {
           <span className={styles.hint}>PNG/JPG recomendado 512x512+</span>
         </div>
 
-        {/* Campos básicos */}
         <div className={styles.grid}>
           <div className={styles.field}>
             <label className={styles.label}>Nombre completo</label>
@@ -567,7 +529,6 @@ export default function UpdateProfile() {
           </div>
         </div>
 
-        {/* Experiencia */}
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h4>Experiencia</h4>
@@ -601,7 +562,6 @@ export default function UpdateProfile() {
                       className={styles.input}
                       value={item.start ?? ""}
                       onChange={(e) => {
-                        // value ya viene como YYYY-MM
                         updExp(i, { start: e.target.value });
                       }}
                     />
@@ -614,7 +574,7 @@ export default function UpdateProfile() {
                       value={present ? "" : (reYYYYMM.test(item.end ?? "") ? (item.end ?? "") : "")}
                       disabled={present}
                       onChange={(e) => {
-                        const v = e.target.value; // YYYY-MM
+                        const v = e.target.value;
                         updExp(i, { end: v });
                       }}
                     />
@@ -644,7 +604,6 @@ export default function UpdateProfile() {
           })}
         </section>
 
-        {/* Educación */}
         <section className={styles.section}>
           <div className={styles.sectionHeader}>
             <h4>Educación</h4>
@@ -715,11 +674,9 @@ export default function UpdateProfile() {
           })}
         </section>
 
-        {/* Banner suave de mensajes */}
         {formError && <div className={styles.error} role="alert">{formError}</div>}
         {ok && <div className={styles.ok} role="status">{ok}</div>}
 
-        {/* Acciones */}
         <div className={styles.actions}>
           <button type="submit" className={styles.primaryBtn} disabled={saving}>
             {saving ? "Guardando…" : "Guardar cambios"}

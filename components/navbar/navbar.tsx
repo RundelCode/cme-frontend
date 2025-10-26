@@ -64,7 +64,6 @@ const COMPANY_BY_ADMIN = `query ($adminId: ID!) {
   }
 }`;
 
-// Normaliza el rol
 function normalizeRole(role: unknown): string {
   return typeof role === "string" ? role.trim().toLowerCase() : "";
 }
@@ -86,7 +85,6 @@ async function getAuthAndProfile() {
 };
 
   try {
-    // 1) authMe
     const authData = await gqlRequest<AuthMeResp>(
       GRAPHQL_ENDPOINT,
       AUTH_ME,
@@ -96,13 +94,10 @@ async function getAuthAndProfile() {
     );
 
     if (!authData?.authMe?.id) {
-      // no logueado; no hace falta logout
       return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
     }
 
     const authMe = authData.authMe;
-
-    // 2) myProfile
     let profile: ProfileType["myProfile"] = null;
     try {
       const p = await gqlRequest<ProfileType>(
@@ -119,7 +114,6 @@ async function getAuthAndProfile() {
       return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
     }
 
-    // 3) rol y 4) empresa
     const rawRole = profile?.role ?? authMe.role ?? "";
     const resolvedRole = normalizeRole(rawRole);
     const isCompanyAdmin = resolvedRole === "company_admin";
@@ -143,7 +137,7 @@ async function getAuthAndProfile() {
     return { isLogged: true, profile, authMe, adminCompany, resolvedRole };
   } catch (err) {
     console.warn("⚠️ Falló auth inicial. Logout server-side…");
-    await serverLogout(); // <- solo limpiará si había cookie
+    await serverLogout();
     return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
   }
 }

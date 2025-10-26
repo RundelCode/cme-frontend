@@ -36,7 +36,6 @@
   font-size: 14px;
 }
 
-/* ======= Portada + input separado (no superpuesto) ======= */
 .coverBlock {
   display: grid;
   gap: 8px;
@@ -72,13 +71,11 @@
   cursor: not-allowed;
 }
 
-/* ======= Logo y selector alineados ======= */
 .logoRow {
   display: grid;
   grid-template-columns: 72px 1fr;
   gap: 12px;
   margin: 8px 0 8px;
-  /* sin superponer con la portada */
   align-items: center;
 }
 
@@ -116,11 +113,9 @@
   color: #6b7280;
 }
 
-/* ======= Form ======= */
 .formGrid {
   display: grid;
   gap: 14px;
-  /* un poco más de aire */
   margin: 16px 0;
 }
 
@@ -185,7 +180,6 @@
   }
 }
 
-/* ======= Acciones ======= */
 .actions {
   width: 100%;
   display: flex;
@@ -233,7 +227,6 @@
   background-color: #f3f4f6;
 }
 
-/* ======= Estados ======= */
 .statusError,
 .statusOk {
   width: 100%;
@@ -254,7 +247,6 @@
   border: 1px solid #b7e1c1;
 }
 
-/* ======= Modal ======= */
 .modalOverlay {
   position: fixed;
   inset: 0;

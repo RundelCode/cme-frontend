@@ -1,4 +1,3 @@
-// src/app/api/profiles/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -43,7 +42,6 @@ export async function GET(req: NextRequest) {
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        // 1) Intento REST batch tipo GET ?ids=...
         try {
             const target = `${PROFILES_BASE}/profiles?ids=${encodeURIComponent(ids.join(","))}`;
             const data = await fetchJson(target, {
@@ -55,11 +53,9 @@ export async function GET(req: NextRequest) {
                 },
                 cache: "no-store",
             });
-            // Normalizo a { profiles: [...] }
             const profiles = Array.isArray(data) ? data : (data?.profiles ?? []);
             return NextResponse.json({ profiles });
         } catch {
-            // 2) Intento REST batch tipo POST /profiles/batch
             try {
                 const target = `${PROFILES_BASE}/profiles/batch`;
                 const data = await fetchJson(target, {
@@ -76,7 +72,6 @@ export async function GET(req: NextRequest) {
                 const profiles = Array.isArray(data) ? data : (data?.profiles ?? []);
                 return NextResponse.json({ profiles });
             } catch {
-                // 3) Fallback súper básico: N requests GET /profiles/:id en paralelo
                 const results = await Promise.allSettled(
                     ids.map(id =>
                         fetchJson(`${PROFILES_BASE}/profiles/${id}`, {

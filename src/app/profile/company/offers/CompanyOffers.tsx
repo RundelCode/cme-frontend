@@ -1,4 +1,3 @@
-// src/app/profile/company/offers/CompanyOffers.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -27,9 +26,9 @@ type JobOffer = {
   id: string;
   title: string;
   location?: string | null;
-  employment_type?: string | null; // ← snake_case como en tu schema
+  employment_type?: string | null;
   status?: string | null;
-  created_at: string;              // ← snake_case como en tu schema
+  created_at: string;
 };
 
 type JobSearchResult = {

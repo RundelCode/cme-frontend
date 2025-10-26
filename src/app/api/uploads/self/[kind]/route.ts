@@ -1,10 +1,8 @@
-// File: src/app/api/uploads/self/[kind]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 const UPLOADS_BASE = process.env.UPLOADS_BASE ?? "http://localhost:3015";
 
-// decodificador base64url sencillo (solo lectura del payload, no verifica firma)
 function decodeJwtPayload<T = any>(jwt: string): T | null {
   try {
     const [, b64] = jwt.split(".");
@@ -18,18 +16,15 @@ function decodeJwtPayload<T = any>(jwt: string): T | null {
 }
 
 function pickBestJwt(req: NextRequest) {
-  // Prioriza access_token sobre session_access
   const access = req.cookies.get("access_token")?.value ?? null;
   const session = req.cookies.get("session_access")?.value ?? null;
 
   const accessPayload = access ? decodeJwtPayload<any>(access) : null;
   const sessionPayload = session ? decodeJwtPayload<any>(session) : null;
 
-  // Si hay access_token válido, úsalo siempre
   if (accessPayload?.sub || accessPayload?.user_id) {
     return { jwt: access, payload: accessPayload, source: "access_token" };
   }
-  // Si no hay access_token, cae a session_access
   if (sessionPayload?.sub || sessionPayload?.user_id) {
     return { jwt: session, payload: sessionPayload, source: "session_access" };
   }
@@ -68,10 +63,8 @@ export async function POST(
     const upstream = await fetch(`${UPLOADS_BASE}/uploads/self/${kind}`, {
       method: "POST",
       headers: {
-        // IMPORTANTES: estos son los que exige tu servicio NestJS
         "x-user-id": String(userId),
         "x-internal-gateway": "next-proxy",
-        // opcional, útil para debug: de dónde salió el token
         "x-auth-source": source ?? "unknown",
       },
       body: fd,

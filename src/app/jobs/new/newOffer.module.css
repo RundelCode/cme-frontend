@@ -15,7 +15,6 @@
   padding: 40px 0;
 }
 
-/* ======= Card ======= */
 .formCard {
   width: min(900px, 96vw);
   background: #fff;
@@ -38,7 +37,6 @@
   font-size: 14px;
 }
 
-/* ======= Portada (por si la usas luego) ======= */
 .coverBlock{
   display: grid;
   gap: 8px;
@@ -76,7 +74,6 @@
 
 .coverImg { width:100%; height:100%; object-fit:cover; border-radius:12px; }
 
-/* ======= Logo (por si lo activas luego) ======= */
 .logoRow {
   display: grid;
   grid-template-columns: 72px 1fr;
@@ -115,13 +112,11 @@
   background:#fff;
 }
 
-/* ======= Tipografías auxiliares ======= */
 .small { font-size: 12px; color: #475467; }
 .helperText { font-size: 12px; color: #6b7280; }
 .helperRow { margin-top: 6px; }
 .dimmed { opacity: 0.7; }
 
-/* ======= Form ======= */
 .formGrid {
   display: grid;
   gap: 14px;
@@ -187,7 +182,6 @@
   .twoCols { grid-template-columns: 1fr 1fr; }
 }
 
-/* ======= Estados ======= */
 .statusNote{
   margin:.75rem 0;
   font-size:.9rem;
@@ -214,7 +208,6 @@
   border: 1px solid #b7e1c1;
 }
 
-/* ======= Acciones ======= */
 .actions {
   width: 100%;
   display: flex;
@@ -251,7 +244,6 @@
 }
 .secundaryBtn:hover { background-color: #f3f4f6; }
 
-/* ======= Modal ======= */
 .modalOverlay {
   position: fixed;
   inset: 0;

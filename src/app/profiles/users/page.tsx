@@ -12,7 +12,6 @@ const GRAPHQL_ENDPOINT =
   process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ??
   "/api/graphql";
 
-// ==== Tipos ====
 type ExperienceItem = {
   role?: string | null;
   company?: string | null;
@@ -38,8 +37,6 @@ type Profile = {
   role?: string | null;
   occupation?: string | null;
   skills?: string[] | null;
-
-  // extendidos
   about_me?: string | null;
   phone?: string | null;
   experience?: ExperienceItem[] | null;
@@ -49,7 +46,6 @@ type Profile = {
 
 type ProfileByIdQuery = { profile: Profile | null };
 
-// ==== Query (incluye subcampos de experience/education) ====
 const PROFILE_BY_ID = `
   query GetProfile($id: ID!) {
     profile(id: $id) {
@@ -101,7 +97,6 @@ async function getProfileById(id: string) {
   }
 }
 
-// helpers para no mostrar listas vacías (con todos los campos nulos)
 function hasValidExperience(exp: ExperienceItem[] | null | undefined) {
   if (!Array.isArray(exp)) return false;
   return exp.some(
@@ -156,7 +151,6 @@ export default async function Page({
 
         {id && profile && (
           <div className={styles.card}>
-            {/* Cover */}
             <div className={styles.coverContainer}>
               {profile.cover_photo ? (
                 <Image
@@ -171,7 +165,6 @@ export default async function Page({
               )}
             </div>
 
-            {/* Header */}
             <div className={styles.infoSection}>
               <div className={styles.avatarWrap}>
                 {profile.profile_picture ? (
@@ -195,7 +188,6 @@ export default async function Page({
               </div>
             </div>
 
-            {/* Sobre mí */}
             <div className={styles.section}>
               <h3>Sobre mí</h3>
               {profile.about_me && profile.about_me.trim().length ? (
@@ -205,7 +197,6 @@ export default async function Page({
               )}
             </div>
 
-            {/* Skills */}
             <div className={styles.section}>
               <h3>Habilidades</h3>
               {profile.skills?.length ? (
@@ -219,7 +210,6 @@ export default async function Page({
               )}
             </div>
 
-            {/* Detalles */}
             <div className={styles.section}>
               <h3>Detalles</h3>
               <dl className={styles.detailList}>
@@ -236,7 +226,6 @@ export default async function Page({
               </dl>
             </div>
 
-            {/* Experiencia */}
             <div className={styles.section}>
               <h3>Experiencia</h3>
 
@@ -265,8 +254,6 @@ export default async function Page({
               )}
             </div>
 
-
-            {/* Educación */}
             <div className={styles.section}>
               <h3>Educación</h3>
 
