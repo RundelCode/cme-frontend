@@ -61,7 +61,6 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 2) Empresa por admin ⇒ companyId
     const company = await fetchJson(`${COMPANIES_BASE}/companies/by-admin/${userId}`, {
       method: "GET",
       headers: {
@@ -74,14 +73,12 @@ export async function GET(req: NextRequest) {
 
     const companyId: string | undefined = company?.id;
     if (!companyId) {
-      // Si no tiene empresa, devolvemos vacío (o podrías optar por OR con headhunter si aplicara)
       return NextResponse.json(
         { total: 0, items: [], note: "No se encontró empresa para este admin" },
         { status: 200 }
       );
     }
 
-    // 3) Llamar a payments con companyId explícito (sin límite/offset para ver TODO)
     const qs = new URLSearchParams();
     qs.set("companyId", companyId);
     if (from) qs.set("from", from);
@@ -101,7 +98,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(payments);
   } catch (e: any) {
-    // mapea 401/403 si el mensaje lo sugiere, si no 500
     const msg = e?.message || "finance_proxy_error";
     const isAuth = /unauthorized|forbidden|token|auth/i.test(msg);
     return NextResponse.json(
