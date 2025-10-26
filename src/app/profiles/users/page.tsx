@@ -1,3 +1,4 @@
+// src/app/profiles/users/page.tsx
 import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
@@ -80,19 +81,23 @@ const PROFILE_BY_ID = `
 
 async function getProfileById(id: string) {
   const hdrs = await nextHeaders();
-  const cookieHeader = (await nextCookies()).toString();
+  const ck = await nextCookies();
+  const cookieHeader = ck
+    .getAll()
+    .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
+    .join("; ");
+  const headersToSend = new Headers(hdrs as any);
 
   try {
     const data = await gqlRequest<ProfileByIdQuery>(
       GRAPHQL_ENDPOINT,
       PROFILE_BY_ID,
       { id },
-      hdrs,
+      headersToSend,
       cookieHeader
     );
     return data?.profile ?? null;
   } catch (e) {
-    console.error("[profiles/users] gqlRequest error:", e);
     return null;
   }
 }
@@ -100,23 +105,34 @@ async function getProfileById(id: string) {
 function hasValidExperience(exp: ExperienceItem[] | null | undefined) {
   if (!Array.isArray(exp)) return false;
   return exp.some(
-    (e) => e?.role || e?.company || e?.start || e?.end || (e?.description && e.description.trim() !== "")
+    (e) =>
+      e?.role ||
+      e?.company ||
+      e?.start ||
+      e?.end ||
+      (e?.description && e.description.trim() !== "")
   );
 }
 
 function hasValidEducation(edu: EducationItem[] | null | undefined) {
   if (!Array.isArray(edu)) return false;
   return edu.some(
-    (e) => e?.degree || e?.institution || e?.start || e?.end || (e?.description && e.description.trim() !== "")
+    (e) =>
+      e?.degree ||
+      e?.institution ||
+      e?.start ||
+      e?.end ||
+      (e?.description && e.description.trim() !== "")
   );
 }
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams?: { id?: string };
+  searchParams: Promise<{ id?: string }>;
 }) {
-  const id = searchParams?.id?.trim();
+  const sp = await searchParams;
+  const id = sp?.id?.trim();
   const profile = id ? await getProfileById(id) : null;
 
   return (
@@ -183,7 +199,9 @@ export default async function Page({
 
               <div className={styles.identity}>
                 <h2 className={styles.name}>
-                  {profile.full_name || profile.email.split("@")[0] || "Usuario"}
+                  {profile.full_name ||
+                    profile.email.split("@")[0] ||
+                    "Usuario"}
                 </h2>
               </div>
             </div>
@@ -202,7 +220,9 @@ export default async function Page({
               {profile.skills?.length ? (
                 <ul className={styles.skills}>
                   {profile.skills.map((s) => (
-                    <li key={s} className={styles.skill}>{s}</li>
+                    <li key={s} className={styles.skill}>
+                      {s}
+                    </li>
                   ))}
                 </ul>
               ) : (
@@ -214,15 +234,17 @@ export default async function Page({
               <h3>Detalles</h3>
               <dl className={styles.detailList}>
                 <div className={styles.detailRow}>
-                  <dt>Email</dt><dd>{profile.email}</dd>
+                  <dt>Email</dt>
+                  <dd>{profile.email}</dd>
                 </div>
                 <div className={styles.detailRow}>
-                  <dt>Ocupación</dt><dd>{profile.occupation ?? "—"}</dd>
+                  <dt>Ocupación</dt>
+                  <dd>{profile.occupation ?? "—"}</dd>
                 </div>
                 <div className={styles.detailRow}>
-                  <dt>Teléfono</dt><dd>{profile.phone ?? "—"}</dd>
+                  <dt>Teléfono</dt>
+                  <dd>{profile.phone ?? "—"}</dd>
                 </div>
-
               </dl>
             </div>
 
@@ -234,17 +256,22 @@ export default async function Page({
                   {profile.experience!.map((it, i) => {
                     const left = (it.start || "").trim();
                     const right = (it.end || "").trim();
-                    const dates = left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
+                    const dates =
+                      left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
                     return (
                       <div className={styles.infoCard} key={`exp-${i}`}>
                         <div className={styles.cardTop}>
                           <div className={styles.cardLeft}>
                             <h4 className={styles.cardTitle}>{it.role || "—"}</h4>
-                            {it.company ? <p className={styles.cardSubtitle}>{it.company}</p> : null}
+                            {it.company ? (
+                              <p className={styles.cardSubtitle}>{it.company}</p>
+                            ) : null}
                           </div>
                           <span className={styles.datePill}>{dates}</span>
                         </div>
-                        {it.description ? <p className={styles.cardDesc}>{it.description}</p> : null}
+                        {it.description ? (
+                          <p className={styles.cardDesc}>{it.description}</p>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -262,17 +289,24 @@ export default async function Page({
                   {profile.education!.map((it, i) => {
                     const left = (it.start || "").trim();
                     const right = (it.end || "").trim();
-                    const dates = left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
+                    const dates =
+                      left || right ? `${left}${right ? ` – ${right}` : ""}` : "—";
                     return (
                       <div className={styles.infoCard} key={`edu-${i}`}>
                         <div className={styles.cardTop}>
                           <div className={styles.cardLeft}>
                             <h4 className={styles.cardTitle}>{it.degree || "—"}</h4>
-                            {it.institution ? <p className={styles.cardSubtitle}>{it.institution}</p> : null}
+                            {it.institution ? (
+                              <p className={styles.cardSubtitle}>{it.institution}</p>
+                            ) : null}
                           </div>
-                          <span className={`${styles.datePill} ${styles.eduPill}`}>{dates}</span>
+                          <span className={`${styles.datePill} ${styles.eduPill}`}>
+                            {dates}
+                          </span>
                         </div>
-                        {it.description ? <p className={styles.cardDesc}>{it.description}</p> : null}
+                        {it.description ? (
+                          <p className={styles.cardDesc}>{it.description}</p>
+                        ) : null}
                       </div>
                     );
                   })}
@@ -281,8 +315,6 @@ export default async function Page({
                 <div className={styles.emptyCard}>Sin educación registrada.</div>
               )}
             </div>
-
-
           </div>
         )}
       </div>
