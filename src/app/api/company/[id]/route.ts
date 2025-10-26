@@ -10,19 +10,15 @@ function buildAuthHeader(req: Request): string | undefined {
     const fromHeader = req.headers.get("authorization");
     if (fromHeader && fromHeader.trim() !== "") return fromHeader;
 
-    // En App Router, cookies vienen en header "cookie" (no hay req.cookies aquí)
     const cookieHeader = req.headers.get("cookie") ?? "";
     const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
     if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
     return undefined;
 }
 
-export async function GET(
-    req: Request,
-    context: { params: { id: string } } // <- esta forma es válida en Next 15
-) {
+export async function GET(req: Request, ctx: any) {
     try {
-        const id = context.params?.id;
+        const id = ctx?.params?.id as string | undefined;
         if (!id) {
             return NextResponse.json({ error: "missing_company_id" }, { status: 400 });
         }
