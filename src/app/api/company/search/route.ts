@@ -1,83 +1,86 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SEARCH_COMPANIES } from "../../../../../lib/queries";
 
-function resolveGraphqlUrl(req: NextRequest) {
-  const env =
-    process.env.GRAPHQL_URL ||
-    process.env.NEXT_PUBLIC_GRAPHQL_URL ||
-    "/api/graphql";
+function buildAuthHeader(req: NextRequest): string | undefined {
+  const fromHeader = req.headers.get("authorization");
+  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+  return undefined;
+}
 
-  if (env.startsWith("/")) {
-    return new URL(env, req.nextUrl.origin).toString();
-  }
-  return env;
+function resolveApiUrl(req: NextRequest) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
+  return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { input } = await req.json().catch(() => ({}));
-    const url = resolveGraphqlUrl(req);
+    const { input = {} } = await req.json().catch(() => ({ input: {} }));
+    const API = resolveApiUrl(req);
+
+    const qs = new URLSearchParams();
+    if (input.q) qs.set("q", String(input.q));
+    if (input.sortBy) qs.set("sortBy", String(input.sortBy));
+    if (input.order) qs.set("order", String(input.order));
+    if (input.limit != null) qs.set("limit", String(input.limit));
+    if (input.offset != null) qs.set("offset", String(input.offset));
+    if (input.industry) qs.set("industry", String(input.industry));
+    if (input.location) qs.set("location", String(input.location));
+    if (input.boolVerified != null) qs.set("boolVerified", String(input.boolVerified));
+    if (input.subscriptionPlan) qs.set("subscriptionPlan", String(input.subscriptionPlan));
+    if (input.minRating != null) qs.set("minRating", String(input.minRating));
+    if (input.maxRating != null) qs.set("maxRating", String(input.maxRating));
+    if (input.adminId) qs.set("adminId", String(input.adminId));
 
     const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
+      Accept: "application/json",
     };
-
-    const auth = req.headers.get("authorization");
+    const auth = buildAuthHeader(req);
     const cookie = req.headers.get("cookie");
     const xReqId = req.headers.get("x-request-id");
     const xCorrId = req.headers.get("x-correlation-id");
-    if (auth) headers["authorization"] = auth;
+    if (auth) headers["Authorization"] = auth;
     if (cookie) headers["cookie"] = cookie;
-    if (xReqId) headers["x-request-id"] = xReqId;
-    if (xCorrId) headers["x-correlation-id"] = xCorrId;
+    if (xReqId) headers["x-request-id"] = xReqId as string;
+    if (xCorrId) headers["x-correlation-id"] = xCorrId as string;
 
-    const gqlRes = await fetch(url, {
-      method: "POST",
+    const upstream = await fetch(`${API}/companies/search?${qs.toString()}`, {
+      method: "GET",
       headers,
-      body: JSON.stringify({
-        query: SEARCH_COMPANIES,
-        variables: { input: input ?? {} },
-      }),
       cache: "no-store",
+      credentials: "include",
     });
 
-    const raw = await gqlRes.text();
+    const raw = await upstream.text();
     let data: any = null;
     try {
-      data = JSON.parse(raw);
+      data = raw ? JSON.parse(raw) : null;
     } catch {
+      data = null;
     }
 
-    if (!gqlRes.ok) {
+    if (!upstream.ok) {
       return NextResponse.json(
         {
-          error: `GraphQL HTTP ${gqlRes.status}`,
-          details: data?.errors ?? null,
+          error: `companies_search_upstream_${upstream.status}`,
           raw: data ?? raw,
-          target: url,
+          target: `${API}/companies/search`,
         },
-        { status: 502 },
+        { status: upstream.status || 502 }
       );
     }
 
-    if (data?.errors?.length) {
-      return NextResponse.json(
-        {
-          error: data.errors[0]?.message ?? "GraphQL error",
-          details: data.errors,
-          target: url,
-        },
-        { status: 500 },
-      );
-    }
-
-    const items = data?.data?.searchCompanies ?? [];
+    const items = Array.isArray(data) ? data : data?.items ?? [];
     return NextResponse.json({ items });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Search error (proxy)" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

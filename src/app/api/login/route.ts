@@ -1,59 +1,76 @@
 import { NextResponse } from "next/server";
 
-const LOGIN = `
-  mutation Login($email: String!, $password: String!) {
-    login(email: $email, password: $password) {
-      user { id email role }
-      session { access_token refresh_token }
-    }
+function resolveApiUrl(reqUrl: string) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  try {
+    new URL(base);
+    return base.replace(/\/$/, "");
+  } catch {
+    const u = new URL(reqUrl);
+    return new URL(base, u.origin).toString().replace(/\/$/, "");
   }
-`;
+}
 
 export async function POST(req: Request) {
   try {
     const { email, password, rememberMe } = await req.json();
 
-    if (!process.env.GRAPHQL_ENDPOINT) {
-      console.error("GRAPHQL_ENDPOINT no definido");
+    if (!email || !password) {
       return NextResponse.json(
-        { error: "Misconfig: GRAPHQL_ENDPOINT no definido" },
-        { status: 500 }
+        { error: "email y password son requeridos" },
+        { status: 400 }
       );
     }
 
-    const upstream = await fetch(process.env.GRAPHQL_ENDPOINT, {
+    const API = resolveApiUrl(req.url);
+
+    const upstream = await fetch(`${API}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: LOGIN, variables: { email, password } }),
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ email, password }),
+      cache: "no-store",
+      credentials: "include",
     });
 
     const raw = await upstream.text();
-
-    let json: any;
+    let data: any = null;
     try {
-      json = raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      console.error("Upstream devolvió no-JSON:\n", raw);
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
       return NextResponse.json(
-        { error: "El gateway devolvió una respuesta no JSON.", details: raw?.slice(0, 300) },
+        { error: "upstream_not_json", details: raw?.slice(0, 300) },
         { status: 502 }
       );
     }
 
-    if (!upstream.ok || json?.errors?.length || !json?.data?.login) {
-      const message =
-        json?.errors?.map((e: any) => e.message).join(" | ") ||
-        `Upstream ${upstream.status}`;
-      return NextResponse.json({ error: message }, { status: 401 });
+    if (!upstream.ok) {
+      const message = data?.error || data?.message || `auth_login_upstream_${upstream.status}`;
+      return NextResponse.json({ error: message }, { status: upstream.status || 401 });
     }
 
-    const { user, session } = json.data.login;
+    const user = data?.user || data?.profile || null;
+    const session = data?.session || data;
+
+    const accessToken =
+      session?.access_token || session?.accessToken || session?.access || data?.access_token;
+    const refreshToken =
+      session?.refresh_token || session?.refreshToken || session?.refresh || data?.refresh_token;
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: "No se recibió access_token del backend" },
+        { status: 502 }
+      );
+    }
 
     const res = NextResponse.json({ user });
 
     const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60;
 
-    res.cookies.set("access_token", session.access_token, {
+    res.cookies.set("access_token", String(accessToken), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -61,17 +78,18 @@ export async function POST(req: Request) {
       maxAge: ACCESS_TTL,
     });
 
-    res.cookies.set("refresh_token", session.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
+    if (refreshToken) {
+      res.cookies.set("refresh_token", String(refreshToken), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    }
 
     return res;
   } catch (err: any) {
-    console.error("Error /api/login:", err);
     return NextResponse.json(
       { error: err?.message || "Internal Server Error" },
       { status: 500 }

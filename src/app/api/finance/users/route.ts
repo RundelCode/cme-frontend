@@ -1,91 +1,118 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-const PAYMENTS_BASE =
-    process.env.PAYMENTS_BASE_URL ??
-    process.env.API_GATEWAY_URL ??
-    "http://localhost:3005";
-
-const PROFILES_BASE = process.env.PROFILES_BASE_URL ?? "http://localhost:3001";
-
 function buildAuthHeader(req: NextRequest): string | undefined {
-    const fromHeader = req.headers.get("authorization");
-    if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+  const fromHeader = req.headers.get("authorization");
+  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+  const token = req.cookies.get("access_token")?.value;
+  if (token && token.trim() !== "") return `Bearer ${token}`;
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+  return undefined;
+}
 
-    const token = req.cookies.get("access_token")?.value;
-    if (token && token.trim() !== "") return `Bearer ${token}`;
-
-    const cookieHeader = req.headers.get("cookie") ?? "";
-    const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
-    if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
-    return undefined;
+function resolveApiUrl(req: NextRequest) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
+  return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
 async function fetchJson(url: string, init: RequestInit) {
-    const res = await fetch(url, init);
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-        const msg = data?.message || data?.error || `upstream_error (${res.status})`;
-        throw new Error(msg);
-    }
-    return data;
+  const res = await fetch(url, init);
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = data?.message || data?.error || `upstream_error (${res.status})`;
+    const err: any = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
 }
 
 export async function GET(req: NextRequest) {
+  try {
+    const API = resolveApiUrl(req);
+    const url = new URL(req.url);
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+
+    const authorization = buildAuthHeader(req);
+    const cookie = req.headers.get("cookie") ?? "";
+
+    const baseHeaders: HeadersInit = {
+      Accept: "application/json",
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(cookie ? { cookie } : {}),
+    };
+
+    let me: any = null;
     try {
-        const url = new URL(req.url);
-        const from = url.searchParams.get("from");
-        const to = url.searchParams.get("to");
-
-        const authorization = buildAuthHeader(req);
-        const cookie = req.headers.get("cookie") ?? "";
-
-        const me = await fetchJson(`${PROFILES_BASE}/profiles/me`, {
-            method: "GET",
-            headers: {
-                Accept: "application/json",
-                ...(authorization ? { authorization } : {}),
-                cookie,
-            },
-            cache: "no-store",
-        });
-
-        const userId: string | undefined = me?.id;
-        if (!userId) {
-            return NextResponse.json(
-                { total: 0, items: [], error: "No autenticado (sin userId)" },
-                { status: 401 }
-            );
-        }
-
-        const qs = new URLSearchParams();
-        qs.set("headhunterId", userId);
-        qs.set("all", "true");
-        if (from) qs.set("from", from);
-        if (to) qs.set("to", to);
-
-        const target = `${PAYMENTS_BASE}/payments?${qs.toString()}`;
-        const payments = await fetchJson(target, {
-            method: "GET",
-            headers: {
-                Accept: "application/json",
-                ...(authorization ? { authorization } : {}),
-                cookie,
-            },
-            cache: "no-store",
-        });
-
-        return NextResponse.json(payments);
+      me = await fetchJson(`${API}/auth/me`, {
+        method: "GET",
+        headers: baseHeaders,
+        cache: "no-store",
+        credentials: "include",
+      });
     } catch (e: any) {
-        const msg = e?.message || "finance_users_proxy_error";
-        const isAuth = /unauthorized|forbidden|token|auth/i.test(msg);
+      if (e?.status !== 404) {
+        try {
+          me = await fetchJson(`${API}/profiles/me`, {
+            method: "GET",
+            headers: baseHeaders,
+            cache: "no-store",
+            credentials: "include",
+          });
+        } catch (e2: any) {
+          return NextResponse.json(
+            { total: 0, items: [], error: e2?.message || "No autenticado" },
+            { status: e2?.status === 401 ? 401 : 500 }
+          );
+        }
+      } else {
         return NextResponse.json(
-            { total: 0, items: [], error: msg },
-            { status: isAuth ? 401 : 500 }
+          { total: 0, items: [], error: e?.message || "No autenticado" },
+          { status: e?.status === 401 ? 401 : 500 }
         );
+      }
     }
+
+    const userId: string | undefined = me?.id;
+    if (!userId) {
+      return NextResponse.json(
+        { total: 0, items: [], error: "No autenticado (sin userId)" },
+        { status: 401 }
+      );
+    }
+
+    const qs = new URLSearchParams();
+    qs.set("headhunterId", userId);
+    qs.set("all", "true");
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+
+    const payments = await fetchJson(`${API}/payments?${qs.toString()}`, {
+      method: "GET",
+      headers: baseHeaders,
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    return NextResponse.json(payments);
+  } catch (e: any) {
+    const msg = e?.message || "finance_users_proxy_error";
+    const isAuth = /unauthorized|forbidden|token|auth/i.test(msg);
+    return NextResponse.json(
+      { total: 0, items: [], error: msg },
+      { status: isAuth ? 401 : e?.status || 500 }
+    );
+  }
 }
 
 export async function OPTIONS() {
-    return NextResponse.json({}, { status: 200 });
+  return NextResponse.json({}, { status: 200 });
 }

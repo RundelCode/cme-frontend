@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-const UPLOADS_BASE = process.env.UPLOADS_BASE ?? "http://localhost:3015";
+
+function resolveApiUrl(req: NextRequest) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
+  return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
+}
 
 function decodeJwtPayload<T = any>(jwt: string): T | null {
   try {
@@ -33,54 +41,61 @@ function pickBestJwt(req: NextRequest) {
 
 export async function POST(
   req: NextRequest,
-  ctx: { params: Promise<{ kind: string }> }
+  ctx: { params: Promise<{ kind: string }> | { kind: string } }
 ) {
   try {
-    const { kind: rawKind } = await ctx.params;
+    const p = "then" in ctx.params ? await ctx.params : (ctx.params as { kind: string });
+    const rawKind = p.kind;
     const kind = (rawKind || "").toLowerCase();
-    if (!["avatar", "cover", "cv"].includes(kind)) {
-      return NextResponse.json({ error: "kind inválido" }, { status: 400 });
+
+    if (!["avatar", "cover"].includes(kind)) {
+      return NextResponse.json({ error: "route_not_supported", detail: `No existe /uploads/self/${kind}` }, { status: 404 });
     }
 
     const { jwt, payload, source } = pickBestJwt(req);
     if (!jwt) {
-      return NextResponse.json({ error: "No autenticado (sin token)" }, { status: 401 });
+      return NextResponse.json({ error: "unauthenticated_missing_token" }, { status: 401 });
     }
 
     const userId = payload?.sub ?? payload?.user_id ?? null;
     if (!userId) {
-      return NextResponse.json({ error: "No se pudo extraer userId del token" }, { status: 401 });
+      return NextResponse.json({ error: "cannot_extract_user_id_from_token" }, { status: 401 });
     }
 
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Falta archivo (key="file")' }, { status: 400 });
+      return NextResponse.json({ error: 'missing_file_field', detail: 'Se espera key "file"' }, { status: 400 });
     }
+
     const fd = new FormData();
     fd.append("file", file, file.name);
 
-    const upstream = await fetch(`${UPLOADS_BASE}/uploads/self/${kind}`, {
+    const API = resolveApiUrl(req);
+    const upstream = await fetch(`${API}/uploads/self/${kind}`, {
       method: "POST",
       headers: {
         "x-user-id": String(userId),
         "x-internal-gateway": "next-proxy",
         "x-auth-source": source ?? "unknown",
+        ...(req.headers.get("authorization") ? { Authorization: req.headers.get("authorization")! } : {}),
+        ...(req.headers.get("cookie") ? { cookie: req.headers.get("cookie")! } : {}),
       },
       body: fd,
+      cache: "no-store",
     });
 
     const text = await upstream.text();
     try {
       const json = text ? JSON.parse(text) : null;
-      return new NextResponse(JSON.stringify(json), { status: upstream.status });
+      return new NextResponse(JSON.stringify(json ?? {}), { status: upstream.status, headers: { "content-type": "application/json" } });
     } catch {
       return NextResponse.json(
-        { error: "Upstream no JSON", sample: text.slice(0, 180) },
+        { error: "upstream_not_json", sample: text.slice(0, 180) },
         { status: 502 }
       );
     }
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Internal Error" }, { status: 500 });
+    return NextResponse.json({ error: e?.message || "internal_error" }, { status: 500 });
   }
 }

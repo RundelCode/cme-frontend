@@ -1,60 +1,79 @@
 // src/app/api/notifications/[id]/read/route.ts
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
-async function gqlFetch<T>(req: Request, query: string, variables?: any): Promise<T> {
-    const base = process.env.NEXT_PUBLIC_GQL_PATH ?? '';
-    const url = `${base}/api/graphql` || '/api/graphql';
-
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json',
-            cookie: req.headers.get('cookie') ?? '',
-            authorization: req.headers.get('authorization') ?? '',
-        },
-        body: JSON.stringify({ query, variables }),
-        cache: 'no-store',
-    });
-
-    const raw = await res.text();
-    let data: any = null;
-    try { data = raw ? JSON.parse(raw) : null; } catch { }
-
-    if (!res.ok || data?.errors?.length) {
-        const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
-        throw new Error(msg);
-    }
-    return data.data as T;
+function buildAuthHeader(req: Request): string | undefined {
+    const fromHeader = req.headers.get("authorization");
+    if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+    const cookieHeader = req.headers.get("cookie") ?? "";
+    const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+    if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+    return undefined;
 }
 
-export async function PATCH(req: Request, ctx: any) {
+function resolveApiUrl(reqUrl: string) {
+    const base =
+        process.env.NEXT_PUBLIC_API_URL ||
+        process.env.API_URL ||
+        "http://localhost:3000/api";
     try {
-        const id = ctx?.params?.id as string | undefined;
-        if (!id) {
-            return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-        }
-
-        const mutation = `
-      mutation U($input: UpdateNotificationInput!) {
-        updateNotification(input: $input) {
-          id
-          read_at
-        }
-      }
-    `;
-
-        const resp = await gqlFetch<{ updateNotification: { id: string; read_at: string } }>(
-            req,
-            mutation,
-            { input: { id, readAt: new Date().toISOString() } }
-        );
-
-        return NextResponse.json({ notification: resp.updateNotification }, { status: 200 });
-    } catch (e: any) {
-        return NextResponse.json({ error: e?.message || 'Error marking as read' }, { status: 500 });
+        new URL(base);
+        return base.replace(/\/$/, "");
+    } catch {
+        const u = new URL(reqUrl);
+        return new URL(base, u.origin).toString().replace(/\/$/, "");
     }
 }
 
-export async function OPTIONS(_req: Request) {
+export async function PATCH(
+    req: Request,
+    ctx: { params?: { id?: string } }
+) {
+    try {
+        const id = ctx?.params?.id;
+        if (!id) return NextResponse.json({ error: "missing_notification_id" }, { status: 400 });
+
+        const API = resolveApiUrl(req.url);
+        const authorization = buildAuthHeader(req);
+        const cookie = req.headers.get("cookie") ?? "";
+
+        const upstream = await fetch(`${API}/notifications/${encodeURIComponent(id)}/read`, {
+            method: "PATCH",
+            headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                ...(authorization ? { Authorization: authorization } : {}),
+                ...(cookie ? { cookie } : {}),
+            },
+            credentials: "include",
+            cache: "no-store",
+            body: JSON.stringify({ readAt: new Date().toISOString() }),
+        });
+
+        const raw = await upstream.text();
+        let data: any = null;
+        try {
+            data = raw ? JSON.parse(raw) : null;
+        } catch {
+            return NextResponse.json(
+                { error: "upstream_not_json", details: raw?.slice(0, 300) },
+                { status: 502 }
+            );
+        }
+
+        if (!upstream.ok) {
+            const msg = data?.error || data?.message || `notifications_upstream_${upstream.status}`;
+            return NextResponse.json({ error: msg }, { status: upstream.status || 500 });
+        }
+
+        return NextResponse.json({ notification: data }, { status: 200 });
+    } catch (e: any) {
+        return NextResponse.json(
+            { error: e?.message || "Error marking as read" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function OPTIONS() {
     return NextResponse.json({}, { status: 200 });
 }

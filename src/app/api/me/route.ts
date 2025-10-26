@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 
-const AUTH_ME = `query { authMe { id email role } }`;
+function resolveApiUrl() {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  try {
+    new URL(base);
+    return base.replace(/\/$/, "");
+  } catch {
+    return "http://localhost:3000/api";
+  }
+}
 
 export async function GET() {
   try {
-    const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT;
-    if (!GRAPHQL_ENDPOINT) {
-      return NextResponse.json({ error: "GRAPHQL_ENDPOINT no definido" }, { status: 500 });
-    }
+    const API = resolveApiUrl();
 
     const hdrs = await nextHeaders();
     const cookieStore = await nextCookies();
@@ -17,31 +25,40 @@ export async function GET() {
     const access = cookieStore.get("access_token")?.value;
     const authHeader = access ? `Bearer ${access}` : undefined;
 
-    const upstream = await fetch(GRAPHQL_ENDPOINT, {
-      method: "POST",
+    const upstream = await fetch(`${API}/auth/me`, {
+      method: "GET",
       headers: {
-        "Content-Type": "application/json",
+        Accept: "application/json",
         cookie: cookieHeader,
         ...(authHeader ? { Authorization: authHeader } : {}),
         "x-correlation-id": hdrs.get("x-correlation-id") || "",
       },
-      body: JSON.stringify({ query: AUTH_ME }),
+      credentials: "include",
       cache: "no-store",
     });
 
     const raw = await upstream.text();
-    let json: any;
-    try { json = raw ? JSON.parse(raw) : null; } catch {
-      return NextResponse.json({ error: "Gateway devolvió no-JSON", details: raw?.slice(0,300) }, { status: 502 });
+    let data: any = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      return NextResponse.json(
+        { error: "upstream_not_json", details: raw?.slice(0, 300) },
+        { status: 502 }
+      );
     }
 
-    if (!upstream.ok || json?.errors?.length) {
-      const msg = json?.errors?.map((e: any) => e.message).join(" | ") || `Upstream ${upstream.status}`;
-      return NextResponse.json({ error: msg }, { status: 401 });
+    if (!upstream.ok) {
+      const msg = data?.error || data?.message || `auth_me_upstream_${upstream.status}`;
+      return NextResponse.json({ error: msg }, { status: upstream.status || 401 });
     }
 
-    return NextResponse.json({ user: json.data.authMe || null });
+    const user = data ?? null;
+    return NextResponse.json({ user });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Internal Error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || "Internal Error" },
+      { status: 500 }
+    );
   }
 }

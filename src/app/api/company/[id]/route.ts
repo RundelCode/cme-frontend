@@ -1,9 +1,6 @@
-// src/app/api/notifications/[id]/read/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-
-function buildAuthHeader(req: Request): string | undefined {
+function buildAuthHeader(req: NextRequest): string | undefined {
   const fromHeader = req.headers.get("authorization");
   if (fromHeader && fromHeader.trim() !== "") return fromHeader;
   const cookieHeader = req.headers.get("cookie") ?? "";
@@ -12,41 +9,65 @@ function buildAuthHeader(req: Request): string | undefined {
   return undefined;
 }
 
-const NOTIFS_BASE = process.env.NOTIFICATIONS_BASE_URL ?? "http://localhost:30xx";
-
-export async function PATCH(req: Request, ctx: any) {
-  try {
-    const id = ctx?.params?.id as string | undefined;
-    if (!id) {
-      return NextResponse.json({ error: "missing_notification_id" }, { status: 400 });
-    }
-
-    const authorization = buildAuthHeader(req);
-    const cookie = req.headers.get("cookie") ?? "";
-
-    const upstream = await fetch(`${NOTIFS_BASE}/notifications/${id}/read`, {
-      method: "PATCH",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...(authorization ? { authorization } : {}),
-        cookie,
-      },
-      cache: "no-store",
-    });
-
-    const data = await upstream.json().catch(() => null);
-    if (!upstream.ok) {
-      const msg = data?.error || data?.message || `notifications_upstream_${upstream.status}`;
-      return NextResponse.json({ error: msg }, { status: upstream.status });
-    }
-
-    return NextResponse.json(data ?? { ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "notifications_proxy_error" }, { status: 500 });
-  }
+function resolveApiUrl(req: NextRequest) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
+  return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
-export async function OPTIONS(_req: Request) {
-  return NextResponse.json({}, { status: 200 });
+export async function POST(req: NextRequest) {
+  try {
+    const { id } = await req.json();
+    if (!id) return NextResponse.json({ error: "Missing 'id' in body" }, { status: 400 });
+
+    const API = resolveApiUrl(req);
+    const authorization = buildAuthHeader(req);
+    const cookie = req.headers.get("cookie") ?? "";
+    const xReqId = req.headers.get("x-request-id");
+    const xCorrId = req.headers.get("x-correlation-id");
+
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(cookie ? { cookie } : {}),
+      ...(xReqId ? { "x-request-id": xReqId } : {}),
+      ...(xCorrId ? { "x-correlation-id": xCorrId } : {}),
+    };
+
+    const upstream = await fetch(`${API}/companies/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers,
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    const raw = await upstream.text();
+    let data: any = null;
+    try {
+      data = raw ? JSON.parse(raw) : null;
+    } catch {
+      return NextResponse.json(
+        { error: "upstream_not_json", details: raw?.slice(0, 300) },
+        { status: 502 }
+      );
+    }
+
+    if (!upstream.ok || !data?.id) {
+      const message =
+        data?.error ||
+        data?.message ||
+        `companies_upstream_${upstream.status}`;
+      return NextResponse.json({ error: message }, { status: upstream.status || 400 });
+    }
+
+    return NextResponse.json({ company: data });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err?.message || "Internal Server Error" },
+      { status: 500 }
+    );
+  }
 }

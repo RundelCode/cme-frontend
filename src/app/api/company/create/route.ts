@@ -1,39 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const SEARCH_COMPANIES = `
-  query SearchCompanies($input: SearchCompaniesInput) {
-    searchCompanies(input: $input) {
-      id
-      name
-      email
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-const CREATE_COMPANY = `
-  mutation CreateCompany($input: CreateCompanyInput!) {
-    createCompany(input: $input) {
-      id
-      name
-      email
-      website
-      description
-      industry
-      location
-      profilePicture
-      coverPhoto
-      companyRating
-      boolVerified
-      verifiedAt
-      subscriptionPlan
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
 function isValidEmail(email: unknown): email is string {
   return typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -42,69 +8,36 @@ function assertString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
 
-async function gqlFetch<T = any>(
-  endpoint: string,
-  init: {
-    query: string;
-    variables?: Record<string, any>;
-    headers?: Record<string, string>;
-  }
-): Promise<{ data?: T; errors?: Array<{ message: string }> }> {
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(init.headers ?? {}),
-    },
-    body: JSON.stringify({
-      query: init.query,
-      variables: init.variables ?? {},
-    }),
-  });
+function buildAuthHeader(req: NextRequest): string | undefined {
+  const fromHeader = req.headers.get("authorization");
+  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+  return undefined;
+}
 
-  const raw = await res.text();
-
-  let json: any;
+function resolveApiUrl(reqUrl: string) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
   try {
-    json = raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    throw new Error(
-      `El gateway devolvió una respuesta no JSON. Status ${res.status}. Cuerpo: ${raw?.slice(
-        0,
-        300
-      )}`
-    );
+    new URL(base);
+    return base.replace(/\/$/, "");
+  } catch {
+    const u = new URL(reqUrl);
+    return new URL(base, u.origin).toString().replace(/\/$/, "");
   }
-
-  if (!res.ok) {
-    const msg =
-      json?.errors?.map((e: any) => e.message).join(" | ") ||
-      `Upstream ${res.status}`;
-    throw new Error(msg);
-  }
-
-  return json;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const endpoint = process.env.GRAPHQL_ENDPOINT;
-    if (!endpoint) {
-      console.error("GRAPHQL_ENDPOINT no definido");
-      return NextResponse.json(
-        { error: "Misconfig: GRAPHQL_ENDPOINT no definido" },
-        { status: 500 }
-      );
-    }
-
     const body = await req.json();
     const input = body?.input ?? {};
 
     if (!assertString(input?.name)) {
-      return NextResponse.json(
-        { error: "Campo 'name' es obligatorio" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Campo 'name' es obligatorio" }, { status: 400 });
     }
     if (!isValidEmail(input?.email)) {
       return NextResponse.json(
@@ -113,55 +46,84 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const authorization = req.headers.get("authorization") ?? "";
+    const API = resolveApiUrl(req.url);
+    const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
 
-    const headers = { authorization, cookie };
-
-    {
-      const pre = await gqlFetch<{
-        searchCompanies: Array<{ id: string; email: string }>;
-      }>(endpoint, {
-        query: SEARCH_COMPANIES,
-        variables: { input: { q: input.email, limit: 10, offset: 0 } }, 
-        headers,
-      });
-
-      const found =
-        pre?.data?.searchCompanies?.find(
-          (c) => (c?.email ?? "").toLowerCase() === input.email.toLowerCase()
-        ) ?? null;
-
-      if (found) {
-        return NextResponse.json(
-          {
-            error:
-              "Ya existe una empresa registrada con este email. Política: un usuario solo puede crear una empresa.",
-            companyId: found.id,
-          },
-          { status: 409 }
-        );
+    const preRes = await fetch(
+      `${API}/companies/search?` +
+        new URLSearchParams({
+          q: String(input.email),
+          limit: "10",
+          offset: "0",
+        }).toString(),
+      {
+        headers: {
+          Accept: "application/json",
+          ...(authorization ? { Authorization: authorization } : {}),
+          cookie,
+        },
+        cache: "no-store",
+        credentials: "include",
       }
+    );
+
+    if (!preRes.ok) {
+      const txt = await preRes.text().catch(() => "");
+      return NextResponse.json(
+        { error: txt || `Error verificando empresas (HTTP ${preRes.status})` },
+        { status: preRes.status }
+      );
     }
 
-    const created = await gqlFetch<{
-      createCompany: Record<string, any>;
-    }>(endpoint, {
-      query: CREATE_COMPANY,
-      variables: { input },
-      headers,
+    const preList: Array<{ id: string; email?: string | null }> = await preRes.json();
+    const found =
+      preList?.find(
+        (c) => (c?.email ?? "").toLowerCase() === String(input.email).toLowerCase()
+      ) ?? null;
+
+    if (found) {
+      return NextResponse.json(
+        {
+          error:
+            "Ya existe una empresa registrada con este email. Política: un usuario solo puede crear una empresa.",
+          companyId: found.id,
+        },
+        { status: 409 }
+      );
+    }
+
+    const createRes = await fetch(`${API}/companies`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(authorization ? { Authorization: authorization } : {}),
+        cookie,
+      },
+      body: JSON.stringify(input),
+      cache: "no-store",
+      credentials: "include",
     });
 
-    if (!created?.data?.createCompany?.id) {
-      const msg =
-        (created as any)?.errors?.map((e: any) => e.message).join(" | ") ||
-        "No se recibió 'id' en la respuesta de createCompany";
-      return NextResponse.json({ error: msg }, { status: 400 });
+    if (!createRes.ok) {
+      const txt = await createRes.text().catch(() => "");
+      return NextResponse.json(
+        { error: txt || `Error creando empresa (HTTP ${createRes.status})` },
+        { status: createRes.status }
+      );
     }
 
-    return NextResponse.json({ company: created.data.createCompany }, { status: 201 });
+    const company = await createRes.json();
+    if (!company?.id) {
+      return NextResponse.json(
+        { error: "No se recibió 'id' en la respuesta de creación" },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({ company }, { status: 201 });
   } catch (err: any) {
-    console.error("Error /api/company/create:", err);
     return NextResponse.json(
       { error: err?.message || "Internal Server Error" },
       { status: 500 }

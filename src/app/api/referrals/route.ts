@@ -1,20 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CREATE_REFERRAL } from "../../../../lib/queries";
 
-function resolveGraphqlUrl(req: NextRequest) {
-  const env =
-    process.env.GRAPHQL_URL ||
-    process.env.NEXT_PUBLIC_GRAPHQL_URL ||
-    "/api/graphql";
-  return env.startsWith("/")
-    ? new URL(env, req.nextUrl.origin).toString()
-    : env;
+function buildAuthHeader(req: NextRequest): string | undefined {
+  const h = req.headers.get("authorization");
+  if (h && h.trim() !== "") return h;
+  const token = req.cookies.get("access_token")?.value;
+  if (token && token.trim() !== "") return `Bearer ${token}`;
+  const cookie = req.headers.get("cookie") ?? "";
+  const m = cookie.match(/(?:^|;\s*)access_token=([^;]+)/i);
+  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+  return undefined;
+}
+
+function resolveApiUrl(req: NextRequest) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
+  return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
 function extractAccessToken(req: NextRequest): string | null {
   const auth = req.headers.get("authorization");
   if (auth?.toLowerCase().startsWith("bearer ")) {
-    const t = auth.slice("bearer ".length).trim();
+    const t = auth.slice(7).trim();
     if (t) return t;
   }
   const cookie = req.headers.get("cookie") ?? "";
@@ -33,8 +42,8 @@ function extractAccessToken(req: NextRequest): string | null {
       if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) {
         return parsed[0];
       }
-      if (parsed && typeof parsed === "object" && typeof parsed.access_token === "string") {
-        return parsed.access_token;
+      if (parsed && typeof parsed === "object" && typeof (parsed as any).access_token === "string") {
+        return (parsed as any).access_token as string;
       }
     } catch {}
   }
@@ -46,9 +55,7 @@ function decodeUserIdFromJwt(token: string | null): string | null {
   const parts = token.split(".");
   if (parts.length < 2) return null;
   try {
-    const json = Buffer
-      .from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64")
-      .toString("utf8");
+    const json = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
     const payload = JSON.parse(json);
     return (
       (typeof payload?.sub === "string" && payload.sub) ||
@@ -61,141 +68,105 @@ function decodeUserIdFromJwt(token: string | null): string | null {
   }
 }
 
-async function getUserIdFromMe(req: NextRequest): Promise<string | null> {
+async function readJson(res: Response) {
+  const raw = await res.text();
+  let data: any = null;
   try {
-    const meUrl = new URL("/api/me", req.nextUrl.origin).toString();
-    const r = await fetch(meUrl, {
-      method: "GET",
-      headers: {
-        accept: "application/json",
-        ...(req.headers.get("cookie") ? { cookie: req.headers.get("cookie")! } : {}),
-        ...(req.headers.get("authorization")
-          ? { authorization: req.headers.get("authorization")! }
-          : {}),
-      },
-      cache: "no-store",
-    });
-    const j = await r.json().catch(() => ({}));
-    const id = j?.user?.id || j?.authMe?.id || j?.me?.id || null;
-    return typeof id === "string" ? id : null;
+    data = raw ? JSON.parse(raw) : null;
   } catch {
-    return null;
+    const e: any = new Error("upstream_not_json");
+    e.__raw = raw?.slice(0, 600);
+    e.status = res.status;
+    throw e;
   }
-}
-
-async function getUserIdFromGraphql(req: NextRequest): Promise<string | null> {
-  const url = resolveGraphqlUrl(req);
-  try {
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
-    };
-    const auth = req.headers.get("authorization");
-    const cookie = req.headers.get("cookie");
-    if (auth) headers["authorization"] = auth;
-    if (cookie) headers["cookie"] = cookie;
-
-    const query = `query { authMe { id } }`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ query }),
-      cache: "no-store",
-    });
-    const raw = await resp.text();
-    let data: any = null;
-    try { data = JSON.parse(raw); } catch { }
-    const id = data?.data?.authMe?.id || null;
-    return typeof id === "string" ? id : null;
-  } catch {
-    return null;
-  }
+  return { data, raw };
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { jobOfferId, candidateId } = await req.json().catch(() => ({} as any));
+    const { jobOfferId, candidateId } = (await req.json().catch(() => ({}))) as {
+      jobOfferId?: string;
+      candidateId?: string;
+    };
+
     if (!jobOfferId) {
       return NextResponse.json({ error: "jobOfferId_required" }, { status: 400 });
     }
 
-    let headhunterId: string | null = await getUserIdFromMe(req);
-    if (!headhunterId) headhunterId = await getUserIdFromGraphql(req);
-    if (!headhunterId) {
-      const token = extractAccessToken(req);
-      headhunterId = decodeUserIdFromJwt(token);
-    }
-    if (!headhunterId) {
-      return NextResponse.json(
-        { error: "unauthenticated_no_user_id" },
-        { status: 401 }
-      );
-    }
-
-    const url = resolveGraphqlUrl(req);
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      accept: "application/json",
-    };
-    const auth = req.headers.get("authorization");
-    const cookie = req.headers.get("cookie");
+    const API = resolveApiUrl(req);
+    const auth = buildAuthHeader(req);
+    const cookie = req.headers.get("cookie") ?? "";
     const xReqId = req.headers.get("x-request-id");
     const xCorrId = req.headers.get("x-correlation-id");
-    if (auth) headers["authorization"] = auth;
-    if (cookie) headers["cookie"] = cookie;
-    if (xReqId) headers["x-request-id"] = xReqId;
-    if (xCorrId) headers["x-correlation-id"] = xCorrId;
 
-    const variables: Record<string, any> = {
-      headhunterId,
-      jobOfferId,
+    const baseHeaders: HeadersInit = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(auth ? { Authorization: auth } : {}),
+      ...(cookie ? { cookie } : {}),
+      ...(xReqId ? { "x-request-id": xReqId } : {}),
+      ...(xCorrId ? { "x-correlation-id": xCorrId } : {}),
     };
-    if (candidateId !== undefined) variables.candidateId = candidateId;
 
-    const gqlRes = await fetch(url, {
+    // 1) Obtener headhunterId desde /auth/me (fallback: JWT cookie)
+    let headhunterId: string | null = null;
+    try {
+      const meRes = await fetch(`${API}/auth/me`, {
+        method: "GET",
+        headers: baseHeaders,
+        cache: "no-store",
+        credentials: "include",
+      });
+      const { data: me } = await readJson(meRes);
+      if (meRes.ok && me?.id) headhunterId = String(me.id);
+    } catch {}
+
+    if (!headhunterId) {
+      headhunterId = decodeUserIdFromJwt(extractAccessToken(req));
+    }
+    if (!headhunterId) {
+      return NextResponse.json({ error: "unauthenticated_no_user_id" }, { status: 401 });
+    }
+
+    // 2) Crear referral en el monolito
+    const payload: Record<string, any> = { headhunterId, jobOfferId };
+    if (candidateId !== undefined) payload.candidateId = candidateId;
+
+    const up = await fetch(`${API}/referrals`, {
       method: "POST",
-      headers,
-      body: JSON.stringify({
-        query: CREATE_REFERRAL,
-        variables,
-        operationName: "CreateReferral",
-      }),
+      headers: baseHeaders,
+      body: JSON.stringify(payload),
       cache: "no-store",
+      credentials: "include",
     });
 
-    const raw = await gqlRes.text();
-    let data: any = null;
-    try { data = JSON.parse(raw); } catch { }
+    const { data, raw } = await readJson(up);
 
-    if (!gqlRes.ok) {
+    if (!up.ok) {
+      const msg = data?.error || data?.message || `referrals_upstream_${up.status}`;
+      const status = /conflict|already|23505/i.test(String(msg)) ? 409 : up.status || 500;
       return NextResponse.json(
-        { error: `GraphQL HTTP ${gqlRes.status}`, details: data?.errors ?? null, raw: data ?? raw, target: url },
-        { status: 502 }
+        { error: msg, raw: data ?? raw, target: `${API}/referrals` },
+        { status }
       );
     }
 
-    if (data?.errors?.length) {
-      const msg = data.errors[0]?.message || "GraphQL error";
-      return NextResponse.json(
-        { error: msg, details: data.errors, target: url },
-        { status: /conflict|23505/i.test(msg) ? 409 : 500 }
-      );
-    }
-
-    const node = data?.data?.createReferral;
+    const node = data || {};
     const code = node?.referral_code ?? node?.code ?? null;
+    const id = node?.id ?? null;
+
     if (!code) {
-      return NextResponse.json({ error: "missing_referral_code", raw: data }, { status: 500 });
+      return NextResponse.json({ error: "missing_referral_code", raw: data }, { status: 502 });
     }
 
-    return NextResponse.json({ code, id: node?.id ?? null }, { status: 200 });
+    return NextResponse.json({ code, id }, { status: 200 });
   } catch (e: any) {
     const msg = e?.message || "referral_create_failed";
     const status =
       /unauth|forbidden|no_user_id/i.test(msg) ? 401 :
-        /conflict|23505/i.test(msg) ? 409 :
-          500;
-    return NextResponse.json({ error: msg }, { status });
+      /conflict|already|23505/i.test(msg) ? 409 :
+      e?.status || 500;
+    return NextResponse.json({ error: msg, __raw: e?.__raw ?? null }, { status });
   }
 }
 

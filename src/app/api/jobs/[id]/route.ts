@@ -1,7 +1,27 @@
 import { NextResponse } from "next/server";
-import { gqlServer } from "../../../../../lib/gqlServer";
-import { Company, getCompanyServer } from "../../../../../lib/company-server";
-import { JOB_BY_ID } from "../../../../../lib/queries";
+
+function buildAuthHeader(req: Request): string | undefined {
+  const fromHeader = req.headers.get("authorization");
+  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
+  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+  return undefined;
+}
+
+function resolveApiUrl(reqUrl: string) {
+  const base =
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.API_URL ||
+    "http://localhost:3000/api";
+  try {
+    new URL(base);
+    return base.replace(/\/$/, "");
+  } catch {
+    const u = new URL(reqUrl);
+    return new URL(base, u.origin).toString().replace(/\/$/, "");
+  }
+}
 
 type Job = {
   id: string;
@@ -20,21 +40,84 @@ type Job = {
   status: string;
 };
 
+type Company = {
+  id: string;
+  name: string;
+  email: string;
+  website?: string | null;
+  description?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  profile_picture?: string | null;
+  cover_photo?: string | null;
+  company_rating?: number | null;
+  bool_verified?: boolean | null;
+  verified_at?: string | null;
+  subscription_plan?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export async function GET(
-  _req: Request,
-  ctx: { params: Promise<{ id: string }> }
+  req: Request,
+  ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const { id } = await ctx.params;
+    const params = "then" in ctx.params ? await (ctx.params as Promise<{ id: string }>) : (ctx.params as { id: string });
+    const { id } = params;
+    if (!id) return NextResponse.json({ job: null, company: null, error: "missing_job_id" }, { status: 400 });
 
-    const data = await gqlServer<{ jobOffer: Job }>(JOB_BY_ID, { id });
-    const job = data?.jobOffer ?? null;
+    const API = resolveApiUrl(req.url);
+    const authorization = buildAuthHeader(req);
+    const cookie = req.headers.get("cookie") ?? "";
 
-    let company: Company | null = null;
-    if (job?.company_id) {
-      company = await getCompanyServer(job.company_id).catch(() => null);
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      ...(authorization ? { Authorization: authorization } : {}),
+      ...(cookie ? { cookie } : {}),
+    };
+
+    const jobRes = await fetch(`${API}/jobs/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers,
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    const jobRaw = await jobRes.text();
+    let job: Job | null = null;
+    try {
+      const parsed = jobRaw ? JSON.parse(jobRaw) : null;
+      if (jobRes.ok && parsed?.id) job = parsed as Job;
+    } catch {}
+
+    if (!jobRes.ok || !job) {
+      const msg = (() => {
+        try {
+          const parsed = jobRaw ? JSON.parse(jobRaw) : null;
+          return parsed?.error || parsed?.message || `jobs_upstream_${jobRes.status}`;
+        } catch {
+          return `jobs_upstream_${jobRes.status}`;
+        }
+      })();
+      return NextResponse.json({ job: null, company: null, error: msg }, { status: jobRes.status || 400 });
     }
 
+    let company: Company | null = null;
+    if (job.company_id) {
+      try {
+        const compRes = await fetch(`${API}/companies/${encodeURIComponent(job.company_id)}`, {
+          method: "GET",
+          headers,
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (compRes.ok) {
+          const comp = await compRes.json().catch(() => null);
+          if (comp?.id) company = comp as Company;
+        }
+      } catch {}
+    }
 
     return NextResponse.json({ job, company }, { status: 200 });
   } catch (e: any) {
