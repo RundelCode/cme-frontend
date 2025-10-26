@@ -1,7 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+// src/app/api/notifications/[id]/read/route.ts
+import { NextResponse } from 'next/server';
 
-async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Promise<T> {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_GQL_PATH ?? ''}/api/graphql` || '/api/graphql', {
+async function gqlFetch<T>(req: Request, query: string, variables?: any): Promise<T> {
+    const base = process.env.NEXT_PUBLIC_GQL_PATH ?? '';
+    const url = `${base}/api/graphql` || '/api/graphql';
+
+    const res = await fetch(url, {
         method: 'POST',
         headers: {
             'content-type': 'application/json',
@@ -14,7 +18,8 @@ async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Pr
 
     const raw = await res.text();
     let data: any = null;
-    try { data = raw ? JSON.parse(raw) : null; } catch {}
+    try { data = raw ? JSON.parse(raw) : null; } catch { }
+
     if (!res.ok || data?.errors?.length) {
         const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
         throw new Error(msg);
@@ -22,15 +27,18 @@ async function gqlFetch<T>(req: NextRequest, query: string, variables?: any): Pr
     return data.data as T;
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, ctx: any) {
     try {
-        const id = params?.id;
-        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+        const id = ctx?.params?.id as string | undefined;
+        if (!id) {
+            return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+        }
 
         const mutation = `
       mutation U($input: UpdateNotificationInput!) {
         updateNotification(input: $input) {
-          id read_at
+          id
+          read_at
         }
       }
     `;
@@ -45,4 +53,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     } catch (e: any) {
         return NextResponse.json({ error: e?.message || 'Error marking as read' }, { status: 500 });
     }
+}
+
+export async function OPTIONS(_req: Request) {
+    return NextResponse.json({}, { status: 200 });
 }
