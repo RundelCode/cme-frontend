@@ -1,9 +1,8 @@
-// src/app/api/notifications/[id]/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-const NOTIFICATION_Q = `
-  query Notification($id: ID!) {
-    notification(id: $id) {
+const NOTIFS_Q = `
+  query Notifications($userId: ID, $status: String, $notificationType: String, $limit: Int, $offset: Int) {
+    notifications(userId: $userId, status: $status, notificationType: $notificationType, limit: $limit, offset: $offset) {
       id
       user_id
       title
@@ -18,17 +17,7 @@ const NOTIFICATION_Q = `
     }
   }
 `;
-
-const UPDATE_NOTIF_M = `
-  mutation UpdateNotification($input: UpdateNotificationInput!) {
-    updateNotification(input: $input) {
-      id
-      status
-      read_at
-      updated_at
-    }
-  }
-`;
+const AUTH_ME = `query { authMe { id } }`;
 
 function resolveGqlURL(origin: string) {
     return (
@@ -38,103 +27,121 @@ function resolveGqlURL(origin: string) {
     );
 }
 
-async function gql<T = any>(req: Request, query: string, variables?: any, debug = false) {
-    const { origin } = new URL(req.url);
-    const url = resolveGqlURL(origin);
+async function gql(req: NextRequest, query: string, variables?: any) {
+    const url = resolveGqlURL(req.nextUrl.origin);
+    const headers: Record<string, string> = {
+        "content-type": "application/json",
+        accept: "application/json",
+    };
+    const auth = req.headers.get("authorization");
+    const cookie = req.headers.get("cookie");
+    if (auth) headers.authorization = auth;
+    if (cookie) headers.cookie = cookie;
 
     const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'content-type': 'application/json',
-            cookie: req.headers.get('cookie') ?? '',
-            authorization: req.headers.get('authorization') ?? '',
-        },
+        method: "POST",
+        headers,
         body: JSON.stringify({ query, variables }),
-        cache: 'no-store',
+        cache: "no-store",
     });
 
     const raw = await res.text();
-    let data: any;
-    try {
-        data = raw ? JSON.parse(raw) : null;
-    } catch {
-        const e = new Error('json_parse_error');
-        (e as any).__debug = { stage: 'parse', url, status: res.status, raw };
-        throw e;
-    }
+    let data: any = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch { }
 
     if (!res.ok || data?.errors?.length) {
-        const message = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
-        const e = new Error(message);
-        (e as any).__debug = { stage: 'gql', url, status: res.status, request: { variables }, responseRaw: raw, response: data };
-        throw e;
+        const message = data?.errors?.map((e: any) => e.message).join(" | ") || `HTTP ${res.status}`;
+        const debug = { stage: "gql", url, status: res.status, request: { variables }, responseRaw: raw, response: data };
+        throw Object.assign(new Error(message), { __debug: debug });
     }
-
-    const payload: any = { data: data?.data };
-    if (debug) payload.__debug = { url, variables, responseRaw: raw, response: data };
-    return payload as T;
+    return data?.data;
 }
 
-export async function GET(req: Request, ctx: any) {
-    const url = new URL(req.url);
-    const debug = url.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
-
-    try {
-        const id: string | undefined = ctx?.params?.id;
-        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-
-        const resp: any = await gql(req, NOTIFICATION_Q, { id }, debug);
-        const notification = resp.data?.notification ?? null;
-
-        return NextResponse.json(
-            debug ? { notification, __debug: resp.__debug } : { notification },
-            { status: 200 }
-        );
-    } catch (e: any) {
-        const payload = { error: e?.message || 'notification_get_failed', __debug: e?.__debug || null };
-        return NextResponse.json(payload, { status: 500 });
-    }
+function resolveNotifsBase(origin: string) {
+    return process.env.NOTIFS_URL?.trim() || "http://localhost:3007";
 }
 
-export async function PATCH(req: Request, ctx: any) {
-    const url = new URL(req.url);
-    const debug = url.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
-
+export async function GET(req: NextRequest) {
     try {
-        const id: string | undefined = ctx?.params?.id;
-        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+        const sp = req.nextUrl.searchParams;
+        const limit = Number(sp.get("limit") ?? "25");
+        const offset = Number(sp.get("offset") ?? "0");
+        const status = sp.get("status") || null;
+        const notificationType = sp.get("type") || sp.get("notificationType") || null;
 
-        const body = await req.json().catch(() => ({} as any));
-
-        const status: string | undefined =
-            typeof body?.status === 'string' && body.status.trim() ? body.status : undefined;
-
-        const rawReadAt = body?.readAt as unknown;
-        let readAt: string | undefined;
-        if (rawReadAt === true || rawReadAt === 'now') readAt = new Date().toISOString();
-        else if (typeof rawReadAt === 'string' && rawReadAt.trim()) readAt = rawReadAt;
-
-        if (!status && !readAt) {
-            return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+        const me = await gql(req, AUTH_ME);
+        const userId: string | null = me?.authMe?.id ?? null;
+        if (!userId) {
+            return NextResponse.json({ items: [], error: "unauthenticated" }, { status: 401 });
         }
 
-        const input: any = { id };
-        if (status) input.status = status;
-        if (readAt) input.readAt = readAt;
-
-        const resp: any = await gql(req, UPDATE_NOTIF_M, { input }, debug);
-        const notification = resp.data?.updateNotification ?? null;
-
-        return NextResponse.json(
-            debug ? { notification, __debug: resp.__debug } : { notification },
-            { status: 200 }
-        );
+        const data = await gql(req, NOTIFS_Q, { userId, status, notificationType, limit, offset });
+        const items = data?.notifications ?? [];
+        return NextResponse.json({ items }, { status: 200 });
     } catch (e: any) {
-        const payload = { error: e?.message || 'notification_update_failed', __debug: e?.__debug || null };
-        return NextResponse.json(payload, { status: 500 });
+        console.error("[/api/notifications][GET] fail:", e?.message, e?.__debug ?? "");
+        return NextResponse.json(
+            { items: [], error: e?.message || "notifications_load_failed", __debug: e?.__debug ?? null },
+            { status: 500 }
+        );
     }
 }
 
-export async function OPTIONS(_req: Request) {
-    return NextResponse.json({}, { status: 200 });
+export async function POST(req: NextRequest) {
+    const origin = req.nextUrl.origin;
+    const base = resolveNotifsBase(origin);
+    try {
+        const body = await req.json().catch(() => ({}));
+
+        const payload = {
+            userId: body.userId ?? body.user_id,
+            title: body.title,
+            message: body.message,
+            notificationType: body.notificationType ?? body.notification_type,
+            channel: body.channel ?? "email",
+            relatedId: body.relatedId ?? body.related_id ?? null,
+        };
+
+
+        if (!payload.userId || !payload.title || !payload.message || !payload.notificationType) {
+            const msg = "Missing required fields (userId, title, message, notificationType)";
+            console.warn("[/api/notifications][POST] 400:", msg);
+            return NextResponse.json({ error: msg }, { status: 400 });
+        }
+
+        const headers: Record<string, string> = {
+            "content-type": "application/json",
+            accept: "application/json",
+        };
+        const auth = req.headers.get("authorization");
+        const cookie = req.headers.get("cookie");
+        if (auth) headers.authorization = auth;
+        if (cookie) headers.cookie = cookie;
+
+        const res = await fetch(`${base}/notifications`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+        });
+
+        const raw = await res.text();
+        let data: any = null;
+        try { data = raw ? JSON.parse(raw) : null; } catch { }
+
+        if (!res.ok) {
+            console.error("[/api/notifications][POST] upstream error", res.status, raw);
+            return NextResponse.json(
+                { error: data?.message || data?.error || `REST error ${res.status}`, __debug: { base, payload, raw } },
+                { status: 500 }
+            );
+        }
+
+        return NextResponse.json({ notification: data }, { status: 201 });
+    } catch (e: any) {
+        console.error("[/api/notifications][POST] fail:", e?.message);
+        return NextResponse.json(
+            { error: e?.message || "notification_create_failed" },
+            { status: 500 }
+        );
+    }
 }

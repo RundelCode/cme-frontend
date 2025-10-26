@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 const NOTIFICATION_Q = `
   query Notification($id: ID!) {
@@ -37,8 +37,10 @@ function resolveGqlURL(origin: string) {
   );
 }
 
-async function gql(req: NextRequest, query: string, variables?: any, debug = false) {
-  const url = resolveGqlURL(req.nextUrl.origin);
+async function gql<T = any>(req: Request, query: string, variables?: any, debug = false) {
+  const { origin } = new URL(req.url);
+  const url = resolveGqlURL(origin);
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -51,7 +53,10 @@ async function gql(req: NextRequest, query: string, variables?: any, debug = fal
   });
 
   const raw = await res.text();
-  let data: any; try { data = raw ? JSON.parse(raw) : null; } catch {
+  let data: any;
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
     const e = new Error('json_parse_error');
     (e as any).__debug = { stage: 'parse', url, status: res.status, raw };
     throw e;
@@ -64,27 +69,38 @@ async function gql(req: NextRequest, query: string, variables?: any, debug = fal
     throw e;
   }
 
-  const payload = { data: data?.data };
-  if (debug) (payload as any).__debug = { url, variables, responseRaw: raw, response: data };
-  return payload;
+  const payload: any = { data: data?.data };
+  if (debug) payload.__debug = { url, variables, responseRaw: raw, response: data };
+  return payload as T;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const debug = req.nextUrl.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
+export async function GET(req: Request, ctx: any) {
+  const url = new URL(req.url);
+  const debug = url.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
+
   try {
-    const resp = await gql(req, NOTIFICATION_Q, { id: params.id }, debug);
-    const notification = (resp as any).data?.notification ?? null;
-    return NextResponse.json(debug ? { notification, __debug: (resp as any).__debug } : { notification }, { status: 200 });
+    const id: string | undefined = ctx?.params?.id;
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    const resp: any = await gql(req, NOTIFICATION_Q, { id }, debug);
+    const notification = resp.data?.notification ?? null;
+
+    return NextResponse.json(
+      debug ? { notification, __debug: resp.__debug } : { notification },
+      { status: 200 }
+    );
   } catch (e: any) {
     const payload = { error: e?.message || 'notification_get_failed', __debug: e?.__debug || null };
     return NextResponse.json(payload, { status: 500 });
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const debug = req.nextUrl.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
+export async function PATCH(req: Request, ctx: any) {
+  const url = new URL(req.url);
+  const debug = url.searchParams.get('__debug') === '1' || req.headers.get('x-debug') === '1';
+
   try {
-    const id = params?.id;
+    const id: string | undefined = ctx?.params?.id;
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
     const body = await req.json().catch(() => ({} as any));
@@ -94,11 +110,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const rawReadAt = body?.readAt as unknown;
     let readAt: string | undefined;
-    if (rawReadAt === true || rawReadAt === 'now') {
-      readAt = new Date().toISOString();
-    } else if (typeof rawReadAt === 'string' && rawReadAt.trim()) {
-      readAt = rawReadAt;
-    }
+    if (rawReadAt === true || rawReadAt === 'now') readAt = new Date().toISOString();
+    else if (typeof rawReadAt === 'string' && rawReadAt.trim()) readAt = rawReadAt;
 
     if (!status && !readAt) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
@@ -108,12 +121,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (status) input.status = status;
     if (readAt) input.readAt = readAt;
 
-    const resp = await gql(req, UPDATE_NOTIF_M, { input }, debug);
-    const notification = (resp as any).data?.updateNotification ?? null;
+    const resp: any = await gql(req, UPDATE_NOTIF_M, { input }, debug);
+    const notification = resp.data?.updateNotification ?? null;
 
-    return NextResponse.json(debug ? { notification, __debug: (resp as any).__debug } : { notification }, { status: 200 });
+    return NextResponse.json(
+      debug ? { notification, __debug: resp.__debug } : { notification },
+      { status: 200 }
+    );
   } catch (e: any) {
     const payload = { error: e?.message || 'notification_update_failed', __debug: e?.__debug || null };
     return NextResponse.json(payload, { status: 500 });
   }
+}
+
+export async function OPTIONS(_req: Request) {
+  return NextResponse.json({}, { status: 200 });
 }
