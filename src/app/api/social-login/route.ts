@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 function resolveApiUrl(reqUrl: string) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "http://localhost:3000/api";
+    "http://localhost:3000/api"; // <-- backend en 3000
   try {
     new URL(base);
     return base.replace(/\/$/, "");
@@ -33,10 +35,12 @@ export async function POST(req: Request) {
     const body = (await req.json().catch(() => ({}))) as {
       access_token?: string;
       refresh_token?: string;
+      rememberMe?: boolean;
     };
 
     const incomingToken = body?.access_token ?? null;
     const incomingRefresh = body?.refresh_token ?? null;
+    const rememberMe = !!body?.rememberMe;
 
     if (!incomingToken) {
       return NextResponse.json({ error: "No access_token" }, { status: 400 });
@@ -44,13 +48,13 @@ export async function POST(req: Request) {
 
     const API = resolveApiUrl(req.url);
 
-    const upstream = await fetch(`${API}/auth/social-login`, {
+    // 🔁 Cambiado a /auth/oauth (tu backend Nest)
+    const upstream = await fetch(`${API}/auth/oauth`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        // algunas implementaciones requieren el bearer entrante
-        Authorization: `Bearer ${incomingToken}`,
+        Authorization: `Bearer ${incomingToken}`, // por si tu service lo lee
       },
       body: JSON.stringify({
         access_token: incomingToken,
@@ -63,18 +67,33 @@ export async function POST(req: Request) {
     const { data, raw } = await readJson(upstream);
 
     if (!upstream.ok) {
-      const msg = data?.error || data?.message || `auth_social_login_upstream_${upstream.status}`;
-      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: upstream.status || 502 });
+      const msg =
+        data?.error ||
+        data?.message ||
+        `auth_oauth_upstream_${upstream.status}`;
+      return NextResponse.json(
+        { error: msg, raw: data ?? raw },
+        { status: upstream.status || 502 }
+      );
     }
 
-    // Normalizamos formas comunes de respuesta
-    const user = data?.user ?? data?.profile ?? null;
+    // Normalizamos: varios backends devuelven shapes distintos
+    const user = data?.user ?? data?.profile ?? data?.me ?? null;
     const session = data?.session ?? data;
 
     const accessToken =
-      session?.access_token || session?.accessToken || session?.access || null;
+      session?.access_token ||
+      session?.accessToken ||
+      session?.access ||
+      data?.access_token ||
+      null;
+
     const refreshToken =
-      session?.refresh_token || session?.refreshToken || session?.refresh || null;
+      session?.refresh_token ||
+      session?.refreshToken ||
+      session?.refresh ||
+      data?.refresh_token ||
+      null;
 
     if (!accessToken) {
       return NextResponse.json({ error: "no session" }, { status: 500 });
@@ -82,10 +101,11 @@ export async function POST(req: Request) {
 
     const isProd = process.env.NODE_ENV === "production";
     const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
-    const sameSiteVal = (process.env.COOKIE_SAMESITE as any) || (isProd ? "none" : "lax");
+    const sameSiteVal =
+      (process.env.COOKIE_SAMESITE as any) || (isProd ? "none" : "lax");
 
-    // TTLs igual que antes
-    const ACCESS_TTL = 60 * 60 * 24 * 7;  // 7d
+    // TTL (como en tu login normal)
+    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60; // 7d o 1h
     const REFRESH_TTL = 60 * 60 * 24 * 30; // 30d
 
     const res = NextResponse.json({ ok: true, user });
@@ -117,4 +137,8 @@ export async function POST(req: Request) {
       { status: err?.status || 500 }
     );
   }
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
 }

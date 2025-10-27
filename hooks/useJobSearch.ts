@@ -1,29 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { JOB_SEARCH } from "../lib/queries";
-
-export async function gql<T>(query: string, variables?: Record<string, unknown>) {
-  const res = await fetch("/api/graphql", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ query, variables }),
-  });
-
-  let json: any = null;
-  try { json = await res.json(); } catch {
-    const text = await res.text();
-    throw new Error(`GraphQL: respuesta no JSON (${res.status}): ${text.slice(0, 150)}`);
-  }
-  if (!res.ok) throw new Error(json?.errors?.[0]?.message ?? `HTTP ${res.status}`);
-  if (json?.errors?.length) throw new Error(json.errors[0]?.message ?? "GraphQL error");
-  if (!json?.data) throw new Error("GraphQL: respuesta sin 'data'");
-
-  return json.data as T;
-}
-
-const TAG = "[useJobSearch]";
 
 export type Filters = {
   q: string;
@@ -50,9 +27,17 @@ export type JobOffer = {
   status: string;
 };
 
-type JobSearchResponse = {
-  jobSearch?: { total?: number; items?: JobOffer[] };
-};
+type SearchResp = { items: JobOffer[]; total: number };
+
+function toQS(params: Record<string, any>) {
+  const usp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v == null || v === "") continue;
+    usp.set(k, String(v));
+  }
+  const s = usp.toString();
+  return s ? `?${s}` : "";
+}
 
 export function useJobSearch(initial: {
   filters: Filters;
@@ -68,41 +53,44 @@ export function useJobSearch(initial: {
   const [total, setTotal] = useState(0);
   const [items, setItems] = useState<JobOffer[]>([]);
 
-  const buildInput = (f: Filters) => {
-    const input = {
-      q: f.q || undefined,
-      employmentType: f.projectType || undefined,
-      location: f.location || undefined,
-      minSalary: f.minSalary === "" ? undefined : f.minSalary,
-      maxSalary: f.maxSalary === "" ? undefined : f.maxSalary,
-      orderBy: f.orderBy,
-    } as const;
-    return input;
-  };
+  const buildQuery = (f: Filters) => ({
+    q: f.q || undefined,
+    employmentType: f.projectType || undefined,
+    location: f.location || undefined,
+    minSalary: f.minSalary === "" ? undefined : Number(f.minSalary),
+    maxSalary: f.maxSalary === "" ? undefined : Number(f.maxSalary),
+    orderBy: f.orderBy,
+  });
 
   const run = useCallback(
     async (f = filters, l = limit, o = offset) => {
       setLoading(true);
       setError(null);
 
-      const input = buildInput(f);
-      const started = performance.now();
-
       try {
-        const data = await gql<JobSearchResponse>(JOB_SEARCH, { input, limit: l, offset: o });
-        const jobSearch = data?.jobSearch;
-        if (!jobSearch || !Array.isArray(jobSearch.items)) {
-          console.error(`${TAG} respuesta mal formada:`, data);
-          throw new Error("Respuesta GraphQL sin 'jobSearch.items'");
+        const qs = toQS({ ...buildQuery(f), limit: l, offset: o });
+        const res = await fetch(`/api/jobs/search${qs}`, {
+          method: "GET",
+          headers: { accept: "application/json" },
+          credentials: "include",
+        });
+
+        const json = await res.json().catch(async () => {
+          const txt = await res.text();
+          throw new Error(`HTTP ${res.status}: ${txt.slice(0, 200)}`);
+        });
+
+        if (!res.ok) throw new Error(json?.error ?? `HTTP ${res.status}`);
+
+        const data = json as SearchResp;
+        if (!data || !Array.isArray(data.items)) {
+          throw new Error("Respuesta REST sin 'items'");
         }
 
-        const dur = Math.round(performance.now() - started);
-
-        setItems(jobSearch.items);
-        setTotal(jobSearch.total ?? 0);
+        setItems(data.items);
+        setTotal(data.total ?? 0);
       } catch (e: any) {
-        console.error(`${TAG} error →`, e?.message ?? e);
-        setError(e?.message ?? "Search failed");
+        setError(e?.message ?? "Error cargando ofertas");
       } finally {
         setLoading(false);
       }
@@ -112,6 +100,7 @@ export function useJobSearch(initial: {
 
   useEffect(() => {
     run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submit = async (nextFilters: Filters) => {

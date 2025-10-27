@@ -16,10 +16,10 @@ function resolveApiUrl(reqUrl: string) {
     "http://localhost:3000/api";
   try {
     new URL(base);
-    return base.replace(/\/$/, "");
+    return base.replace(/\/+$/, "");
   } catch {
     const u = new URL(reqUrl);
-    return new URL(base, u.origin).toString().replace(/\/$/, "");
+    return new URL(base, u.origin).toString().replace(/\/+$/, "");
   }
 }
 
@@ -40,10 +40,10 @@ type Job = {
   status: string;
 };
 
-type Company = {
+type CompanyRaw = {
   id: string;
   name: string;
-  email: string;
+  email?: string | null;
   website?: string | null;
   description?: string | null;
   industry?: string | null;
@@ -54,8 +54,8 @@ type Company = {
   bool_verified?: boolean | null;
   verified_at?: string | null;
   subscription_plan?: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export async function GET(
@@ -80,7 +80,6 @@ export async function GET(
     const jobRes = await fetch(`${API}/jobs/${encodeURIComponent(id)}`, {
       method: "GET",
       headers,
-      credentials: "include",
       cache: "no-store",
     });
 
@@ -89,7 +88,7 @@ export async function GET(
     try {
       const parsed = jobRaw ? JSON.parse(jobRaw) : null;
       if (jobRes.ok && parsed?.id) job = parsed as Job;
-    } catch {}
+    } catch { }
 
     if (!jobRes.ok || !job) {
       const msg = (() => {
@@ -103,20 +102,26 @@ export async function GET(
       return NextResponse.json({ job: null, company: null, error: msg }, { status: jobRes.status || 400 });
     }
 
-    let company: Company | null = null;
+    let company: { name?: string | null; profilePicture?: string | null; coverPhoto?: string | null; location?: string | null } | null = null;
     if (job.company_id) {
       try {
         const compRes = await fetch(`${API}/companies/${encodeURIComponent(job.company_id)}`, {
           method: "GET",
           headers,
-          credentials: "include",
           cache: "no-store",
         });
         if (compRes.ok) {
-          const comp = await compRes.json().catch(() => null);
-          if (comp?.id) company = comp as Company;
+          const comp = (await compRes.json().catch(() => null)) as CompanyRaw | null;
+          if (comp?.id) {
+            company = {
+              name: comp.name ?? null,
+              profilePicture: comp.profile_picture ?? null,
+              coverPhoto: comp.cover_photo ?? null,
+              location: comp.location ?? null,
+            };
+          }
         }
-      } catch {}
+      } catch { }
     }
 
     return NextResponse.json({ job, company }, { status: 200 });

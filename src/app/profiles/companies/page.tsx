@@ -1,15 +1,13 @@
-// src/app/profile/company/page.tsx (o la ruta que uses)
+// src/app/profile/company/page.tsx
 import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
 import styles from "./companyProfile.module.css";
-import { gqlRequest } from "../../../../lib/gql";
 import CompanyRatingClient from "./rating/CompanyRatingClient";
 import CompanyOffers from "./offers/CompanyOffers";
 
 export const dynamic = "force-dynamic";
-const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
 
 type Company = {
   id: string;
@@ -19,52 +17,76 @@ type Company = {
   description?: string | null;
   industry?: string | null;
   location?: string | null;
-  profilePicture?: string | null;
-  coverPhoto?: string | null;
+  profilePicture?: string | null; // camelCase usado por la vista
+  coverPhoto?: string | null;     // camelCase usado por la vista
   companyRating?: number | null;
   boolVerified?: boolean | null;
   verifiedAt?: string | null;
   subscriptionPlan?: string | null;
-  createdAt: string;
+  createdAt?: string | null;
   updatedAt?: string | null;
 };
 
-type CompanyQuery = { company: Company | null };
+// Utilidad: toma el valor camel si existe; si no, el snake; si no, null
+function coalesce<T>(...vals: (T | null | undefined)[]): T | null {
+  for (const v of vals) if (v !== undefined && v !== null) return v as T;
+  return null;
+}
 
-const GET_COMPANY = `
-  query GetCompany($id: ID!) {
-    company(id: $id) {
-      id
-      name
-      email
-      website
-      description
-      industry
-      location
-      profilePicture
-      coverPhoto
-      companyRating
-      boolVerified
-      verifiedAt
-      subscriptionPlan
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-async function getCompanyById(id: string) {
+async function getOrigin() {
   const hdrs = await nextHeaders();
-  const cookieHeader = (await nextCookies()).toString();
+  const host = hdrs.get("host") || "localhost:3001";
+  const proto = hdrs.get("x-forwarded-proto") || "http";
+  return `${proto}://${host}`;
+}
+
+async function getCompanyById(id: string): Promise<Company | null> {
   try {
-    const data = await gqlRequest<CompanyQuery>(
-      GRAPHQL_ENDPOINT,
-      GET_COMPANY,
-      { id },
-      hdrs,
-      cookieHeader
-    );
-    return data?.company ?? null;
+    const origin = await getOrigin();
+    const ck = await nextCookies();
+    const cookieHeader = ck
+      .getAll()
+      .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
+      .join("; ");
+
+    // Nota: este proxy devuelve lo que venga del backend (snake o camel).
+    const res = await fetch(`${origin}/api/company/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+      headers: cookieHeader
+        ? { cookie: cookieHeader, Accept: "application/json" }
+        : { Accept: "application/json" },
+    });
+
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const raw = data?.company ?? data ?? null;
+    if (!raw?.id) return null;
+
+    // 🔁 Normalizamos snake → camel para lo que consume la UI
+    const company: Company = {
+      id: raw.id,
+      name: raw.name,
+      email: raw.email,
+      website: coalesce<string>(raw.website, raw.website_url),
+      description: raw.description ?? null,
+      industry: raw.industry ?? null,
+      location: raw.location ?? null,
+      profilePicture: coalesce<string>(raw.profilePicture, raw.profile_picture),
+      coverPhoto: coalesce<string>(raw.coverPhoto, raw.cover_photo),
+      companyRating: (() => {
+        const n = Number(
+          raw.companyRating ?? raw.company_rating ?? null
+        );
+        return Number.isFinite(n) ? n : null;
+      })(),
+      boolVerified: coalesce<boolean>(raw.boolVerified, raw.bool_verified) ?? null,
+      verifiedAt: raw.verifiedAt ?? raw.verified_at ?? null,
+      subscriptionPlan: raw.subscriptionPlan ?? raw.subscription_plan ?? null,
+      createdAt: raw.createdAt ?? raw.created_at ?? null,
+      updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
+    };
+
+    return company;
   } catch {
     return null;
   }

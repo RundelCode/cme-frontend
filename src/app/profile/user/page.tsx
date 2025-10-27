@@ -3,13 +3,9 @@ import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
 import styles from "./userProfile.module.css";
-import { gqlRequest } from "../../../../lib/gql";
+import { getOriginFromHeaders } from "../../../../lib/getOrigin";
 
 export const dynamic = "force-dynamic";
-
-const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
-
-type AuthMe = { authMe: { id: string; email: string; role: string } };
 
 type ExperienceItem = {
   role?: string | null;
@@ -43,87 +39,39 @@ type Profile = {
   cv_url?: string | null;
 };
 
-type ProfileQuery = { myProfile: Profile | null };
-
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const MY_PROFILE = `
-  query {
-    myProfile {
-      id
-      email
-      full_name
-      profile_picture
-      cover_photo
-      occupation
-      skills
-      role
-      phone
-      about_me
-      experience {
-        role
-        company
-        start
-        end
-        description
-      }
-      education {
-        degree
-        institution
-        start
-        end
-        description
-      }
-      cv_url
-    }
-  }
-`;
-
 async function getAuthAndProfile() {
   const hdrs = await nextHeaders();
-  const cookieHeader = (await nextCookies()).toString();
+  const cookies = await nextCookies();
+  const cookieHeader = cookies.toString();
+  const origin = await getOriginFromHeaders();
 
-  try {
-    const auth = await gqlRequest<AuthMe>(GRAPHQL_ENDPOINT, AUTH_ME, {}, hdrs, cookieHeader);
-    const isLogged = !!auth?.authMe?.id;
+  const meRes = await fetch(`${origin}/api/me`, {
+    headers: { cookie: cookieHeader, Accept: "application/json", "x-correlation-id": hdrs.get("x-correlation-id") || "" },
+    cache: "no-store",
+  });
+  const meJson = await meRes.json().catch(() => null);
+  const userId: string | null = meJson?.id ?? meJson?.user?.id ?? null;
+  if (!meRes.ok || !userId) return { isLogged: false, profile: null, authMe: null };
 
-    let profile: Profile | null = null;
-    if (isLogged) {
-      try {
-        const q = await gqlRequest<ProfileQuery>(GRAPHQL_ENDPOINT, MY_PROFILE, {}, hdrs, cookieHeader);
-        profile = q.myProfile ?? null;
-      } catch {
-        profile = null;
-      }
-    }
-    return { isLogged, profile, authMe: auth?.authMe ?? null };
-  } catch {
-    return { isLogged: false, profile: null, authMe: null };
-  }
+  const pRes = await fetch(`${origin}/api/profiles?ids=${encodeURIComponent(userId)}`, {
+    headers: { cookie: cookieHeader, Accept: "application/json" },
+    cache: "no-store",
+  });
+  const pJson = await pRes.json().catch(() => null);
+  const profile: Profile | null = Array.isArray(pJson?.profiles) ? pJson.profiles[0] ?? null : null;
+
+  const authMe = { id: userId, email: profile?.email ?? "", role: profile?.role ?? meJson?.role ?? "" };
+  return { isLogged: true, profile, authMe };
 }
 
 function hasValidExperience(exp: ExperienceItem[] | null | undefined) {
   if (!Array.isArray(exp)) return false;
-  return exp.some(
-    (e) =>
-      e.role ||
-      e.company ||
-      e.start ||
-      e.end ||
-      (e.description && e.description.trim() !== "")
-  );
+  return exp.some((e) => e.role || e.company || e.start || e.end || (e.description && e.description.trim() !== ""));
 }
 
 function hasValidEducation(edu: EducationItem[] | null | undefined) {
   if (!Array.isArray(edu)) return false;
-  return edu.some(
-    (e) =>
-      e.degree ||
-      e.institution ||
-      e.start ||
-      e.end ||
-      (e.description && e.description.trim() !== "")
-  );
+  return edu.some((e) => e.degree || e.institution || e.start || e.end || (e.description && e.description.trim() !== ""));
 }
 
 export default async function Page() {
@@ -182,6 +130,7 @@ export default async function Page() {
                 </h2>
               </div>
             </div>
+
             <div className={styles.section}>
               <h3>Sobre mí</h3>
               {profile.about_me && profile.about_me.trim().length ? (
@@ -204,7 +153,6 @@ export default async function Page() {
               )}
             </div>
 
-            {/* Detalles */}
             <div className={styles.section}>
               <h3>Detalles</h3>
               <dl className={styles.detailList}>
@@ -219,9 +167,9 @@ export default async function Page() {
                 </div>
               </dl>
             </div>
+
             <div className={styles.section}>
               <h3>Experiencia</h3>
-
               {hasValidExperience(profile.experience) ? (
                 <div className={styles.gridCards}>
                   {profile.experience!.map((it, i) => {
@@ -249,7 +197,6 @@ export default async function Page() {
 
             <div className={styles.section}>
               <h3>Educación</h3>
-
               {hasValidEducation(profile.education) ? (
                 <div className={styles.gridCards}>
                   {profile.education!.map((it, i) => {
@@ -274,8 +221,6 @@ export default async function Page() {
                 <div className={styles.emptyCard}>Sin educación registrada.</div>
               )}
             </div>
-
-
           </div>
         )}
       </div>

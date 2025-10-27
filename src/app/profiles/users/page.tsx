@@ -4,14 +4,8 @@ import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
 import styles from "./userProfile.module.css";
-import { gqlRequest } from "../../../../lib/gql";
 
 export const dynamic = "force-dynamic";
-
-const GRAPHQL_ENDPOINT =
-  process.env.GRAPHQL_ENDPOINT ??
-  process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ??
-  "/api/graphql";
 
 type ExperienceItem = {
   role?: string | null;
@@ -45,59 +39,28 @@ type Profile = {
   cv_url?: string | null;
 };
 
-type ProfileByIdQuery = { profile: Profile | null };
-
-const PROFILE_BY_ID = `
-  query GetProfile($id: ID!) {
-    profile(id: $id) {
-      id
-      email
-      full_name
-      profile_picture
-      cover_photo
-      occupation
-      skills
-      role
-      phone
-      about_me
-      experience {
-        role
-        company
-        start
-        end
-        description
-      }
-      education {
-        degree
-        institution
-        start
-        end
-        description
-      }
-      cv_url
-    }
-  }
-`;
-
-async function getProfileById(id: string) {
+async function getOrigin() {
   const hdrs = await nextHeaders();
-  const ck = await nextCookies();
-  const cookieHeader = ck
-    .getAll()
-    .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
-    .join("; ");
-  const headersToSend = new Headers(hdrs as any);
+  const host = hdrs.get("host") || "localhost:3001";
+  const proto = hdrs.get("x-forwarded-proto") || "http";
+  return `${proto}://${host}`;
+}
 
+async function getProfileById(id: string): Promise<Profile | null> {
   try {
-    const data = await gqlRequest<ProfileByIdQuery>(
-      GRAPHQL_ENDPOINT,
-      PROFILE_BY_ID,
-      { id },
-      headersToSend,
-      cookieHeader
-    );
-    return data?.profile ?? null;
-  } catch (e) {
+    const origin = await getOrigin();
+    const ck = await nextCookies();
+    const cookieHeader = ck.getAll().map((c) => `${c.name}=${encodeURIComponent(c.value)}`).join("; ");
+    const res = await fetch(`${origin}/api/profiles/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+      headers: cookieHeader ? { cookie: cookieHeader, Accept: "application/json" } : { Accept: "application/json" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (!data) return null;
+    if (data.profile) return data.profile as Profile;
+    return data as Profile;
+  } catch {
     return null;
   }
 }
@@ -129,10 +92,9 @@ function hasValidEducation(edu: EducationItem[] | null | undefined) {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ id?: string }>;
+  searchParams?: { id?: string };
 }) {
-  const sp = await searchParams;
-  const id = sp?.id?.trim();
+  const id = searchParams?.id?.trim();
   const profile = id ? await getProfileById(id) : null;
 
   return (
@@ -250,7 +212,6 @@ export default async function Page({
 
             <div className={styles.section}>
               <h3>Experiencia</h3>
-
               {hasValidExperience(profile.experience) ? (
                 <div className={styles.gridCards}>
                   {profile.experience!.map((it, i) => {
@@ -283,7 +244,6 @@ export default async function Page({
 
             <div className={styles.section}>
               <h3>Educación</h3>
-
               {hasValidEducation(profile.education) ? (
                 <div className={styles.gridCards}>
                   {profile.education!.map((it, i) => {

@@ -1,4 +1,18 @@
+// src/app/api/referrals/route.ts
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+type ReferralRow = {
+  id: string;
+  headhunter_id?: string | null;
+  candidate_id?: string | null;
+  job_offer_id: string;
+  referral_code: string;
+  status?: string;
+  created_at?: string;
+  updated_at?: string | null;
+};
 
 function buildAuthHeader(req: NextRequest): string | undefined {
   const h = req.headers.get("authorization");
@@ -27,27 +41,38 @@ function extractAccessToken(req: NextRequest): string | null {
     if (t) return t;
   }
   const cookie = req.headers.get("cookie") ?? "";
-
   const m1 = cookie.match(/(?:^|;\s*)sb-access-token=([^;]+)/i);
   if (m1?.[1]) return decodeURIComponent(m1[1]);
-
   const m2 = cookie.match(/(?:^|;\s*)access_token=([^;]+)/i);
   if (m2?.[1]) return decodeURIComponent(m2[1]);
-
   const m3 = cookie.match(/(?:^|;\s*)supabase-auth-token=([^;]+)/i);
   if (m3?.[1]) {
     try {
       const val = decodeURIComponent(m3[1]);
       const parsed = JSON.parse(val);
-      if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) {
-        return parsed[0];
-      }
+      if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) return parsed[0];
       if (parsed && typeof parsed === "object" && typeof (parsed as any).access_token === "string") {
         return (parsed as any).access_token as string;
       }
-    } catch {}
+    } catch { }
   }
   return null;
+}
+
+function base64UrlDecode(s: string): string {
+  try {
+    // Node
+    return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+  } catch {
+    // Edge runtime fallback
+    const pad = s.length % 4 ? s + "=".repeat(4 - (s.length % 4)) : s;
+    const str = atob(pad.replace(/-/g, "+").replace(/_/g, "/"));
+    // decode UTF-8
+    const esc = str.replace(/%/g, "%25").replace(/[\x00-\x7F]/g, (c) =>
+      "%" + c.charCodeAt(0).toString(16).padStart(2, "0")
+    );
+    return decodeURIComponent(esc);
+  }
 }
 
 function decodeUserIdFromJwt(token: string | null): string | null {
@@ -55,7 +80,7 @@ function decodeUserIdFromJwt(token: string | null): string | null {
   const parts = token.split(".");
   if (parts.length < 2) return null;
   try {
-    const json = Buffer.from(parts[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const json = base64UrlDecode(parts[1]);
     const payload = JSON.parse(json);
     return (
       (typeof payload?.sub === "string" && payload.sub) ||
@@ -82,6 +107,7 @@ async function readJson(res: Response) {
   return { data, raw };
 }
 
+// Crea un referral
 export async function POST(req: NextRequest) {
   try {
     const { jobOfferId, candidateId } = (await req.json().catch(() => ({}))) as {
@@ -108,7 +134,7 @@ export async function POST(req: NextRequest) {
       ...(xCorrId ? { "x-correlation-id": xCorrId } : {}),
     };
 
-    // 1) Obtener headhunterId desde /auth/me (fallback: JWT cookie)
+    // 1) headhunterId desde /auth/me, fallback JWT
     let headhunterId: string | null = null;
     try {
       const meRes = await fetch(`${API}/auth/me`, {
@@ -118,8 +144,11 @@ export async function POST(req: NextRequest) {
         credentials: "include",
       });
       const { data: me } = await readJson(meRes);
-      if (meRes.ok && me?.id) headhunterId = String(me.id);
-    } catch {}
+      if (meRes.ok) {
+        headhunterId = String(me?.id || me?.user?.id || "");
+        if (!headhunterId) headhunterId = null;
+      }
+    } catch { }
 
     if (!headhunterId) {
       headhunterId = decodeUserIdFromJwt(extractAccessToken(req));
@@ -128,11 +157,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthenticated_no_user_id" }, { status: 401 });
     }
 
-    // 2) Crear referral en el monolito
-    const payload: Record<string, any> = { headhunterId, jobOfferId };
-    if (candidateId !== undefined) payload.candidateId = candidateId;
+    // 2) Payload con ambos formatos (snake y camel) para máxima compatibilidad
+    const payload = {
+      headhunter_id: headhunterId,
+      job_offer_id: jobOfferId,
+      ...(candidateId ? { candidate_id: candidateId } : {}),
 
-    const up = await fetch(`${API}/referrals`, {
+      headhunterId,
+      jobOfferId,
+      ...(candidateId ? { candidateId } : {}),
+    };
+
+    // 3) Intento 1: POST /referrals
+    let up = await fetch(`${API}/referrals`, {
       method: "POST",
       headers: baseHeaders,
       body: JSON.stringify(payload),
@@ -140,32 +177,60 @@ export async function POST(req: NextRequest) {
       credentials: "include",
     });
 
+    // Fallback: algunos backends exponen /referrals/create
+    if (up.status === 404 || up.status === 405) {
+      up = await fetch(`${API}/referrals/create`, {
+        method: "POST",
+        headers: baseHeaders,
+        body: JSON.stringify(payload),
+        cache: "no-store",
+        credentials: "include",
+      });
+    }
+
     const { data, raw } = await readJson(up);
 
     if (!up.ok) {
       const msg = data?.error || data?.message || `referrals_upstream_${up.status}`;
       const status = /conflict|already|23505/i.test(String(msg)) ? 409 : up.status || 500;
       return NextResponse.json(
-        { error: msg, raw: data ?? raw, target: `${API}/referrals` },
+        { error: msg, raw: data ?? raw, target: up.url },
         { status }
       );
     }
 
-    const node = data || {};
-    const code = node?.referral_code ?? node?.code ?? null;
+    // 4) Normaliza respuesta
+    const node: ReferralRow | any = data?.referral ?? data ?? {};
+    const code =
+      node?.referral_code ?? node?.code ?? node?.referralCode ?? null;
     const id = node?.id ?? null;
+
+    const normalized = {
+      id,
+      code,
+      referral: {
+        id: node?.id ?? null,
+        referral_code: code,
+        headhunter_id: node?.headhunter_id ?? node?.headhunterId ?? headhunterId ?? null,
+        candidate_id: node?.candidate_id ?? node?.candidateId ?? candidateId ?? null,
+        job_offer_id: node?.job_offer_id ?? node?.jobOfferId ?? jobOfferId,
+        status: node?.status ?? null,
+        created_at: node?.created_at ?? node?.createdAt ?? null,
+        updated_at: node?.updated_at ?? node?.updatedAt ?? null,
+      } as ReferralRow,
+    };
 
     if (!code) {
       return NextResponse.json({ error: "missing_referral_code", raw: data }, { status: 502 });
     }
 
-    return NextResponse.json({ code, id }, { status: 200 });
+    return NextResponse.json(normalized, { status: 200 });
   } catch (e: any) {
     const msg = e?.message || "referral_create_failed";
     const status =
       /unauth|forbidden|no_user_id/i.test(msg) ? 401 :
-      /conflict|already|23505/i.test(msg) ? 409 :
-      e?.status || 500;
+        /conflict|already|23505/i.test(msg) ? 409 :
+          e?.status || 500;
     return NextResponse.json({ error: msg, __raw: e?.__raw ?? null }, { status });
   }
 }

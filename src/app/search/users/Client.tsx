@@ -12,7 +12,7 @@ import { searchProfiles } from "../../../../lib/profile-client";
 import Link from "next/link";
 
 function renderStars(value: number | null | undefined, max = 5) {
-    if (value == null) return null;
+    if (value == null || Number.isNaN(value)) return null;
     const rating = Math.min(5, Math.max(0, value));
     const rounded = Math.round(rating);
     const stars = [];
@@ -55,6 +55,9 @@ export default function UserSearchClient() {
         run();
     }, []);
 
+    const placeholderSrc =
+        (ProfilePlaceholder as unknown as { src: string }).src ?? "/images/placeholders/company.png";
+
     return (
         <div className={styles.main}>
             <div className={styles.blueLine} />
@@ -67,6 +70,7 @@ export default function UserSearchClient() {
                     width={320}
                     height={320}
                     priority
+                    style={{ width: "auto", height: "auto" }}
                 />
                 <h2>Usuarios</h2>
             </div>
@@ -85,6 +89,7 @@ export default function UserSearchClient() {
                         className={styles.searchIcon}
                         width={16}
                         height={16}
+                        style={{ width: "auto", height: "auto" }}
                     />
                     <input
                         type="text"
@@ -99,45 +104,44 @@ export default function UserSearchClient() {
                 </button>
             </form>
 
-
             {loading ? (
                 <div className={styles.loader}>
                     <PropagateLoader />
                 </div>
             ) : (
                 <ul className={styles.results}>
-                    {items?.map((u) => (
-                        <Link href={`/profiles/users?id=${u.id}`} key={u.id} className={styles.card}>
-                            <Image
-                                className={styles.profilePicture}
-                                src={u.profile_picture || ProfilePlaceholder}
-                                alt={u.full_name ?? u.email}
-                                width={100}
-                                height={100}
-                                priority
-                            />
+                    {(items ?? []).map((u) => {
+                        const rep = Number(u.reputation_score);
+                        const hasRep = u.reputation_score != null && !Number.isNaN(rep);
+                        return (
+                            <li key={u.id} className={styles.card}>
+                                <Link href={`/profiles/users?id=${u.id}`} className={styles.cardLink}>
+                                    <Image
+                                        className={styles.profilePicture}
+                                        src={u.profile_picture || placeholderSrc}
+                                        alt={u.full_name ?? u.email}
+                                        width={100}
+                                        height={100}
+                                        priority
+                                    />
 
-                            <div className={styles.profileInfo}>
-                                <div className={styles.profileTitle}>
-                                    {u.full_name ?? u.email}
-                                </div>
+                                    <div className={styles.profileInfo}>
+                                        <div className={styles.profileTitle}>
+                                            {u.full_name ?? u.email}
+                                        </div>
 
-                                <div>
-                                    {u.occupation ?? "—"}
-                                </div>
+                                        <div>{u.occupation ?? "—"}</div>
 
-                                {u.reputation_score != null && (
-                                    <div className={styles.rating}>
-                                        {renderStars(u.reputation_score)}
+                                        {hasRep && <div className={styles.rating}>{renderStars(rep)}</div>}
                                     </div>
-                                )}
-                            </div>
-                        </Link>
-                    ))}
+                                </Link>
+                            </li>
+                        );
+                    })}
+                    {(items && items.length === 0) && <li className={styles.empty}>Sin resultados</li>}
                 </ul>
             )}
             {err && <p>{err}</p>}
-
         </div>
     );
 }

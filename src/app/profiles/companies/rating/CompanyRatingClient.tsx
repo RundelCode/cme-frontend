@@ -2,39 +2,41 @@
 
 import React, { useMemo, useState } from "react";
 
-const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graphql";
+const PATCH_API = (id: string) => `/api/company/${encodeURIComponent(id)}`;
 
-async function gql<T>(query: string, variables?: any) {
-  const res = await fetch(GRAPHQL_ENDPOINT, {
-    method: "POST",
+async function patchCompanyRating(companyId: string, rating: number) {
+  const res = await fetch(PATCH_API(companyId), {
+    method: "PATCH",
     credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables }),
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ companyRating: rating, company_rating: rating }),
   });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json?.errors?.length) {
-    throw new Error(json?.errors?.[0]?.message ?? `GraphQL failed (${res.status})`);
+
+  const txt = await res.text();
+  let json: any = null;
+  try { json = txt ? JSON.parse(txt) : null; } catch { }
+
+  if (!res.ok) {
+    const msg = json?.error || json?.message || `company PATCH failed (${res.status})`;
+    throw new Error(msg);
   }
-  return json.data as T;
+
+  const val =
+    json?.companyRating ??
+    json?.company?.companyRating ??
+    json?.data?.companyRating ??
+    json?.data?.company?.companyRating ??
+    json?.company_rating ??
+    json?.company?.company_rating ??
+    json?.data?.company_rating ??
+    json?.data?.company?.company_rating ??
+    null;
+
+  return typeof val === "number" ? val : Number(val);
 }
-
-const RATE_COMPANY = `
-  mutation RateCompany($companyId: ID!, $rating: Float!) {
-    rateCompany(companyId: $companyId, rating: $rating) {
-      id
-      companyRating
-    }
-  }
-`;
-
-const UPDATE_COMPANY = `
-  mutation UpdateCompany($input: UpdateCompanyInput!) {
-    updateCompany(input: $input) {
-      id
-      companyRating
-    }
-  }
-`;
 
 function Star({
   filled,
@@ -58,6 +60,7 @@ function Star({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       style={{ cursor: "pointer", transition: "transform .08s", verticalAlign: "middle" }}
+      aria-hidden="true"
     >
       <path
         d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.786 1.402 8.168L12 18.897l-7.336 3.867 1.402-8.168L.132 9.21l8.2-1.192z"
@@ -80,7 +83,8 @@ export default function CompanyRatingClient({
   className?: string;
   valueClassName?: string;
 }) {
-  const [value, setValue] = useState(Math.max(0, Math.min(5, initialRating)));
+  const clamp = (n: number) => Math.max(0, Math.min(5, n));
+  const [value, setValue] = useState(clamp(Number(initialRating) || 0));
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const stars = useMemo(() => [0, 1, 2, 3, 4], []);
@@ -92,20 +96,16 @@ export default function CompanyRatingClient({
     setValue(optimistic);
 
     try {
-      try {
-        const data = await gql<{ rateCompany: { id: string; companyRating: number } }>(
-          RATE_COMPANY,
-          { companyId, rating }
-        );
-        setValue(data.rateCompany.companyRating ?? optimistic);
-        return;
-      } catch {
-        const data = await gql<{ updateCompany: { id: string; companyRating: number } }>(
-          UPDATE_COMPANY,
-          { input: { id: companyId, companyRating: rating } }
-        );
-        setValue(data.updateCompany.companyRating ?? optimistic);
-      }
+      const res = await fetch(`/api/company/${companyId}/rating`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ rating }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || payload?.message || "rating_failed");
+      const serverVal = Number(payload?.company?.companyRating);
+      setValue(Number.isFinite(serverVal) ? serverVal : optimistic);
     } catch (e) {
       setValue(prev);
       console.error("rating error:", e);
@@ -124,7 +124,7 @@ export default function CompanyRatingClient({
             filled={filled}
             onMouseEnter={() => setHoverIdx(i)}
             onMouseLeave={() => setHoverIdx(null)}
-            onClick={() => !saving && submit(i + 1)}
+            onClick={() => submit(i + 1)}
           />
         );
       })}
