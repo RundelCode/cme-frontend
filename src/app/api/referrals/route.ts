@@ -34,65 +34,6 @@ function resolveApiUrl(req: NextRequest) {
   return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
-function extractAccessToken(req: NextRequest): string | null {
-  const auth = req.headers.get("authorization");
-  if (auth?.toLowerCase().startsWith("bearer ")) {
-    const t = auth.slice(7).trim();
-    if (t) return t;
-  }
-  const cookie = req.headers.get("cookie") ?? "";
-  const m1 = cookie.match(/(?:^|;\s*)sb-access-token=([^;]+)/i);
-  if (m1?.[1]) return decodeURIComponent(m1[1]);
-  const m2 = cookie.match(/(?:^|;\s*)access_token=([^;]+)/i);
-  if (m2?.[1]) return decodeURIComponent(m2[1]);
-  const m3 = cookie.match(/(?:^|;\s*)supabase-auth-token=([^;]+)/i);
-  if (m3?.[1]) {
-    try {
-      const val = decodeURIComponent(m3[1]);
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) return parsed[0];
-      if (parsed && typeof parsed === "object" && typeof (parsed as any).access_token === "string") {
-        return (parsed as any).access_token as string;
-      }
-    } catch { }
-  }
-  return null;
-}
-
-function base64UrlDecode(s: string): string {
-  try {
-    // Node
-    return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
-  } catch {
-    // Edge runtime fallback
-    const pad = s.length % 4 ? s + "=".repeat(4 - (s.length % 4)) : s;
-    const str = atob(pad.replace(/-/g, "+").replace(/_/g, "/"));
-    // decode UTF-8
-    const esc = str.replace(/%/g, "%25").replace(/[\x00-\x7F]/g, (c) =>
-      "%" + c.charCodeAt(0).toString(16).padStart(2, "0")
-    );
-    return decodeURIComponent(esc);
-  }
-}
-
-function decodeUserIdFromJwt(token: string | null): string | null {
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const json = base64UrlDecode(parts[1]);
-    const payload = JSON.parse(json);
-    return (
-      (typeof payload?.sub === "string" && payload.sub) ||
-      (typeof payload?.user_id === "string" && payload.user_id) ||
-      (typeof payload?.id === "string" && payload.id) ||
-      null
-    );
-  } catch {
-    return null;
-  }
-}
-
 async function readJson(res: Response) {
   const raw = await res.text();
   let data: any = null;
@@ -100,14 +41,100 @@ async function readJson(res: Response) {
     data = raw ? JSON.parse(raw) : null;
   } catch {
     const e: any = new Error("upstream_not_json");
-    e.__raw = raw?.slice(0, 600);
+    e.__raw = raw?.slice(0, 800);
     e.status = res.status;
     throw e;
   }
   return { data, raw };
 }
 
-// Crea un referral
+/* ========= NUEVO: GET /api/referrals ========= */
+export async function GET(req: NextRequest) {
+  try {
+    const API = resolveApiUrl(req);
+    const auth = buildAuthHeader(req);
+    const cookie = req.headers.get("cookie") ?? "";
+
+    const baseHeaders: HeadersInit = {
+      Accept: "application/json",
+      ...(auth ? { Authorization: auth } : {}),
+      ...(cookie ? { cookie } : {}),
+    };
+
+    const sp = req.nextUrl.searchParams;
+    const candidateId = sp.get("candidateId") ?? sp.get("candidate_id") ?? "";
+    const headhunterId = sp.get("headhunterId") ?? sp.get("headhunter_id") ?? "";
+    const jobOfferId = sp.get("jobOfferId") ?? sp.get("job_offer_id") ?? "";
+    const limit = sp.get("limit") ?? "50";
+    const offset = sp.get("offset") ?? "0";
+    const status = sp.get("status") ?? "";
+    const from = sp.get("from") ?? "";
+    const to = sp.get("to") ?? "";
+    const all = sp.get("all") ?? "";
+
+    const qs = new URLSearchParams();
+    if (candidateId) {
+      qs.set("candidateId", candidateId);
+      qs.set("candidate_id", candidateId);
+    }
+    if (headhunterId) {
+      qs.set("headhunterId", headhunterId);
+      qs.set("headhunter_id", headhunterId);
+    }
+    if (jobOfferId) {
+      qs.set("jobOfferId", jobOfferId);
+      qs.set("job_offer_id", jobOfferId);
+    }
+    if (status) qs.set("status", status);
+    if (from) qs.set("from", from);
+    if (to) qs.set("to", to);
+    if (all) qs.set("all", all);
+    qs.set("limit", String(limit));
+    qs.set("offset", String(offset));
+
+    let up = await fetch(`${API}/referrals?${qs.toString()}`, {
+      method: "GET",
+      headers: baseHeaders,
+      cache: "no-store",
+      credentials: "include",
+    });
+
+    if (up.status === 404) {
+      // fallback por si el monolito expone otra convención
+      up = await fetch(`${API}/referrals/list?${qs.toString()}`, {
+        method: "GET",
+        headers: baseHeaders,
+        cache: "no-store",
+        credentials: "include",
+      });
+    }
+
+    const { data, raw } = await readJson(up);
+    if (!up.ok) {
+      const msg = data?.error || data?.message || `referrals_list_upstream_${up.status}`;
+      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 500 });
+    }
+
+    const items: ReferralRow[] = Array.isArray(data)
+      ? data
+      : data?.items ?? data?.rows ?? data ?? [];
+    const count: number =
+      typeof data?.count === "number"
+        ? data.count
+        : typeof data?.total === "number"
+          ? data.total
+          : Array.isArray(items)
+            ? items.length
+            : 0;
+
+    return NextResponse.json({ items, count }, { status: 200 });
+  } catch (e: any) {
+    const status = e?.status || 500;
+    return NextResponse.json({ error: e?.message || "referrals_list_failed", raw: e?.__raw ?? null }, { status });
+  }
+}
+
+/* ========= Ya existente: POST /api/referrals (crear) ========= */
 export async function POST(req: NextRequest) {
   try {
     const { jobOfferId, candidateId } = (await req.json().catch(() => ({}))) as {
@@ -134,7 +161,6 @@ export async function POST(req: NextRequest) {
       ...(xCorrId ? { "x-correlation-id": xCorrId } : {}),
     };
 
-    // 1) headhunterId desde /auth/me, fallback JWT
     let headhunterId: string | null = null;
     try {
       const meRes = await fetch(`${API}/auth/me`, {
@@ -150,25 +176,15 @@ export async function POST(req: NextRequest) {
       }
     } catch { }
 
-    if (!headhunterId) {
-      headhunterId = decodeUserIdFromJwt(extractAccessToken(req));
-    }
-    if (!headhunterId) {
-      return NextResponse.json({ error: "unauthenticated_no_user_id" }, { status: 401 });
-    }
-
-    // 2) Payload con ambos formatos (snake y camel) para máxima compatibilidad
     const payload = {
       headhunter_id: headhunterId,
       job_offer_id: jobOfferId,
       ...(candidateId ? { candidate_id: candidateId } : {}),
-
       headhunterId,
       jobOfferId,
       ...(candidateId ? { candidateId } : {}),
     };
 
-    // 3) Intento 1: POST /referrals
     let up = await fetch(`${API}/referrals`, {
       method: "POST",
       headers: baseHeaders,
@@ -177,7 +193,6 @@ export async function POST(req: NextRequest) {
       credentials: "include",
     });
 
-    // Fallback: algunos backends exponen /referrals/create
     if (up.status === 404 || up.status === 405) {
       up = await fetch(`${API}/referrals/create`, {
         method: "POST",
@@ -189,20 +204,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { data, raw } = await readJson(up);
-
     if (!up.ok) {
       const msg = data?.error || data?.message || `referrals_upstream_${up.status}`;
       const status = /conflict|already|23505/i.test(String(msg)) ? 409 : up.status || 500;
-      return NextResponse.json(
-        { error: msg, raw: data ?? raw, target: up.url },
-        { status }
-      );
+      return NextResponse.json({ error: msg, raw: data ?? raw, target: up.url }, { status });
     }
 
-    // 4) Normaliza respuesta
     const node: ReferralRow | any = data?.referral ?? data ?? {};
-    const code =
-      node?.referral_code ?? node?.code ?? node?.referralCode ?? null;
+    const code = node?.referral_code ?? node?.code ?? node?.referralCode ?? null;
     const id = node?.id ?? null;
 
     const normalized = {
