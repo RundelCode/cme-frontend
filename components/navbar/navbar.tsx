@@ -226,6 +226,16 @@ export default async function Navbar() {
                 </div>
               </>
             )}
+
+            {isCompanyAdmin && (
+              <div className={styles.category}>
+                  <p className={styles.navTitle}>Finanzas</p>
+                  <Link href="/finance" className={styles.option}>
+                    <Image className={styles.navIcon} src={BillingIcon} alt="Billing" width={320} height={320} priority />
+                    Resumen
+                  </Link>
+                </div>
+            )}
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>
               <Link href="/notifications" className={styles.option} aria-label="Notificaciones">

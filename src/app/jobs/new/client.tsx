@@ -5,61 +5,6 @@ import styles from "./newOffer.module.css";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graphql";
-
-async function gql<T>(q: string, variables?: any) {
-  const res = await fetch(GRAPHQL_ENDPOINT, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: q, variables })
-  });
-
-  const json = await res.json().catch(() => null);
-
-  if (!res.ok || json?.errors?.length) {
-    const err0 = json?.errors?.[0];
-    const ext = err0?.extensions?.exception?.response;
-    const message =
-      (Array.isArray(ext?.message) && ext.message.join(" | ")) ||
-      err0?.message ||
-      `GraphQL failed (${res.status})`;
-    throw new Error(message);
-  }
-  return json.data as T;
-}
-
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const COMPANY_BY_ADMIN = `query ($adminId: ID!) {
-  companyByAdmin(adminId: $adminId) {
-    id
-    name
-    profilePicture
-    coverPhoto
-    companyRating
-  }
-}`;
-
-const CREATE_JOB = `
-mutation CreateJob($input: CreateJobInput!) {
-  createJob(input: $input) {
-    id
-    company_id
-    title
-    description
-    employment_type
-    location_type
-    location
-    salary
-    currency
-    status
-    created_at
-    updated_at
-  }
-}
-`;
-
 type FeeQuote = { bracket: string; feeLabel: string; feeValue: number; feePercent?: number };
 function computeCmeFeeUSD(salaryUSD: number): FeeQuote {
   if (!salaryUSD || salaryUSD <= 0) return { bracket: "—", feeLabel: "—", feeValue: 0 };
@@ -77,8 +22,7 @@ function normalizeEmploymentType(v: string | null | undefined): EmploymentType {
   const raw = (v ?? "").toLowerCase().trim();
   if (raw === "full-time" || raw === "full_time") return "full-time";
   if (raw === "part-time" || raw === "part_time") return "part-time";
-  if (raw === "services-agreement" || raw === "service-agreement" || raw === "services" || raw === "contract")
-    return "services-agreement";
+  if (raw === "services-agreement" || raw === "service-agreement" || raw === "services" || raw === "contract") return "services-agreement";
   return "full-time";
 }
 function normalizeLocationType(v: string | null | undefined): LocationType {
@@ -88,37 +32,6 @@ function normalizeLocationType(v: string | null | undefined): LocationType {
   if (raw === "hybrid") return "hybrid";
   return "remote";
 }
-
-type EmploymentTypeGQL = "FULL_TIME" | "PART_TIME" | "SERVICES_AGREEMENT";
-type LocationTypeGQL = "REMOTE" | "ON_SITE" | "HYBRID";
-
-function toGQLEnumEmployment(v: EmploymentType): EmploymentTypeGQL {
-  switch (v) {
-    case "full-time": return "FULL_TIME";
-    case "part-time": return "PART_TIME";
-    default: return "SERVICES_AGREEMENT";
-  }
-}
-function toGQLEnumLocation(v: LocationType): LocationTypeGQL {
-  switch (v) {
-    case "remote": return "REMOTE";
-    case "on_site": return "ON_SITE";
-    default: return "HYBRID";
-  }
-}
-
-type CreateJobInputPayload = {
-  companyId: string;
-  title: string;
-  description: string;
-  employmentType: EmploymentType;
-  locationType: LocationType;
-  location?: string;
-  salary?: number;
-  currency?: string;
-  requirements?: string;
-  skills?: string[];
-};
 
 type FormState = {
   companyId?: string;
@@ -131,57 +44,71 @@ type FormState = {
   currency?: string | null;
 };
 
-type CompanyLite = {
-  id: string;
-  name: string;
-  profilePicture?: string | null;
-  coverPhoto?: string | null;
-  companyRating?: number | null;
-};
+type CompanyLite = { id: string; name: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function buildCreateJobVariables(input: CreateJobInputPayload) {
-  return {
-    input: {
-      company_id: input.companyId,
-      title: input.title,
-      description: input.description,
-      employment_type: toGQLEnumEmployment(input.employmentType),
-      location_type: toGQLEnumLocation(input.locationType),
-      location: input.location ?? null,
-      salary: input.salary ?? null,
-      currency: input.currency ?? null,
-      requirements: input.requirements ?? null,
-      skills: input.skills ?? null,
-    },
-  };
+function norm(v: unknown) {
+  return typeof v === "string" ? v.trim().toLowerCase() : "";
+}
+function isCompanyAdminFrom(me: any, profile: any) {
+  const candidates: string[] = [];
+  if (me?.role) candidates.push(norm(me.role));
+  if (me?.user?.role) candidates.push(norm(me.user.role));
+  if (profile?.role) candidates.push(norm(profile.role));
+  const arrays: any[] = [me?.roles, me?.user?.roles, me?.claims?.roles, profile?.roles, profile?.permissions, me?.permissions];
+  for (const arr of arrays) {
+    if (Array.isArray(arr)) for (const r of arr) candidates.push(norm(r));
+  }
+  const flags = [
+    me?.is_company_admin,
+    profile?.is_company_admin,
+    profile?.company_admin,
+    me?.user?.is_company_admin,
+    profile?.isCompanyAdmin,
+    me?.isCompanyAdmin,
+  ].some(Boolean);
+  const aliases = new Set(["company_admin", "companyadmin", "employer", "company-owner", "company_owner", "org_admin", "employer_admin"]);
+  const hit = candidates.some((r) => aliases.has(r));
+  return flags || hit;
 }
 
 export default function Client() {
   const router = useRouter();
 
-  const [role, setRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
-
+  const [authErr, setAuthErr] = useState<string | null>(null);
   const [adminCompany, setAdminCompany] = useState<CompanyLite | null>(null);
   const [companyLoading, setCompanyLoading] = useState(false);
-  const isCompanyAdmin = (role ?? "").toLowerCase() === "company_admin";
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
         setAuthLoading(true);
-        const me = await gql<{ authMe: { id: string; role: string | null } }>(AUTH_ME);
-        setRole(me?.authMe?.role ?? null);
-        setUserId(me?.authMe?.id ?? null);
-        if ((me?.authMe?.role ?? "").toLowerCase() !== "company_admin") {
-          setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear ofertas laborales.");
+        const meRes = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+        const me = await meRes.json().catch(() => null);
+        const id: string | null = me?.id ?? me?.user?.id ?? null;
+        if (!id) {
+          setIsCompanyAdmin(false);
+          setAuthErr("No autenticado");
+          return;
         }
-      } catch (e: any) {
-        setAuthErr(e?.message ?? "No autenticado");
+        setUserId(id);
+        let profile: any = null;
+        try {
+          const pRes = await fetch(`/api/profiles?ids=${encodeURIComponent(id)}`, { credentials: "include", cache: "no-store" });
+          const pdata = await pRes.json().catch(() => null);
+          profile = Array.isArray(pdata?.profiles) ? pdata.profiles[0] ?? null : null;
+        } catch {
+          profile = null;
+        }
+        const flag = isCompanyAdminFrom(me, profile);
+        setIsCompanyAdmin(Boolean(flag));
+        if (!flag) setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear ofertas laborales.");
+      } catch {
+        setAuthErr("No autenticado");
       } finally {
         setAuthLoading(false);
       }
@@ -193,8 +120,18 @@ export default function Client() {
     (async () => {
       setCompanyLoading(true);
       try {
-        const data = await gql<{ companyByAdmin: CompanyLite | null }>(COMPANY_BY_ADMIN, { adminId: userId });
-        setAdminCompany(data?.companyByAdmin ?? null);
+        const cRes = await fetch(`/api/company/search`, {
+          method: "POST",
+          headers: { "content-type": "application/json", Accept: "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ input: { adminId: userId, limit: 1 } }),
+          cache: "no-store",
+        });
+        const cjson = await cRes.json().catch(() => null);
+        const items: any[] = Array.isArray(cjson?.items) ? cjson.items : [];
+        const mine = items.find((it: any) => String(it?.adminId ?? it?.admin_id ?? it?.ownerId ?? it?.owner_id ?? it?.userId ?? it?.user_id ?? "") === userId);
+        if (mine?.id) setAdminCompany({ id: String(mine.id), name: String(mine.name ?? "Mi empresa") });
+        else setAdminCompany(null);
       } catch {
         setAdminCompany(null);
       } finally {
@@ -215,9 +152,7 @@ export default function Client() {
   });
 
   useEffect(() => {
-    if (adminCompany?.id && UUID_RE.test(adminCompany.id)) {
-      setForm((f) => ({ ...f, companyId: adminCompany.id }));
-    }
+    if (adminCompany?.id && UUID_RE.test(adminCompany.id)) setForm((f) => ({ ...f, companyId: adminCompany.id }));
   }, [adminCompany?.id]);
 
   const [skillsText, setSkillsText] = useState<string>("");
@@ -229,14 +164,11 @@ export default function Client() {
 
   const onChange =
     (key: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const value =
-        e.currentTarget.type === "number"
-          ? (e.currentTarget as HTMLInputElement).valueAsNumber
-          : e.currentTarget.value;
-      setForm((f) => ({ ...f, [key]: (key === "salary" ? Number(value) : value) as any }));
-      if (key === "salary") setSalaryInput(String(value ?? ""));
-    };
+      (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const value = e.currentTarget.type === "number" ? (e.currentTarget as HTMLInputElement).valueAsNumber : e.currentTarget.value;
+        setForm((f) => ({ ...f, [key]: (key === "salary" ? Number(value) : value) as any }));
+        if (key === "salary") setSalaryInput(String(value ?? ""));
+      };
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -281,37 +213,30 @@ export default function Client() {
     const employmentType = normalizeEmploymentType(form.employmentType);
     const locationType = normalizeLocationType(form.locationType);
 
-    const skills = (skillsText || "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const requirements =
-      (requirementsText || "")
-        .split(/\r?\n/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .join("\n") || undefined;
+    const skills = (skillsText || "").split(",").map((s) => s.trim()).filter(Boolean);
+    const requirements = (requirementsText || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean).join("\n") || undefined;
 
-    const payload: CreateJobInputPayload = {
+    const payload = {
       companyId,
       title: titleTrim,
       description: descTrim,
       employmentType,
       locationType,
-      location: (form.location || "").trim() || undefined,
-      salary: isFinite(salaryNumber) && salaryNumber > 0 ? salaryNumber : undefined,
+      location: (form.location || "").trim() || null,
+      salary: isFinite(salaryNumber) && salaryNumber > 0 ? salaryNumber : null,
       currency: (form.currency || "USD").trim() || "USD",
-      requirements,
-      skills: skills.length ? skills : undefined,
+      requirements: requirements ?? null,
+      skills: skills.length ? skills : null
     };
-
-    const variables = buildCreateJobVariables(payload);
 
     setLoading(true);
     try {
-      const data = await gql<{ createJob: any }>(CREATE_JOB, variables);
-      if (!data?.createJob?.id) throw new Error("No se pudo crear la oferta");
-      setCreated(data.createJob);
+      const res = await fetch("/api/jobs/create", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const txt = await res.text();
+      let json: any = null;
+      try { json = txt ? JSON.parse(txt) : null; } catch { }
+      if (!res.ok || !json?.id) throw new Error(json?.message || `HTTP ${res.status}`);
+      setCreated(json);
       setShowModal(true);
     } catch (err: any) {
       setError(err?.message || "Error inesperado");
@@ -341,13 +266,11 @@ export default function Client() {
             <div className={styles.statusNote}>Validando tu empresa…</div>
           ) : !adminCompany?.id ? (
             <div className={styles.statusError}>
-              No tienes una empresa asociada todavía{" "}
-              <Link className={styles.secundaryBtn} href="/createCompany">Crear empresa</Link>
+              No tienes una empresa asociada todavía <Link className={styles.secundaryBtn} href="/createCompany">Crear empresa</Link>
             </div>
           ) : (
             <div className={styles.statusOk}>
-              Publicarás como <b>{adminCompany.name}</b>{" "}
-              <small style={{ opacity: .7 }}>({adminCompany.id})</small>.
+              Publicarás como <b>{adminCompany.name}</b> <small style={{ opacity: .7 }}>({adminCompany.id})</small>.
             </div>
           )}
 
@@ -434,10 +357,7 @@ export default function Client() {
               />
               <div className={styles.helperRow}>
                 <span className={styles.helperText}>
-                  <b>Tarifa CME:</b> {fee.feeLabel}{" "}
-                  <span className={styles.dimmed}>
-                    (rango: {fee.bracket}{fee.feePercent ? ` • ${fee.feePercent}%` : ""})
-                  </span>
+                  <b>Tarifa CME:</b> {fee.feeLabel} <span className={styles.dimmed}>(rango: {fee.bracket}{fee.feePercent ? ` • ${fee.feePercent}%` : ""})</span>
                 </span>
               </div>
             </div>
@@ -510,11 +430,7 @@ export default function Client() {
           <div className={styles.modalCard}>
             <h3 className={styles.modalTitle}>¡Oferta creada!</h3>
             <p className={styles.modalBody}>
-              {created?.title ? (
-                <>La oferta <b>{created.title}</b> se creó correctamente.</>
-              ) : (
-                "La oferta se creó correctamente."
-              )}
+              {created?.title ? <>La oferta <b>{created.title}</b> se creó correctamente.</> : "La oferta se creó correctamente."}
             </p>
             <div className={styles.modalActions}>
               <button className={styles.primaryBtn} onClick={handleModalAccept}>
