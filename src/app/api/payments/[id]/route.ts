@@ -1,5 +1,4 @@
-import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 function buildAuthHeader(req: NextRequest): string | undefined {
     const fromHeader = req.headers.get('authorization');
@@ -26,9 +25,9 @@ async function readUpstream(res: Response) {
     return { ok: res.ok, status: res.status, data, text, url: res.url };
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: any) {
     try {
-        const id = params?.id;
+        const id = context?.params?.id;
         if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
         const API = resolveApiUrl(req);

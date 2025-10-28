@@ -1,4 +1,3 @@
-// src/app/api/profiles/[id]/route.ts
 import { NextResponse } from "next/server";
 
 function buildAuthHeader(req: Request): string | undefined {
@@ -24,13 +23,9 @@ function resolveApiUrl(reqUrl: string) {
     }
 }
 
-export async function GET(
-    req: Request,
-    ctx: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function GET(req: Request, context: any) {
     try {
-        const params = "then" in ctx.params ? await (ctx.params as Promise<{ id: string }>) : (ctx.params as { id: string });
-        const { id } = params;
+        const id = context?.params?.id;
         if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
 
         const API = resolveApiUrl(req.url);
@@ -56,13 +51,8 @@ export async function GET(
 
         const raw = await up.text();
         let data: any = null;
-        try {
-            data = raw ? JSON.parse(raw) : null;
-        } catch {
-            return NextResponse.json(
-                { error: "upstream_not_json", details: raw?.slice(0, 300) },
-                { status: 502 }
-            );
+        try { data = raw ? JSON.parse(raw) : null; } catch {
+            return NextResponse.json({ error: "upstream_not_json", details: raw?.slice(0, 300) }, { status: 502 });
         }
 
         if (!up.ok) {
@@ -71,9 +61,7 @@ export async function GET(
         }
 
         const profile = data?.profile ?? data ?? null;
-        if (!profile?.id) {
-            return NextResponse.json({ error: "not_found" }, { status: 404 });
-        }
+        if (!profile?.id) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
         return NextResponse.json({ profile });
     } catch (e: any) {

@@ -39,15 +39,9 @@ function pickBestJwt(req: NextRequest) {
   return { jwt: null as string | null, payload: null as any, source: null as string | null };
 }
 
-export async function POST(
-  req: NextRequest,
-  ctx: { params: Promise<{ kind: string }> | { kind: string } }
-) {
+export async function POST(req: NextRequest, context: any) {
   try {
-    const p = "then" in ctx.params ? await ctx.params : (ctx.params as { kind: string });
-    const rawKind = p.kind;
-    const kind = (rawKind || "").toLowerCase();
-
+    const kind = (context?.params?.kind || "").toLowerCase();
     if (!["avatar", "cover"].includes(kind)) {
       return NextResponse.json({ error: "route_not_supported", detail: `No existe /uploads/self/${kind}` }, { status: 404 });
     }
@@ -90,10 +84,7 @@ export async function POST(
       const json = text ? JSON.parse(text) : null;
       return new NextResponse(JSON.stringify(json ?? {}), { status: upstream.status, headers: { "content-type": "application/json" } });
     } catch {
-      return NextResponse.json(
-        { error: "upstream_not_json", sample: text.slice(0, 180) },
-        { status: 502 }
-      );
+      return NextResponse.json({ error: "upstream_not_json", sample: text.slice(0, 180) }, { status: 502 });
     }
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "internal_error" }, { status: 500 });

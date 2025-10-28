@@ -17,14 +17,14 @@ function resolveReferralsBase(req: NextRequest) {
         process.env.REFERRALS_BASE ||
         process.env.NEXT_PUBLIC_API_URL ||
         process.env.API_URL ||
-        "cme-monolith.vercel.app/api"; // fallback al gateway solo si no hay envs
+        "cme-monolith.vercel.app/api";
     if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
     return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, context: any) {
     try {
-        const { id } = ctx.params;
+        const id = context?.params?.id;
         if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
 
         const API = resolveReferralsBase(req);
