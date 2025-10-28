@@ -2,15 +2,34 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 function buildAuthHeader(req: NextRequest): string | undefined {
-    const fromHeader = req.headers.get("authorization");
-    if (fromHeader && fromHeader.trim() !== "") return fromHeader;
-    const token = req.cookies.get("access_token")?.value;
-    if (token && token.trim() !== "") return `Bearer ${token}`;
-    const cookieHeader = req.headers.get("cookie") ?? "";
-    const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
-    if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
+    const c = req.headers.get("cookie") ?? "";
+    const read = (name: string) => {
+        const m = c.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`, "i"));
+        return m?.[1] ? decodeURIComponent(m[1]) : null;
+    };
+
+    const access = read("access_token") || read("sb-access-token");
+    if (access && access.trim() !== "") return `Bearer ${access}`;
+
+    const packed = read("supabase-auth-token");
+    if (packed) {
+        try {
+            const parsed = JSON.parse(packed);
+            if (Array.isArray(parsed) && typeof parsed[0] === "string" && parsed[0]) {
+                return `Bearer ${parsed[0]}`;
+            }
+            if (parsed && typeof parsed === "object" && typeof (parsed as any).access_token === "string") {
+                return `Bearer ${(parsed as any).access_token}`;
+            }
+        } catch { }
+    }
+
+    const h = req.headers.get("authorization");
+    if (h && h.trim() !== "") return h;
+
     return undefined;
 }
+
 
 function resolveApiUrl(req: NextRequest) {
     const base =

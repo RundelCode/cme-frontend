@@ -36,6 +36,20 @@ function mapProfiles(arr: any[]): any[] {
     }));
 }
 
+async function readJson(res: Response) {
+    const raw = await res.text();
+    let data: any = null;
+    try {
+        data = raw ? JSON.parse(raw) : null;
+    } catch {
+        const e: any = new Error("upstream_not_json");
+        e.status = res.status;
+        e.raw = raw?.slice(0, 600);
+        throw e;
+    }
+    return { data, raw };
+}
+
 export async function GET(req: Request) {
     try {
         const API = resolveApiUrl(req.url);
@@ -54,31 +68,57 @@ export async function GET(req: Request) {
         };
 
         const idsParam = url.searchParams.get("ids");
+
         if (idsParam) {
-            const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
-            const up = await fetch(`${API}/profiles/search`, {
-                method: "POST",
-                headers: { "content-type": "application/json", ...baseHeaders },
-                body: JSON.stringify({ ids, limit: ids.length }),
-                credentials: "include",
-                cache: "no-store",
-            });
-            const raw = await up.text();
-            let data: any = null;
-            try {
-                data = raw ? JSON.parse(raw) : null;
-            } catch {
-                return NextResponse.json(
-                    { error: "upstream_not_json", details: raw?.slice(0, 300) },
-                    { status: 502 }
-                );
+            const ids = idsParam
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean);
+
+            if (ids.length === 0) {
+                return NextResponse.json({ profiles: [] }, { status: 200 });
             }
-            if (!up.ok) {
-                const msg = data?.error || data?.message || `profiles_search_upstream_${up.status}`;
-                return NextResponse.json({ error: msg }, { status: up.status || 400 });
+
+            if (ids.length === 1) {
+                const up = await fetch(`${API}/profiles/${encodeURIComponent(ids[0])}`, {
+                    method: "GET",
+                    headers: baseHeaders,
+                    credentials: "include",
+                    cache: "no-store",
+                });
+                const { data } = await readJson(up);
+                if (!up.ok) {
+                    const msg = data?.error || data?.message || `profiles_upstream_${up.status}`;
+                    return NextResponse.json({ error: msg }, { status: up.status || 404 });
+                }
+                const profile = data?.profile ?? data ?? null;
+                if (!profile?.id) {
+                    return NextResponse.json({ error: "not_found" }, { status: 404 });
+                }
+                return NextResponse.json({ profiles: mapProfiles([profile]) }, { status: 200 });
             }
-            const profiles = mapProfiles(Array.isArray(data) ? data : data?.items ?? data?.profiles ?? []);
-            return NextResponse.json({ profiles });
+
+            const results = await Promise.allSettled(
+                ids.map((id) =>
+                    fetch(`${API}/profiles/${encodeURIComponent(id)}`, {
+                        method: "GET",
+                        headers: baseHeaders,
+                        credentials: "include",
+                        cache: "no-store",
+                    }).then(async (r) => {
+                        const { data } = await readJson(r);
+                        if (!r.ok) throw new Error(data?.error || data?.message || `profiles_upstream_${r.status}`);
+                        return data?.profile ?? data ?? null;
+                    })
+                )
+            );
+
+            const profiles = results
+                .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+                .map((r) => r.value)
+                .filter((p) => p && p.id);
+
+            return NextResponse.json({ profiles: mapProfiles(profiles) }, { status: 200 });
         }
 
         const q = url.searchParams.get("q") || undefined;
@@ -101,26 +141,16 @@ export async function GET(req: Request) {
             cache: "no-store",
         });
 
-        const raw = await up.text();
-        let data: any = null;
-        try {
-            data = raw ? JSON.parse(raw) : null;
-        } catch {
-            return NextResponse.json(
-                { error: "upstream_not_json", details: raw?.slice(0, 300) },
-                { status: 502 }
-            );
-        }
-
+        const { data } = await readJson(up);
         if (!up.ok) {
             const msg = data?.error || data?.message || `profiles_search_upstream_${up.status}`;
             return NextResponse.json({ error: msg }, { status: up.status || 400 });
         }
 
         const profiles = mapProfiles(Array.isArray(data) ? data : data?.items ?? data?.profiles ?? []);
-        return NextResponse.json({ profiles });
+        return NextResponse.json({ profiles }, { status: 200 });
     } catch (e: any) {
-        return NextResponse.json({ error: e?.message || "profiles_error" }, { status: 500 });
+        return NextResponse.json({ error: e?.message || "profiles_error" }, { status: e?.status || 500 });
     }
 }
 
@@ -148,25 +178,15 @@ export async function POST(req: Request) {
             cache: "no-store",
         });
 
-        const raw = await up.text();
-        let data: any = null;
-        try {
-            data = raw ? JSON.parse(raw) : null;
-        } catch {
-            return NextResponse.json(
-                { error: "upstream_not_json", details: raw?.slice(0, 300) },
-                { status: 502 }
-            );
-        }
-
+        const { data } = await readJson(up);
         if (!up.ok) {
             const msg = data?.error || data?.message || `profiles_search_upstream_${up.status}`;
             return NextResponse.json({ error: msg }, { status: up.status || 400 });
         }
 
         const profiles = mapProfiles(Array.isArray(data) ? data : data?.items ?? data?.profiles ?? []);
-        return NextResponse.json({ profiles });
+        return NextResponse.json({ profiles }, { status: 200 });
     } catch (e: any) {
-        return NextResponse.json({ error: e?.message || "profiles_error" }, { status: 500 });
+        return NextResponse.json({ error: e?.message || "profiles_error" }, { status: e?.status || 500 });
     }
 }

@@ -4,48 +4,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styles from './active.module.css';
 import { PropagateLoader } from 'react-spinners';
 
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const REFERRALS_BY_HEADHUNTER = `
-  query ReferralsByHeadhunter($headhunterId: ID!, $limit: Int, $offset: Int, $status: String) {
-    referralsByHeadhunter(headhunterId: $headhunterId, limit: $limit, offset: $offset, status: $status) {
-      id
-      headhunter_id
-      candidate_id
-      job_offer_id
-      referral_code
-      status
-      created_at
-      updated_at
-    }
-  }
-`;
-
-const JOB_BY_ID_MIN = `
-  query JobById($id: ID!) {
-    jobOffer(id: $id) {
-      id
-      company_id
-      title
-      location
-      employment_type
-      status
-      created_at
-    }
-  }
-`;
-
-const GET_COMPANY_MIN = `
-  query GetCompany($id: ID!) {
-    company(id: $id) {
-      id
-      name
-      profilePicture
-      location
-    }
-  }
-`;
-
 type Referral = {
     id: string;
     headhunter_id: string;
@@ -70,8 +28,14 @@ type JobMin = {
 type CompanyMin = {
     id: string;
     name: string | null;
-    profilePicture?: string | null;
     location?: string | null;
+    city?: string | null;
+    profilePicture?: string | null;
+    profile_picture?: string | null;
+    logoUrl?: string | null;
+    logo_url?: string | null;
+    logo?: string | null;
+    avatar?: string | null;
 };
 
 type ProfileLite = {
@@ -82,25 +46,16 @@ type ProfileLite = {
     profile_picture?: string | null;
 };
 
-async function gql<T = any>(query: string, variables?: any) {
-    const res = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query, variables }),
-        cache: 'no-store',
-    });
+async function j<T = any>(input: RequestInfo, init?: RequestInit): Promise<T> {
+    const res = await fetch(input, { credentials: 'include', cache: 'no-store', ...init });
     const raw = await res.text();
-    let data: any;
-    try {
-        data = raw ? JSON.parse(raw) : null;
-    } catch {
-        throw new Error(`GraphQL non-JSON: ${raw?.slice(0, 200)}`);
-    }
-    if (!res.ok || data?.errors?.length) {
-        const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
+    let data: any = null;
+    try { data = raw ? JSON.parse(raw) : null; } catch { }
+    if (!res.ok) {
+        const msg = data?.error || data?.message || raw || `HTTP ${res.status}`;
         throw new Error(msg);
     }
-    return data.data as T;
+    return data as T;
 }
 
 function getDefaultMonth(): string {
@@ -137,13 +92,10 @@ function humanStatus(s?: string) {
 
 function statusClass(s?: string, css?: any) {
     switch ((s || '').toLowerCase()) {
-        case 'hired':
-            return css.pillOk;
+        case 'hired': return css.pillOk;
         case 'rejected':
-        case 'declined_by_candidate':
-            return css.pillWarn;
-        default:
-            return css.pillMuted;
+        case 'declined_by_candidate': return css.pillWarn;
+        default: return css.pillMuted;
     }
 }
 
@@ -160,15 +112,35 @@ function initials(name?: string | null) {
     return parts.map((p) => p[0]?.toUpperCase() ?? '').join('') || '•';
 }
 
+function companyLogo(c?: CompanyMin | null): string | null {
+    if (!c) return null;
+    return (
+        c.profilePicture ??
+        c.profile_picture ??
+        c.logoUrl ??
+        c.logo_url ??
+        c.logo ??
+        c.avatar ??
+        null
+    );
+}
+
+function pickCompanyFromResponse(r: any): CompanyMin | null {
+    const c = r?.company ?? r?.data ?? r ?? null;
+    if (c && typeof c === 'object') return c as CompanyMin;
+    return null;
+}
+
 export default function MyReferralsPage() {
     const [month, setMonth] = useState<string>(getDefaultMonth());
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [items, setItems] = useState<Referral[]>([]);
-
     const [profiles, setProfiles] = useState<Record<string, ProfileLite>>({});
-    const [companies, setCompanies] = useState<Record<string, CompanyMin>>({});
-    const [jobs, setJobs] = useState<Record<string, JobMin>>({});
+    const [companiesById, setCompaniesById] = useState<Record<string, CompanyMin>>({});
+    const [jobsById, setJobsById] = useState<Record<string, JobMin>>({});
+
+    const monthRange = useMemo(() => getMonthRange(month), [month]);
 
     useEffect(() => {
         let alive = true;
@@ -177,49 +149,50 @@ export default function MyReferralsPage() {
                 setLoading(true);
                 setErr(null);
 
-                const me = await gql<{ authMe: { id: string } | null }>(AUTH_ME);
-                const headhunterId = me?.authMe?.id;
+                const me = await j<{ id?: string; user?: { id?: string } }>('/api/me');
+                const headhunterId = me?.id || me?.user?.id;
                 if (!headhunterId) throw new Error('No autenticado');
 
-                const r = await gql<{ referralsByHeadhunter: Referral[] }>(
-                    REFERRALS_BY_HEADHUNTER,
-                    { headhunterId, limit: 200, offset: 0 }
-                );
-                const refs = r?.referralsByHeadhunter ?? [];
-
-                const jobIds = Array.from(new Set(refs.map((x) => x.job_offer_id)));
-                const candIds = Array.from(
-                    new Set(refs.map((x) => x.candidate_id).filter(Boolean))
-                ) as string[];
-
-                const companyCache = new Map<string, CompanyMin | null>();
-                const jobsMap: Record<string, JobMin> = {};
-                const companiesMap: Record<string, CompanyMin> = {};
-
-                for (const jid of jobIds) {
-                    try {
-                        const j = await gql<{ jobOffer: JobMin | null }>(JOB_BY_ID_MIN, { id: jid });
-                        const job = j?.jobOffer ?? null;
-                        if (job) {
-                            jobsMap[jid] = job;
-                            if (job.company_id) {
-                                if (companyCache.has(job.company_id)) {
-                                    const c = companyCache.get(job.company_id);
-                                    if (c) companiesMap[jid] = c;
-                                } else {
-                                    const c = await gql<{ company: CompanyMin | null }>(GET_COMPANY_MIN, {
-                                        id: job.company_id,
-                                    });
-                                    const company = c?.company ?? null;
-                                    companyCache.set(job.company_id, company);
-                                    if (company) companiesMap[jid] = company;
-                                }
-                            }
-                        }
-                    } catch {
-                    }
+                const qs = new URLSearchParams();
+                if (monthRange) {
+                    qs.set('from', String(monthRange.from));
+                    qs.set('to', String(monthRange.to));
                 }
 
+                const refData = await j<any>(`/api/referrals/active${qs.toString() ? `?${qs.toString()}` : ''}`);
+                const refs: Referral[] = Array.isArray(refData) ? refData : refData?.items ?? refData ?? [];
+
+                // Jobs
+                const jobIds = Array.from(new Set(refs.map((x) => x.job_offer_id)));
+                const jobsMap: Record<string, JobMin> = {};
+                await Promise.all(jobIds.map(async (jid) => {
+                    try {
+                        const jd = await j<{ job?: JobMin; jobOffer?: JobMin }>(`/api/jobs/${encodeURIComponent(jid)}`);
+                        const job = (jd as any).job ?? (jd as any).jobOffer ?? null;
+                        if (job) jobsMap[jid] = job;
+                    } catch { }
+                }));
+
+                // Companies by company_id (from jobs)
+                const companyIds = Array.from(new Set(Object.values(jobsMap).map(j => j.company_id).filter(Boolean)));
+                const companiesMap: Record<string, CompanyMin> = {};
+                await Promise.all(companyIds.map(async (cid) => {
+                    try {
+                        // singular
+                        const c1 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
+                        const comp1 = pickCompanyFromResponse(c1);
+                        if (comp1) { companiesMap[cid] = comp1; return; }
+                        // fallthrough to plural
+                    } catch { }
+                    try {
+                        const c2 = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
+                        const comp2 = pickCompanyFromResponse(c2);
+                        if (comp2) companiesMap[cid] = comp2;
+                    } catch { }
+                }));
+
+                // Profiles (igual)
+                const candIds = Array.from(new Set(refs.map((x) => x.candidate_id).filter(Boolean))) as string[];
                 const profilesMap: Record<string, ProfileLite> = {};
                 if (candIds.length) {
                     let loaded = false;
@@ -229,10 +202,11 @@ export default function MyReferralsPage() {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ ids: candIds }),
+                            credentials: 'include',
                         });
                         if (r1.ok) {
-                            const j = await r1.json();
-                            const arr: ProfileLite[] = j?.profiles ?? j ?? [];
+                            const j1 = await r1.json();
+                            const arr: ProfileLite[] = j1?.profiles ?? j1 ?? [];
                             for (const p of arr) profilesMap[p.id] = p;
                             loaded = true;
                         }
@@ -241,10 +215,13 @@ export default function MyReferralsPage() {
                     if (!loaded) {
                         try {
                             const q = encodeURIComponent(candIds.join(','));
-                            const r0 = await fetch(`/api/profiles?ids=${q}`, { method: 'GET' });
+                            const r0 = await fetch(`/api/profiles?ids=${q}`, {
+                                method: 'GET',
+                                credentials: 'include',
+                            });
                             if (r0.ok) {
-                                const j = await r0.json();
-                                const arr: ProfileLite[] = j?.profiles ?? j ?? [];
+                                const j0 = await r0.json();
+                                const arr: ProfileLite[] = j0?.profiles ?? j0 ?? [];
                                 for (const p of arr) profilesMap[p.id] = p;
                                 loaded = true;
                             }
@@ -253,21 +230,26 @@ export default function MyReferralsPage() {
 
                     if (!loaded) {
                         try {
-                            const query = `
-                query ProfilesByIds($ids: [ID!]!) {
-                  profilesByIds(ids: $ids) {
-                    id full_name email phone profile_picture
+                            const body = {
+                                query: `
+                  query ProfilesByIds($ids: [ID!]!) {
+                    profilesByIds(ids: $ids) {
+                      id
+                      full_name
+                      email
+                      phone
+                      profile_picture
+                    }
                   }
-                }
-              `;
+                `,
+                                variables: { ids: candIds },
+                                operationName: 'ProfilesByIds',
+                            };
                             const r2 = await fetch(`/api/graphql`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    query,
-                                    variables: { ids: candIds },
-                                    operationName: 'ProfilesByIds',
-                                }),
+                                body: JSON.stringify(body),
+                                credentials: 'include',
                             });
                             const j2 = await r2.json();
                             const arr: ProfileLite[] = j2?.data?.profilesByIds ?? [];
@@ -278,8 +260,8 @@ export default function MyReferralsPage() {
 
                 if (!alive) return;
                 setItems(refs);
-                setJobs(jobsMap);
-                setCompanies(companiesMap);
+                setJobsById(jobsMap);
+                setCompaniesById(companiesMap);
                 setProfiles(profilesMap);
             } catch (e: any) {
                 if (!alive) return;
@@ -288,12 +270,9 @@ export default function MyReferralsPage() {
                 if (alive) setLoading(false);
             }
         })();
-        return () => {
-            alive = false;
-        };
-    }, []);
+        return () => { alive = false; };
+    }, [monthRange]);
 
-    const monthRange = useMemo(() => getMonthRange(month), [month]);
     const filtered = useMemo(() => {
         if (!monthRange) return items;
         const { from, to } = monthRange;
@@ -308,133 +287,76 @@ export default function MyReferralsPage() {
             <div className={styles.main}>
                 <header className={styles.pageHeader}>
                     <h1 className={styles.title}>Mis referencias</h1>
-                    <p className={styles.subtitle}>
-                        Revisa el estado de tus referidos y contáctalos rápido.
-                    </p>
+                    <p className={styles.subtitle}>Revisa el estado de tus referidos y contáctalos rápido.</p>
                 </header>
 
                 {loading ? (
-                    <div className={styles.loading}>
-                        <PropagateLoader />
-                    </div>
+                    <div className={styles.loading}><PropagateLoader /></div>
                 ) : err ? (
                     <div className={styles.error}>Error: {err}</div>
                 ) : filtered.length === 0 ? (
-                    <div className={styles.empty}>Aún no tienes referencias en este período.</div>
+                    <div className={styles.empty}>Aún no tienes referencias.</div>
                 ) : (
                     <section className={styles.section}>
-                        <h2 className={styles.sectionTitle}>
-                            Referencias ({filtered.length})
-                        </h2>
-
+                        <h2 className={styles.sectionTitle}>Referencias ({filtered.length})</h2>
                         <ul className={styles.list}>
                             {filtered.map((r) => {
-                                const job = jobs[r.job_offer_id];
-                                const company = companies[r.job_offer_id];
+                                const job = jobsById[r.job_offer_id];
+                                const company = job?.company_id ? companiesById[job.company_id] : undefined;
                                 const prof = r.candidate_id ? profiles[r.candidate_id] : undefined;
 
                                 const emailHref = prof?.email ? `mailto:${prof.email}` : undefined;
-                                const chatHref = waLink(
-                                    prof?.phone,
-                                    'Hola, te referí a una vacante.'
-                                );
+                                const chatHref = waLink(prof?.phone, 'Hola, te referí a una vacante.');
+                                const logo = companyLogo(company);
 
                                 return (
                                     <li className={styles.card} key={r.id}>
                                         <div className={styles.media}>
-                                            {company?.profilePicture ? (
-                                                <img
-                                                    className={styles.avatarImg}
-                                                    src={company.profilePicture}
-                                                    alt={company.name ?? 'Empresa'}
-                                                    loading="lazy"
-                                                />
+                                            {logo ? (
+                                                <img className={styles.avatarImg} src={logo} alt={company?.name ?? 'Empresa'} loading="lazy" />
                                             ) : (
-                                                <div className={styles.avatarFallback}>
-                                                    {initials(company?.name)}
-                                                </div>
+                                                <div className={styles.avatarFallback}>{initials(company?.name)}</div>
                                             )}
                                         </div>
 
                                         <div className={styles.content}>
                                             <div className={styles.rowTop}>
                                                 <div className={styles.companyBlock}>
-                                                    <div className={styles.companyName}>
-                                                        {company?.name ?? 'Empresa'}
-                                                    </div>
-                                                    <div className={styles.companySub}>
-                                                        {company?.location ?? '—'}
-                                                    </div>
+                                                    <div className={styles.companyName}>{company?.name ?? 'Empresa'}</div>
+                                                    <div className={styles.companySub}>{company?.location ?? company?.city ?? '—'}</div>
                                                 </div>
-
-                                                <span
-                                                    className={`${styles.pill} ${statusClass(
-                                                        r.status,
-                                                        styles
-                                                    )}`}
-                                                >
-                                                    {humanStatus(r.status)}
-                                                </span>
+                                                <span className={`${styles.pill} ${statusClass(r.status, styles)}`}>{humanStatus(r.status)}</span>
                                             </div>
 
                                             <div className={styles.jobBlock}>
-                                                <div className={styles.jobTitle}>
-                                                    {job?.title ?? 'Oferta'}
-                                                </div>
+                                                <div className={styles.jobTitle}>{job?.title ?? 'Oferta'}</div>
                                                 <div className={styles.jobMeta}>
                                                     <span>{job?.location ?? '—'}</span>
                                                     <span>•</span>
                                                     <span>{job?.employment_type ?? '—'}</span>
                                                     <span>•</span>
-                                                    <span className={`${styles.pill} ${styles.pillInfo}`}>
-                                                        {job?.status ?? '—'}
-                                                    </span>
+                                                    <span className={`${styles.pill} ${styles.pillInfo}`}>{job?.status ?? '—'}</span>
                                                 </div>
                                             </div>
 
                                             <div className={styles.rowBottom}>
                                                 <div className={styles.metaRow}>
                                                     <span className={styles.metaLabel}>Referido</span>
-                                                    <span>
-                                                        {prof?.full_name ??
-                                                            (r.candidate_id
-                                                                ? `ID ${r.candidate_id.slice(0, 8)}…`
-                                                                : '—')}
-                                                    </span>
+                                                    <span>{prof?.full_name ?? (r.candidate_id ? `ID ${r.candidate_id.slice(0, 8)}…` : '—')}</span>
                                                 </div>
 
                                                 <div className={styles.metaRow}>
                                                     <span className={styles.metaLabel}>Código</span>
-                                                    <span className={styles.mono}>
-                                                        {r.referral_code ?? '—'}
-                                                    </span>
+                                                    <span className={styles.mono}>{r.referral_code ?? '—'}</span>
                                                 </div>
 
                                                 <div className={styles.metaRow} style={{ gap: 12 }}>
-                                                    {emailHref ? (
-                                                        <a className={styles.link} href={emailHref}>
-                                                            Email
-                                                        </a>
-                                                    ) : (
-                                                        <span className={styles.mono} style={{ opacity: .6 }}>
-                                                            Email no disponible
-                                                        </span>
-                                                    )}
+                                                    {emailHref ? <a className={styles.link} href={emailHref}>Email</a> : <span className={styles.mono} style={{ opacity: 0.6 }}>Email no disponible</span>}
                                                     <span>•</span>
-                                                    <a
-                                                        className={styles.link}
-                                                        href={chatHref}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        Chatear
-                                                    </a>
+                                                    <a className={styles.link} href={chatHref} target="_blank" rel="noopener noreferrer">Chatear</a>
                                                 </div>
 
-                                                <span className={styles.date}>
-                                                    Creado el{' '}
-                                                    {new Date(r.created_at).toLocaleDateString()}
-                                                </span>
+                                                <span className={styles.date}>Creado el {new Date(r.created_at).toLocaleDateString()}</span>
                                             </div>
                                         </div>
                                     </li>

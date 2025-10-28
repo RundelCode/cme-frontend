@@ -5,10 +5,8 @@ import styles from './companyJobs.module.css';
 import Link from 'next/link';
 import { PropagateLoader } from 'react-spinners';
 
-/* ====== FEE fijo (fallback cuando NO hay salario USD) ====== */
 const FEE_COP = 10000;
 
-/* ====== Tipado y cálculo de fee (tarifas USD) ====== */
 type FeeQuote = { bracket: string; feeLabel: string; feeValue: number; feePercent?: number };
 function computeCmeFeeUSD(salaryUSD: number): FeeQuote {
     if (!salaryUSD || salaryUSD <= 0) return { bracket: '—', feeLabel: '—', feeValue: 0 };
@@ -19,108 +17,23 @@ function computeCmeFeeUSD(salaryUSD: number): FeeQuote {
     return { bracket: '≥ 5,001', feeLabel: '12% del monto', feeValue: Math.round(salaryUSD * 0.12), feePercent: 12 };
 }
 
-/* ============== GQL helper ============== */
-async function gql<T = any>(query: string, variables?: any) {
-    const res = await fetch('/api/graphql', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query, variables }),
-        cache: 'no-store',
+async function restJson<T = any>(url: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(url, {
         credentials: 'include',
+        cache: 'no-store',
+        headers: { Accept: 'application/json', ...(init?.headers || {}) },
+        ...init,
     });
-    const raw = await res.text();
-    let data: any;
-    try {
-        data = raw ? JSON.parse(raw) : null;
-    } catch {
-        throw new Error(`GraphQL non-JSON: ${raw?.slice(0, 200)}`);
-    }
-    if (!res.ok || data?.errors?.length) {
-        const msg = data?.errors?.map((e: any) => e.message).join(' | ') || `HTTP ${res.status}`;
+    const text = await res.text();
+    let json: any = null;
+    try { json = text ? JSON.parse(text) : null; } catch { throw new Error(`${url} devolvió no-JSON: ${text.slice(0, 180)}`); }
+    if (!res.ok) {
+        const msg = json?.error || json?.message || `HTTP ${res.status}`;
         throw new Error(msg);
     }
-    return data.data as T;
+    return json as T;
 }
 
-/* ============== Queries/Mutations ============== */
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const COMPANY_BY_ADMIN = `
-  query ($adminId: ID!) {
-    companyByAdmin(adminId: $adminId) {
-      id
-      name
-      profilePicture
-      location
-    }
-  }
-`;
-
-const MY_COMPANY_JOBS = `
-  query MyCompanyJobs($input: JobSearchInput!, $limit: Int, $offset: Int) {
-    jobSearch(input: $input, limit: $limit, offset: $offset) {
-      total
-      items {
-        id
-        title
-        status
-        created_at
-        company_id
-        location
-        employment_type
-        salary
-        currency
-      }
-    }
-  }
-`;
-
-const JOB_REFERRALS = `
-  query JobWithReferrals($jobId: ID!, $limit: Int, $offset: Int) {
-    jobOffer(id: $jobId) {
-      id
-      title
-      status
-    }
-    referrals(jobOfferId: $jobId, limit: $limit, offset: $offset) {
-      id
-      status
-      referral_code
-      created_at
-      candidate_id
-      headhunter_id
-      job_offer_id
-    }
-  }
-`;
-
-const UPDATE_REFERRAL_STATUS = `
-  mutation UpdateReferralStatus($id: ID!, $status: String!) {
-    updateReferralStatus(id: $id, status: $status) {
-      id
-      status
-      updated_at
-    }
-  }
-`;
-
-const CREATE_PAYMENT = `
-  mutation CreatePayment($input: CreatePaymentInput!) {
-    createPayment(input: $input) {
-      id
-      amount
-      currency
-      status
-      direction
-      psp_payment_id
-      company_id
-      job_offer_id
-      headhunter_id
-    }
-  }
-`;
-
-/* ====== Tipos ====== */
 type AuthMe = { id: string; email?: string | null; role?: string | null };
 type Company = { id: string; name: string; profilePicture?: string | null; location?: string | null };
 
@@ -135,7 +48,6 @@ type JobItem = {
     salary?: number | null;
     currency?: string | null;
 };
-type JobSearchResp = { jobSearch: { total: number; items: JobItem[] } };
 
 type ReferralRow = {
     id: string;
@@ -147,28 +59,16 @@ type ReferralRow = {
     job_offer_id: string;
 };
 
-/* === flujo progresivo (desde aceptada por el candidato) === */
-const LINEAR_FLOW: string[] = [
-    'accepted_by_candidate',
-    'reviewing',
-    'shortlist',
-    'hired',
-];
+const LINEAR_FLOW: string[] = ['accepted_by_candidate', 'reviewing', 'shortlist', 'hired'];
 
 const TERMINALS = {
     declined_by_candidate: 'declined_by_candidate',
     rejected: 'rejected',
 } as const;
 
-/* ====== helpers UI ====== */
 function humanStatus(s?: string | null) {
     if (!s) return '—';
-    const map: Record<string, string> = {
-        draft: 'Borrador',
-        open: 'Abierta',
-        paused: 'Pausada',
-        closed: 'Cerrada',
-    };
+    const map: Record<string, string> = { draft: 'Borrador', open: 'Abierta', paused: 'Pausada', closed: 'Cerrada' };
     return map[s] ?? s;
 }
 
@@ -185,7 +85,6 @@ function humanReferralStatus(s?: string | null) {
     return s ? (map[s] ?? s) : '—';
 }
 
-/* ====== formateo de dinero genérico ====== */
 function formatMoney(currency: string, amount: number) {
     const cur = (currency || 'USD').toUpperCase();
     try {
@@ -197,65 +96,37 @@ function formatMoney(currency: string, amount: number) {
     }
 }
 
-/* 📩 notificación (best-effort) */
-async function createNotificationForCandidate({
-    candidateId,
-    jobTitle,
-    newStatus,
-    jobId
-}: {
-    candidateId: string;
-    jobTitle: string;
-    newStatus: string;
-    jobId?: string;
-}) {
+async function createNotificationForCandidate(p: { candidateId: string; jobTitle: string; newStatus: string; jobId?: string; }) {
+    const { candidateId, jobTitle, newStatus, jobId } = p;
     const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    if (!uuidRe.test(candidateId)) {
-        console.warn('[notif] invalid candidateId, skipping', candidateId);
-        return;
-    }
+    if (!uuidRe.test(candidateId)) return;
     const rawTitle = `Actualización en tu proceso para "${jobTitle}"`;
     const rawMessage = `El estado de tu referencia ha cambiado a: ${humanReferralStatus(newStatus)}.`;
-    const body = {
-        userId: candidateId,
-        title: rawTitle.slice(0, 180),
-        message: rawMessage.slice(0, 5000),
-        notificationType: 'recommendation',
-        channel: 'system',
-        relatedId: jobId ?? undefined,
-    };
-    try {
-        const res = await fetch('/api/notifications', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-            body: JSON.stringify(body),
-        });
-        const txt = await res.text();
-        let json: any; try { json = txt ? JSON.parse(txt) : null; } catch { json = txt; }
-        if (!res.ok) {
-            console.warn('[notif] create failed', res.status, json);
-        } else {
-            console.log('[notif] created', json);
-        }
-    } catch (e) {
-        console.warn('[notif] create error', e);
-    }
+    const body = { userId: candidateId, title: rawTitle.slice(0, 180), message: rawMessage.slice(0, 5000), notificationType: 'recommendation', channel: 'system', relatedId: jobId ?? undefined };
+    try { await restJson('/api/notifications', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); } catch { }
 }
 
-/* ===================== Estados de pago ===================== */
+async function createNotificationForHeadhunter(p: { headhunterId: string; candidateName: string; jobTitle: string; newStatus: string; jobId?: string; }) {
+    const { headhunterId, candidateName, jobTitle, newStatus, jobId } = p;
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRe.test(headhunterId)) return;
+    const who = candidateName?.trim() ? candidateName.trim() : 'el candidato que referiste';
+    const rawTitle = `Tu referido en "${jobTitle}" cambió de estado`;
+    const rawMessage = `${who} fue puesto en estado: ${humanReferralStatus(newStatus)}.`;
+    const body = { userId: headhunterId, title: rawTitle.slice(0, 180), message: rawMessage.slice(0, 5000), notificationType: 'recommendation', channel: 'system', relatedId: jobId ?? undefined };
+    try { await restJson('/api/notifications', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); } catch { }
+}
+
 type PayStatus = 'idle' | 'creating' | 'waiting' | 'approved' | 'rejected' | 'error';
 type PayDbStatus = 'idle' | 'saving' | 'ok' | 'failed';
 
 export default function Client() {
     const [auth, setAuth] = useState<AuthMe | null>(null);
     const [company, setCompany] = useState<Company | null>(null);
-
     const [rows, setRows] = useState<JobItem[]>([]);
     const [total, setTotal] = useState(0);
-
     const [limit, setLimit] = useState(20);
     const [offset, setOffset] = useState(0);
-
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
 
@@ -283,32 +154,32 @@ export default function Client() {
 
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Refs “frescos” para el polling
     const companyRef = useRef<Company | null>(null);
     const payForReferralRef = useRef<ReferralRow | null>(null);
     const payForJobRef = useRef<JobItem | null>(null);
+    const candMapRef = useRef<Record<string, { name?: string | null; photo?: string | null }>>({});
+
+    const [candidateMap, setCandidateMap] = useState<Record<string, { name?: string | null; photo?: string | null }>>({});
+
     useEffect(() => { companyRef.current = company; }, [company]);
     useEffect(() => { payForReferralRef.current = payForReferral; }, [payForReferral]);
     useEffect(() => { payForJobRef.current = payForJob; }, [payForJob]);
+    useEffect(() => { candMapRef.current = candidateMap; }, [candidateMap]);
 
-    /* ====== bootstrap auth + company ====== */
     useEffect(() => {
         let alive = true;
         (async () => {
             try {
                 setLoading(true);
                 setErr(null);
-
-                const me = await gql<{ authMe: AuthMe | null }>(AUTH_ME);
-                if (!me?.authMe?.id) throw new Error('No autenticado');
-                setAuth(me.authMe);
-
-                if ((me.authMe.role ?? '').toLowerCase() !== 'company_admin') {
-                    throw new Error("Solo los usuarios con rol 'company_admin' pueden ver sus ofertas.");
-                }
-
-                const c = await gql<{ companyByAdmin: Company | null }>(COMPANY_BY_ADMIN, { adminId: me.authMe.id });
-                const comp = c?.companyByAdmin ?? null;
+                const me = await restJson<{ id: string; role?: string | null; user?: any; error?: string }>('/api/me');
+                const userId = me?.id ?? me?.user?.id;
+                const role = (me?.user?.role ?? me?.role ?? '').toString().toLowerCase();
+                if (!userId) throw new Error('No autenticado');
+                if (role !== 'company_admin') throw new Error("Solo los usuarios con rol 'company_admin' pueden ver sus ofertas.");
+                setAuth({ id: userId, role });
+                const c = await restJson<{ items?: Company[] }>('/api/company/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input: { adminId: userId, limit: 1 } }) });
+                const comp = Array.isArray(c?.items) ? c.items[0] ?? null : null;
                 if (!comp?.id) throw new Error('No tienes una empresa asociada aún.');
                 setCompany(comp);
             } catch (e: any) {
@@ -321,33 +192,29 @@ export default function Client() {
         return () => { alive = false; };
     }, []);
 
-    /* ====== cargar ofertas ====== */
     useEffect(() => {
         let alive = true;
         if (!company?.id || !isCompanyAdmin) return;
-
         (async () => {
             try {
                 setLoading(true);
                 setErr(null);
-
-                const resp = await gql<JobSearchResp>(MY_COMPANY_JOBS, {
-                    input: { companyId: company.id },
-                    limit,
-                    offset,
-                });
-
+                const qs = new URLSearchParams({ companyId: company.id, limit: String(limit), offset: String(offset) }).toString();
+                const resp = await restJson<{ total?: number; items?: JobItem[] } | JobItem[]>(`/api/jobs/search?${qs}`);
+                const items = Array.isArray(resp) ? resp : (Array.isArray((resp as any)?.items) ? (resp as any).items : []);
+                const totalVal = typeof (resp as any)?.total === 'number' ? (resp as any).total : items.length;
                 if (!alive) return;
-                setRows(resp?.jobSearch?.items ?? []);
-                setTotal(resp?.jobSearch?.total ?? 0);
+                setRows(items);
+                setTotal(totalVal);
             } catch (e: any) {
                 if (!alive) return;
                 setErr(e?.message || 'No se pudieron cargar las ofertas');
+                setRows([]);
+                setTotal(0);
             } finally {
                 if (alive) setLoading(false);
             }
         })();
-
         return () => { alive = false; };
     }, [company?.id, isCompanyAdmin, limit, offset]);
 
@@ -357,17 +224,14 @@ export default function Client() {
     const canPrev = offset > 0;
     const canNext = offset + limit < total;
 
-    /* ====== fee para una oferta ====== */
     function getFeeForJob(job?: JobItem | null): { amount: number; currency: string; label: string } {
         if (job?.salary && (job.currency ?? '').toUpperCase() === 'USD') {
             const q = computeCmeFeeUSD(job.salary);
             return { amount: q.feeValue, currency: 'USD', label: q.feeLabel };
         }
-        // fallback: tarifa fija en COP
         return { amount: FEE_COP, currency: 'COP', label: formatMoney('COP', FEE_COP) };
     }
 
-    /* ----- Modal handlers ----- */
     function openReferralsModal(job: JobItem) {
         setModalJob(job);
         setModalOpen(true);
@@ -392,52 +256,67 @@ export default function Client() {
         setModalPage(p);
     }
 
-    /* ====== Cargar referidos cuando cambie el job/página ====== */
     useEffect(() => {
         if (!modalOpen || !modalJob?.id) return;
-
         let alive = true;
         const currentJobId = modalJob.id;
         const newOffset = (modalPage - 1) * MODAL_LIMIT;
-
         (async () => {
             try {
                 setModalLoading(true);
                 setModalError(null);
-
-                const resp = await gql<{ referrals: ReferralRow[] }>(
-                    JOB_REFERRALS,
-                    { jobId: currentJobId, limit: MODAL_LIMIT, offset: newOffset }
-                );
-
-                if (!alive) return;
-
-                let list = (resp?.referrals ?? []).filter(
-                    r => (r.status ?? '').toLowerCase() !== 'submitted'
-                );
-
-                list = list.filter(r => (r.job_offer_id ?? '') === currentJobId);
-
-                if (currentJobId !== modalJob.id) return;
-
-                setModalRefs(list);
-
-                if ((resp?.referrals?.length ?? 0) > 0 && list.length === 0) {
-                    console.warn(
-                        '[JOB_REFERRALS] backend devolvió referidos que no pertenecen.',
-                        { requested: currentJobId, sample: resp?.referrals?.[0]?.job_offer_id }
-                    );
+                let list: ReferralRow[] = [];
+                try {
+                    const qs = new URLSearchParams({ jobOfferId: currentJobId, limit: String(MODAL_LIMIT), offset: String(newOffset) }).toString();
+                    const r = await restJson<{ items?: ReferralRow[] } | ReferralRow[]>(`/api/referrals?${qs}`);
+                    list = Array.isArray(r) ? r : (Array.isArray(r?.items) ? r.items : []);
+                } catch {
+                    const r2 = await restJson<{ items?: ReferralRow[] } | ReferralRow[]>(`/api/referrals/search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobOfferId: currentJobId, limit: MODAL_LIMIT, offset: newOffset }) });
+                    list = Array.isArray(r2) ? r2 : (Array.isArray(r2?.items) ? r2.items : []);
                 }
+                list = (list || []).filter(r => (r.status ?? '').toLowerCase() !== 'submitted');
+                list = list.filter(r => (r.job_offer_id ?? '') === currentJobId);
+                if (!alive) return;
+                if (currentJobId !== modalJob.id) return;
+                setModalRefs(list);
             } catch (e: any) {
                 if (!alive) return;
                 setModalError(e?.message || 'No se pudieron cargar los referidos');
+                setModalRefs([]);
             } finally {
                 if (alive) setModalLoading(false);
             }
         })();
-
         return () => { alive = false; };
     }, [modalOpen, modalJob?.id, modalPage]);
+
+    useEffect(() => {
+        const ids = Array.from(new Set((modalRefs || []).map(r => r.candidate_id).filter(Boolean))) as string[];
+        if (!ids.length) { setCandidateMap({}); return; }
+        let alive = true;
+        (async () => {
+            try {
+                const key = encodeURIComponent(ids.join(','));
+                const res = await restJson<{ profiles?: any[] }>(`/api/profiles?ids=${key}`);
+                const arr = Array.isArray(res?.profiles) ? res.profiles : [];
+                const map: Record<string, { name?: string | null; photo?: string | null }> = {};
+                for (const p of arr) {
+                    const first = p.first_name ?? p.firstName ?? p.given_name ?? p.givenName ?? null;
+                    const last = p.last_name ?? p.lastName ?? p.family_name ?? p.familyName ?? null;
+                    const joined = [first, last].filter(Boolean).join(' ').trim() || null;
+                    const emailLocal = typeof p.email === 'string' && p.email.includes('@') ? p.email.split('@')[0] : null;
+                    const name = p.full_name ?? p.fullName ?? p.name ?? joined ?? p.username ?? emailLocal ?? null;
+                    const photo = p.profile_picture ?? p.profilePicture ?? p.avatar ?? p.photo ?? null;
+                    if (p.id) map[p.id] = { name, photo };
+                }
+                if (!alive) return;
+                setCandidateMap(map);
+            } catch {
+                setCandidateMap({});
+            }
+        })();
+        return () => { alive = false; };
+    }, [modalRefs]);
 
     function linearIndex(status?: string | null) {
         const i = LINEAR_FLOW.indexOf((status ?? '').toLowerCase());
@@ -448,9 +327,7 @@ export default function Client() {
         return v === TERMINALS.declined_by_candidate || v === TERMINALS.rejected;
     }
 
-    /* ====== Pago / Hired ====== */
     function openPayModal(refRow: ReferralRow, job: JobItem) {
-        console.log('[PAY][openPayModal]', { refRow, job });
         setPayForReferral(refRow);
         setPayForJob(job);
         setPayOpen(true);
@@ -473,100 +350,135 @@ export default function Client() {
         if (pollRef.current) clearInterval(pollRef.current);
     }
 
+    async function persistPaymentAndGetId(freshJob: JobItem, freshReferral: ReferralRow, freshCompany: Company | null, pspId: string | null) {
+        const fee = getFeeForJob(freshJob);
+        let paymentId: string | null = null;
+        setPayDbStatus('saving');
+        try {
+            const created = await restJson<{ id?: string }>('/api/payments', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                    jobOfferId: freshJob.id,
+                    headhunterId: freshReferral.headhunter_id ?? null,
+                    companyId: freshCompany?.id ?? null,
+                    amount: fee.amount,
+                    currency: fee.currency,
+                    direction: 'out',
+                    pspPaymentId: pspId ?? undefined,
+                }),
+            });
+            paymentId = created?.id ?? null;
+            if (paymentId) {
+                await restJson(`/api/payments/${encodeURIComponent(paymentId)}`, {
+                    method: 'PATCH',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ status: 'succeeded', pspPaymentId: pspId ?? undefined }),
+                });
+            }
+            setPayDbStatus('ok');
+        } catch {
+            try {
+                const created2 = await restJson<{ id?: string }>('/api/payments/create', {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        jobOfferId: freshJob.id,
+                        headhunterId: freshReferral.headhunter_id ?? null,
+                        companyId: freshCompany?.id ?? null,
+                        amount: fee.amount,
+                        currency: fee.currency,
+                        direction: 'out',
+                        pspPaymentId: pspId ?? undefined,
+                    }),
+                });
+                paymentId = created2?.id ?? null;
+                if (paymentId) {
+                    await restJson(`/api/payments/${encodeURIComponent(paymentId)}`, {
+                        method: 'PATCH',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ status: 'succeeded', pspPaymentId: pspId ?? undefined }),
+                    });
+                }
+                setPayDbStatus('ok');
+            } catch {
+                setPayDbStatus('failed');
+            }
+        }
+        return paymentId;
+    }
+
     function startPolling(preferenceId: string) {
         if (pollRef.current) clearInterval(pollRef.current);
-        console.log('[PAY][poll] start', { preferenceId });
-
         pollRef.current = setInterval(async () => {
             try {
-                const res = await fetch(`/api/check-preference?pref_id=${encodeURIComponent(preferenceId)}`, { cache: 'no-store' });
-                const data = await res.json().catch(() => ({} as any));
-                console.log('[PAY][poll] tick', { ok: res.ok, data });
-
-                if (data?.payment_id) {
-                    setPayPaymentId(String(data.payment_id));
-                }
-
+                const data = await restJson<any>(`/api/check-preference?pref_id=${encodeURIComponent(preferenceId)}`);
+                if (data?.payment_id) setPayPaymentId(String(data.payment_id));
                 if (data.status === 'approved') {
-                    console.log('[PAY][poll] approved ✅');
                     setPayStatus('approved');
                     if (pollRef.current) clearInterval(pollRef.current);
-
                     const freshReferral = payForReferralRef.current;
                     const freshJob = payForJobRef.current;
                     const freshCompany = companyRef.current;
                     const pspId = data?.payment_id ? String(data.payment_id) : (payPaymentId ?? null);
+                    if (!freshReferral || !freshJob) return;
 
-                    if (!freshReferral || !freshJob) {
-                        console.warn('[PAY] Falta referral/job en approve', { freshReferral, freshJob });
-                        return;
-                    }
+                    const paymentId = await persistPaymentAndGetId(freshJob, freshReferral, freshCompany, pspId);
 
-                    // 1) actualizar estado a hired
                     try {
-                        console.log('[PAY] update referral -> hired', { referralId: freshReferral.id });
-                        await gql(UPDATE_REFERRAL_STATUS, { id: freshReferral.id, status: 'hired' });
-
-                        if (freshReferral.candidate_id && freshJob?.title) {
-                            await createNotificationForCandidate({
-                                candidateId: freshReferral.candidate_id,
-                                jobTitle: freshJob.title,
-                                newStatus: 'hired',
-                                jobId: freshJob.id,
-                            });
-                        }
-
+                        await restJson(`/api/referrals/${encodeURIComponent(freshReferral.id)}`, {
+                            method: 'PATCH',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify({
+                                status: 'hired',
+                                paymentId: paymentId ?? undefined,
+                                pspPaymentId: pspId ?? undefined,
+                                jobOfferId: freshJob.id,
+                                companyId: freshCompany?.id ?? undefined,
+                                headhunterId: freshReferral.headhunter_id ?? undefined,
+                                paymentStatus: 'succeeded',
+                            }),
+                        });
                         setModalRefs(prev => prev.map(r => r.id === freshReferral.id ? { ...r, status: 'hired' } : r));
-                    } catch (e: any) {
-                        console.error('[PAY] No se pudo actualizar la referencia a hired tras el pago:', e?.message || e);
-                        setPayError('Pago aprobado, pero no se pudo actualizar la referencia. Intenta recargar.');
-                    }
-
-                    // 2) crear Payment en DB (best-effort)
-                    const fee = getFeeForJob(freshJob);
-                    if (!freshCompany?.id) {
-                        console.warn('[PAY] No company.id disponible, no se creó Payment en DB');
-                    } else {
+                    } catch {
                         try {
-                            setPayDbStatus('saving');
-                            console.log('[PAY] creating Payment via GQL…', {
-                                companyId: freshCompany.id,
-                                jobOfferId: freshJob?.id,
-                                headhunterId: freshReferral?.headhunter_id,
-                                amount: fee.amount,
-                                currency: fee.currency,
-                                direction: 'OUT',
-                                pspPaymentId: pspId,
-                            });
-
-                            const resp = await gql(CREATE_PAYMENT, {
-                                input: {
-                                    jobOfferId: freshJob?.id ?? null,
-                                    headhunterId: freshReferral?.headhunter_id ?? null,
-                                    companyId: freshCompany.id,
-                                    amount: fee.amount,
-                                    currency: fee.currency,
-                                    direction: 'OUT',
+                            await restJson(`/api/referrals/update-status`, {
+                                method: 'POST',
+                                headers: { 'content-type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: freshReferral.id,
+                                    status: 'HIRED',
+                                    paymentId: paymentId ?? undefined,
                                     pspPaymentId: pspId ?? undefined,
-                                },
+                                    jobOfferId: freshJob.id,
+                                    companyId: freshCompany?.id ?? undefined,
+                                    headhunterId: freshReferral.headhunter_id ?? undefined,
+                                    paymentStatus: 'succeeded',
+                                }),
                             });
-                            console.log('[PAY] createPayment resp:', resp);
-                            setPayDbStatus('ok');
-                        } catch (err: any) {
-                            console.error('[PAY] createPayment ERROR:', err?.message || err);
-                            setPayDbStatus('failed');
+                            setModalRefs(prev => prev.map(r => r.id === freshReferral.id ? { ...r, status: 'hired' } : r));
+                        } catch {
+                            setPayError('Pago aprobado, pero no se pudo actualizar la referencia.');
                         }
                     }
+
+                    const candId = freshReferral.candidate_id || undefined;
+                    const candName = candId ? (candMapRef.current[candId]?.name || '') : '';
+                    try {
+                        if (candId && freshJob?.title) {
+                            await createNotificationForCandidate({ candidateId: candId, jobTitle: freshJob.title, newStatus: 'hired', jobId: freshJob.id });
+                        }
+                        if (freshReferral.headhunter_id && freshJob?.title) {
+                            await createNotificationForHeadhunter({ headhunterId: freshReferral.headhunter_id, candidateName: candName, jobTitle: freshJob.title, newStatus: 'hired', jobId: freshJob.id });
+                        }
+                    } catch { }
                 } else if (data.status === 'rejected') {
-                    console.log('[PAY][poll] rejected ❌');
                     setPayStatus('rejected');
                     if (pollRef.current) clearInterval(pollRef.current);
                 } else {
                     setPayStatus('waiting');
                 }
-            } catch (e) {
-                console.warn('[PAY][poll] error', e);
-            }
+            } catch { }
         }, 3000);
     }
 
@@ -574,46 +486,28 @@ export default function Client() {
         try {
             setPayError(null);
             setPayStatus('creating');
-            console.log('[PAY][beginPayment] creando preferencia…');
-
             const fee = getFeeForJob(payForJob);
-            const title =
-                payForJob?.title
-                    ? `Fee contratación: ${payForJob.title}`
-                    : 'Fee contratación';
-
-            // Enviamos amount/currency para que el backend de create-preference lo soporte cuando lo habilites
-            const res = await fetch('/api/create-preference', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({
-                    amount: fee.amount,
-                    currency: fee.currency,
-                    title,
-                }),
-            });
-            const data = await res.json().catch(() => ({} as any));
-            console.log('[PAY][beginPayment] resp create-preference:', { ok: res.ok, data });
-
-            if (!res.ok || !data?.init_point || !data?.preference_id) {
+            const title = payForJob?.title ? `Fee contratación: ${payForJob.title}` : 'Fee contratación';
+            const data = await restJson<{ init_point?: string; preference_id?: string; error?: string }>(
+                '/api/create-preference',
+                { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount: fee.amount, currency: fee.currency, title }) }
+            );
+            if (!data?.init_point || !data?.preference_id) {
                 setPayStatus('error');
                 setPayError(data?.error || 'No se pudo crear la preferencia');
                 return;
             }
             setPayPrefId(data.preference_id);
             setPayStatus('waiting');
-
             window.open(data.init_point, '_blank', 'noopener,noreferrer');
-
             startPolling(data.preference_id);
         } catch (e: any) {
-            console.error('[PAY][beginPayment] error:', e);
             setPayStatus('error');
             setPayError(e?.message || 'Error iniciando el pago');
         }
     }
 
-    async function setReferralStatus(referralId: string, newStatus: string) {
+    async function setReferralStatus(referralId: string, newStatus: string, candidateId?: string) {
         try {
             if (newStatus.toLowerCase() === 'hired') {
                 const ref = modalRefs.find(r => r.id === referralId);
@@ -621,20 +515,35 @@ export default function Client() {
                 openPayModal(ref, modalJob);
                 return;
             }
-
             setSavingReferralId(referralId);
-            setModalRefs(prev => prev.map(r => r.id === referralId ? { ...r, status: newStatus } : r));
-            await gql(UPDATE_REFERRAL_STATUS, { id: referralId, status: newStatus });
-
-            const ref = modalRefs.find(r => r.id === referralId);
-            if (ref?.candidate_id && modalJob?.title) {
-                await createNotificationForCandidate({
-                    candidateId: ref.candidate_id,
-                    jobTitle: modalJob.title,
-                    newStatus,
-                    jobId: modalJob.id
-                });
+            const prev = modalRefs.find(r => r.id === referralId)?.status;
+            const refRow = modalRefs.find(r => r.id === referralId) || null;
+            setModalRefs(prevList => prevList.map(r => r.id === referralId ? { ...r, status: newStatus } : r));
+            const res = await fetch(`/api/referrals/${encodeURIComponent(referralId)}`, {
+                method: 'PATCH',
+                headers: { 'content-type': 'application/json', accept: 'application/json' },
+                credentials: 'include',
+                cache: 'no-store',
+                body: JSON.stringify({ status: newStatus }),
+            });
+            const ct = res.headers.get('content-type') || '';
+            const txt = await res.text();
+            const json = ct.includes('application/json') ? (txt ? JSON.parse(txt) : null) : null;
+            if (!res.ok) {
+                const msg = json?.error || json?.message || `HTTP ${res.status}`;
+                setModalRefs(prevList => prevList.map(r => r.id === referralId ? { ...r, status: prev ?? r.status } : r));
+                throw new Error(msg);
             }
+            try {
+                const idForNotify = candidateId ?? refRow?.candidate_id ?? null;
+                const candName = idForNotify ? (candidateMap[idForNotify]?.name || '') : '';
+                if (idForNotify && modalJob?.title) {
+                    await createNotificationForCandidate({ candidateId: idForNotify, jobTitle: modalJob.title, newStatus, jobId: modalJob.id });
+                }
+                if (refRow?.headhunter_id && modalJob?.title) {
+                    await createNotificationForHeadhunter({ headhunterId: refRow.headhunter_id, candidateName: candName, jobTitle: modalJob.title, newStatus, jobId: modalJob.id });
+                }
+            } catch { }
         } catch (e: any) {
             setModalError(e?.message || 'No se pudo actualizar el estado');
         } finally {
@@ -688,23 +597,15 @@ export default function Client() {
                                 {rows.map(job => (
                                     <tr key={job.id} className={styles.row}>
                                         <td className={styles.jobTitleCell}>
-                                            <Link href={`/jobs/${job.id}`} className={styles.link}>
-                                                {job.title}
-                                            </Link>
+                                            <Link href={`/jobs/${job.id}`} className={styles.link}>{job.title}</Link>
                                         </td>
                                         <td>{job.employment_type ?? '—'}</td>
                                         <td>{job.location ?? '—'}</td>
                                         <td>{job.salary ? `${job.salary} ${job.currency ?? 'USD'}` : '—'}</td>
-                                        <td>
-                                            <span className={`${styles.pill} ${pillClass(job.status, styles)}`}>
-                                                {humanStatus(job.status)}
-                                            </span>
-                                        </td>
+                                        <td><span className={`${styles.pill} ${pillClass(job.status, styles)}`}>{humanStatus(job.status)}</span></td>
                                         <td>{job.created_at ? new Date(job.created_at).toLocaleDateString() : '—'}</td>
                                         <td className={styles.actionsCell}>
-                                            <button className={styles.secBtn} onClick={() => openReferralsModal(job)}>
-                                                Ver referidos
-                                            </button>
+                                            <button className={styles.secBtn} onClick={() => openReferralsModal(job)}>Ver referidos</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -713,64 +614,35 @@ export default function Client() {
                     </div>
 
                     <div className={styles.pager}>
-                        <button
-                            className={styles.pagerBtn}
-                            disabled={!canPrev}
-                            onClick={() => canPrev && setOffset(Math.max(0, offset - limit))}
-                        >
-                            ← Anterior
-                        </button>
-                        <span className={styles.pagerInfo}>
-                            Página {page} de {totalPages} • {total} resultados
-                        </span>
-                        <button
-                            className={styles.pagerBtn}
-                            disabled={!canNext}
-                            onClick={() => canNext && setOffset(offset + limit)}
-                        >
-                            Siguiente →
-                        </button>
-
+                        <button className={styles.pagerBtn} disabled={!canPrev} onClick={() => canPrev && setOffset(Math.max(0, offset - limit))}>← Anterior</button>
+                        <span className={styles.pagerInfo}>Página {page} de {totalPages} • {total} resultados</span>
+                        <button className={styles.pagerBtn} disabled={!canNext} onClick={() => canNext && setOffset(offset + limit)}>Siguiente →</button>
                         <div className={styles.pageSize}>
                             <label>
                                 Mostrar
-                                <select
-                                    className={styles.pageSizeSelect}
-                                    value={limit}
-                                    onChange={(e) => {
-                                        const n = Number(e.currentTarget.value) || 20;
-                                        setLimit(n);
-                                        setOffset(0);
-                                    }}
-                                >
+                                <select className={styles.pageSizeSelect} value={limit} onChange={(e) => { const n = Number(e.currentTarget.value) || 20; setLimit(n); setOffset(0); }}>
                                     <option value={10}>10</option>
                                     <option value={20}>20</option>
                                     <option value={50}>50</option>
-                                </select>
-                                {' '}por página
+                                </select>{' '}por página
                             </label>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* ===== Modal de Referidos ===== */}
             {modalOpen && (
                 <div className={styles.modalOverlay} role="dialog" aria-modal="true" onClick={closeReferralsModal}>
                     <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
                         <div className={styles.modalHeader}>
-                            <div className={styles.modalTitle}>
-                                {modalJob?.title ?? 'Referidos'}
-                            </div>
+                            <div className={styles.modalTitle}>{modalJob?.title ?? 'Referidos'}</div>
                             <button className={styles.modalClose} onClick={closeReferralsModal}>✕</button>
                         </div>
 
                         <div className={styles.modalBody}>
                             {modalError && <div className={styles.error}>{modalError}</div>}
                             {modalLoading ? (
-                                <div className={styles.loading}>
-                                    <PropagateLoader />
-                                </div>
+                                <div className={styles.loading}><PropagateLoader /></div>
                             ) : modalRefs.length === 0 ? (
                                 <div className={styles.empty}>Esta oferta no tiene referidos (aceptados) aún.</div>
                             ) : (
@@ -779,12 +651,13 @@ export default function Client() {
                                         const v = (r.status ?? '').toLowerCase();
                                         const currentIdx = linearIndex(v);
                                         const terminal = isTerminal(v);
-
+                                        const candId = r.candidate_id || '';
+                                        const candName = candId ? (candidateMap[candId]?.name || '') : '';
                                         return (
                                             <li key={r.id} className={styles.modalItem}>
                                                 <div className={styles.modalItemMain}>
                                                     <div className={styles.modalItemTitle}>
-                                                        {r.candidate_id ? `Candidato #${r.candidate_id.slice(0, 8)}` : 'Candidato'}
+                                                        {candName ? candName : (candId ? `Candidato #${candId.slice(0, 8)}` : 'Candidato')}
                                                     </div>
                                                     <div className={styles.modalItemSub}>
                                                         Código: <span className={styles.mono}>{r.referral_code ?? '—'}</span>
@@ -793,38 +666,17 @@ export default function Client() {
 
                                                 <div className={styles.modalItemMeta}>
                                                     <span className={`${styles.pill} ${styles.pillInfo}`}>{humanReferralStatus(r.status)}</span>
-                                                    <span className={styles.modalItemDate}>
-                                                        {r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}
-                                                    </span>
+                                                    <span className={styles.modalItemDate}>{r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'}</span>
                                                 </div>
 
                                                 <div className={styles.modalItemActions}>
                                                     {r.candidate_id && (
-                                                        <a
-                                                            className={styles.secBtn}
-                                                            href={`/profiles/users?id=${r.candidate_id}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                        >
-                                                            Perfil candidato
-                                                        </a>
+                                                        <a className={styles.secBtn} href={`/profiles/users?id=${r.candidate_id}`} target="_blank" rel="noopener noreferrer">Perfil candidato</a>
                                                     )}
                                                     {r.headhunter_id && (
-                                                        <a
-                                                            className={styles.secBtn}
-                                                            href={`/profiles/users?id=${r.headhunter_id}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                        >
-                                                            Ver referidor
-                                                        </a>
+                                                        <a className={styles.secBtn} href={`/profiles/users?id=${r.headhunter_id}`} target="_blank" rel="noopener noreferrer">Ver referidor</a>
                                                     )}
-                                                    <button
-                                                        className={styles.primaryBtn}
-                                                        onClick={() =>
-                                                            setExpandedReferralId(expandedReferralId === r.id ? null : r.id)
-                                                        }
-                                                    >
+                                                    <button className={styles.primaryBtn} onClick={() => setExpandedReferralId(expandedReferralId === r.id ? null : r.id)}>
                                                         {expandedReferralId === r.id ? 'Ocultar proceso' : 'Gestionar proceso'}
                                                     </button>
                                                 </div>
@@ -836,19 +688,11 @@ export default function Client() {
                                                                 const active = idx === currentIdx && !terminal;
                                                                 const canClick = !terminal && idx === currentIdx + 1;
                                                                 const isHiredStep = step === 'hired';
-                                                                const disabled =
-                                                                    terminal ||
-                                                                    (idx !== currentIdx && idx !== currentIdx + 1) ||
-                                                                    savingReferralId === r.id;
-
+                                                                const disabled = terminal || (idx !== currentIdx && idx !== currentIdx + 1) || savingReferralId === r.id;
                                                                 return (
                                                                     <button
                                                                         key={step}
-                                                                        className={[
-                                                                            styles.stepBtn,
-                                                                            active ? styles.stepBtnActive : '',
-                                                                            disabled ? styles.stepBtnDisabled : '',
-                                                                        ].join(' ')}
+                                                                        className={[styles.stepBtn, active ? styles.stepBtnActive : '', disabled ? styles.stepBtnDisabled : ''].join(' ')}
                                                                         disabled={disabled}
                                                                         title={humanReferralStatus(step)}
                                                                         onClick={() => {
@@ -856,7 +700,7 @@ export default function Client() {
                                                                             if (isHiredStep) {
                                                                                 openPayModal(r, modalJob!);
                                                                             } else {
-                                                                                setReferralStatus(r.id, step);
+                                                                                setReferralStatus(r.id, step, r.candidate_id || undefined);
                                                                             }
                                                                         }}
                                                                     >
@@ -869,16 +713,14 @@ export default function Client() {
                                                         <div className={styles.dangerRow}>
                                                             <button
                                                                 className={styles.dangerBtn}
-                                                                disabled={savingReferralId === r.id || v === 'hired' || terminal}
-                                                                onClick={() => setReferralStatus(r.id, TERMINALS.rejected)}
+                                                                disabled={savingReferralId === r.id || (r.status ?? '').toLowerCase() === 'hired' || terminal}
+                                                                onClick={() => setReferralStatus(r.id, TERMINALS.rejected, r.candidate_id || undefined)}
                                                             >
                                                                 Marcar “Rechazado”
                                                             </button>
                                                         </div>
 
-                                                        {savingReferralId === r.id && (
-                                                            <div className={styles.inlineSaving}>Guardando cambios…</div>
-                                                        )}
+                                                        {savingReferralId === r.id && <div className={styles.inlineSaving}>Guardando cambios…</div>}
                                                     </div>
                                                 )}
                                             </li>
@@ -889,35 +731,16 @@ export default function Client() {
                         </div>
 
                         <div className={styles.modalFooter}>
-                            <button
-                                className={styles.pagerBtn}
-                                onClick={() => modalPage > 1 && modalGoToPage(modalPage - 1)}
-                                disabled={modalPage <= 1 || modalLoading}
-                            >
-                                ← Anterior
-                            </button>
+                            <button className={styles.pagerBtn} onClick={() => modalPage > 1 && modalGoToPage(modalPage - 1)} disabled={modalPage <= 1 || modalLoading}>← Anterior</button>
                             <span className={styles.pagerInfo}>Página {modalPage}</span>
-                            <button
-                                className={styles.pagerBtn}
-                                onClick={() => modalGoToPage(modalPage + 1)}
-                                disabled={modalLoading}
-                            >
-                                Siguiente →
-                            </button>
+                            <button className={styles.pagerBtn} onClick={() => modalGoToPage(modalPage + 1)} disabled={modalLoading}>Siguiente →</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* ===== Modal de Pago ===== */}
             {payOpen && (
-                <div
-                    className={styles.modalOverlay}
-                    role="dialog"
-                    aria-modal="true"
-                    style={{ zIndex: 9999, backdropFilter: 'blur(1px)' }}
-                    onClick={closePayModal}
-                >
+                <div className={styles.modalOverlay} role="dialog" aria-modal="true" style={{ zIndex: 9999, backdropFilter: 'blur(1px)' }} onClick={closePayModal}>
                     <div className={styles.modalCard} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 560 }}>
                         <div className={styles.modalHeader}>
                             <div className={styles.modalTitle}>Confirmar contratación</div>
@@ -927,11 +750,7 @@ export default function Client() {
                         <div className={styles.modalBody}>
                             {payStatus === 'idle' && (
                                 <>
-                                    <p style={{ marginBottom: 12 }}>
-                                        Para marcar a este candidato como <b>Contratado</b>, la empresa debe pagar un fee.
-                                    </p>
-
-                                    {/* Mostrar el fee dinámico */}
+                                    <p style={{ marginBottom: 12 }}>Para marcar a este candidato como <b>Contratado</b>, la empresa debe pagar un fee.</p>
                                     <div className={styles.infoBox} style={{ marginBottom: 12 }}>
                                         <div>Oferta: <b>{payForJob?.title ?? '—'}</b></div>
                                         <div>
@@ -939,7 +758,6 @@ export default function Client() {
                                             <b>
                                                 {(() => {
                                                     const fee = getFeeForJob(payForJob);
-                                                    // Si es USD, mostramos etiqueta de tramo; si es COP, mostramos formateado en COP
                                                     if ((payForJob?.currency ?? '').toUpperCase() === 'USD' && (payForJob?.salary ?? 0) > 0) {
                                                         const q = computeCmeFeeUSD(payForJob!.salary!);
                                                         return `${q.feeLabel} (${formatMoney('USD', q.feeValue)})`;
@@ -949,7 +767,6 @@ export default function Client() {
                                             </b>
                                         </div>
                                     </div>
-
                                     <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
                                         <button className={styles.secBtn} onClick={closePayModal}>Cancelar</button>
                                         <button className={styles.primaryBtn} onClick={beginPayment}>Pagar</button>
@@ -957,11 +774,7 @@ export default function Client() {
                                 </>
                             )}
 
-                            {payStatus === 'creating' && (
-                                <div className={styles.loading} style={{ textAlign: 'center' }}>
-                                    <PropagateLoader />
-                                </div>
-                            )}
+                            {payStatus === 'creating' && <div className={styles.loading} style={{ textAlign: 'center' }}><PropagateLoader /></div>}
 
                             {payStatus === 'waiting' && (
                                 <div style={{ textAlign: 'center' }}>
@@ -979,11 +792,8 @@ export default function Client() {
                                     <div style={{ marginTop: 12 }}>
                                         {payDbStatus === 'saving' && <p>Registrando pago</p>}
                                         {payDbStatus === 'ok' && <p>Pago registrado</p>}
-                                        {payDbStatus === 'failed' && (
-                                            <p>No se pudo registrar el pago (ver consola).</p>
-                                        )}
+                                        {payDbStatus === 'failed' && (<p>No se pudo registrar el pago.</p>)}
                                     </div>
-
                                     <p style={{ marginTop: 8 }}>La referencia fue marcada como <b>Contratado</b>.</p>
                                     <div style={{ marginTop: 12 }}>
                                         <button className={styles.primaryBtn} onClick={closePayModal}>Cerrar</button>

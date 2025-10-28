@@ -4,91 +4,41 @@ import React, { useEffect, useMemo, useState } from 'react';
 import styles from './updateCompany.module.css';
 import { PropagateLoader } from 'react-spinners';
 
-const GRAPHQL_ENDPOINT =
-  process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? '/api/graphql';
-
-async function gql<T>(q: string, variables?: any) {
-  const res = await fetch(GRAPHQL_ENDPOINT, {
-    method: 'POST',
+async function restJson<T = any>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
     credentials: 'include',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ query: q, variables }),
+    cache: 'no-store',
+    headers: { Accept: 'application/json', ...(init?.headers || {}) },
+    ...init,
   });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json?.errors?.length) {
-    console.error('🟥 GraphQL error:', json);
-    throw new Error(json?.errors?.[0]?.message ?? `GraphQL failed (${res.status})`);
-  }
-  return json.data as T;
-}
-
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const COMPANY_BY_ADMIN = `
-  query CompanyByAdmin($adminId: ID!) {
-    companyByAdmin(adminId: $adminId) {
-      id
-      name
-      email
-      website
-      description
-      industry
-      location
-      profilePicture
-      coverPhoto
-      companyRating
-      boolVerified
-      subscriptionPlan
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-const UPDATE_COMPANY = `
-  mutation UpdateCompany($id: ID!, $input: UpdateCompanyPatch!) {
-    updateCompany(id: $id, input: $input) {
-      id
-      name
-      email
-      website
-      description
-      industry
-      location
-      profilePicture
-      coverPhoto
-      companyRating
-      boolVerified
-      subscriptionPlan
-      updatedAt
-    }
-  }
-`;
-
-type UploadKind = 'avatar' | 'cover';
-async function uploadOneShot(kind: UploadKind, file: File) {
-  const fd = new FormData();
-  fd.append('file', file, file.name);
-  const res = await fetch(`/api/uploads/self/${kind}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: fd,
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg =
-      json?.error ||
-      (json?.message && (Array.isArray(json.message) ? json.message.join(', ') : json.message)) ||
-      `Fallo subiendo ${kind} (${res.status})`;
-    throw new Error(msg);
-  }
-  if (!json?.url) throw new Error(`Respuesta inválida al subir ${kind}`);
-  return json as { url: string; bucket: string; path: string };
+  const raw = await res.text();
+  let json: any = null;
+  try { json = raw ? JSON.parse(raw) : null; } catch { throw new Error(`${url} devolvió no-JSON: ${raw?.slice(0, 180)}`); }
+  if (!res.ok) { throw new Error(json?.error || json?.message || `HTTP ${res.status}`); }
+  return json as T;
 }
 
 function normalizeRole(role: unknown): string {
   return typeof role === 'string' ? role.trim().toLowerCase() : '';
 }
+
+type Me = { id: string; role?: string | null; user?: any };
+type CompanyCamel = {
+  id: string;
+  name: string;
+  email: string | null;
+  website: string | null;
+  description: string | null;
+  industry: string | null;
+  location: string | null;
+  profilePicture: string | null;
+  coverPhoto: string | null;
+  companyRating: number | null;
+  boolVerified: boolean | null;
+  subscriptionPlan: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+};
 
 export default function UpdateCompany() {
   const [authLoading, setAuthLoading] = useState(true);
@@ -114,27 +64,19 @@ export default function UpdateCompany() {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
 
-  const logoPreview = useMemo(
-    () => (logoFile ? URL.createObjectURL(logoFile) : logoUrl || undefined),
-    [logoFile, logoUrl]
-  );
-  const coverPreview = useMemo(
-    () => (coverFile ? URL.createObjectURL(coverFile) : coverUrl || undefined),
-    [coverFile, coverUrl]
-  );
+  const logoPreview = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : logoUrl || undefined), [logoFile, logoUrl]);
+  const coverPreview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : coverUrl || undefined), [coverFile, coverUrl]);
 
   useEffect(() => {
     (async () => {
       try {
         setAuthLoading(true);
         setAuthErr(null);
-        const me = await gql<{ authMe: { id: string; role: string } | null }>(AUTH_ME);
-        const id = me?.authMe?.id ?? null;
-        const r = normalizeRole(me?.authMe?.role);
+        const me = await restJson<Me>('/api/me');
+        const id = me?.id ?? me?.user?.id ?? null;
+        const r = normalizeRole(me?.user?.role ?? (me as any)?.role ?? '');
         if (!id) throw new Error('No autenticado');
-        if (r !== 'company_admin') {
-          throw new Error("Solo los usuarios con rol 'company_admin' pueden editar la empresa.");
-        }
+        if (r !== 'company_admin') throw new Error("Solo 'company_admin' puede editar la empresa.");
         setMeId(id);
         setRole(r);
       } catch (e: any) {
@@ -151,12 +93,16 @@ export default function UpdateCompany() {
       try {
         setLoading(true);
         setErr(null);
-        const data = await gql<{ companyByAdmin: any }>(COMPANY_BY_ADMIN, { adminId: meId });
-        const c = data?.companyByAdmin;
+        const search = await restJson<{ items: CompanyCamel[] }>('/api/company/search', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ input: { adminId: meId, limit: 1 } }),
+        });
+        const c = search.items?.[0];
         if (!c?.id) {
           setCompanyId(null);
           setOk(null);
-          setErr('No encontramos una empresa asociada a tu usuario. Crea una primero.');
+          setErr('No encontramos una empresa asociada. Crea una primero.');
           return;
         }
         setCompanyId(c.id);
@@ -183,48 +129,51 @@ export default function UpdateCompany() {
     };
   }, [logoPreview, coverPreview]);
 
+  async function uploadOne(kind: 'avatar' | 'cover', file: File) {
+    const fd = new FormData();
+    fd.append('file', file, file.name);
+    const res = await fetch(`/api/uploads/self/${kind}`, { method: 'POST', credentials: 'include', body: fd });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.url) throw new Error(json?.error || json?.message || `Fallo subiendo ${kind}`);
+    return json.url as string;
+  }
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setErr(null);
     setOk(null);
-
     try {
       if (!companyId) throw new Error('No hay empresa para editar.');
       if (!name.trim()) throw new Error('El nombre es obligatorio.');
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new Error('Ingresa un email válido.');
-      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Ingresa un email válido.');
 
-      let newCoverUrl = coverUrl;
-      let newLogoUrl = logoUrl;
+      let newCover = coverUrl;
+      let newLogo = logoUrl;
+      if (coverFile) newCover = await uploadOne('cover', coverFile);
+      if (logoFile) newLogo = await uploadOne('avatar', logoFile);
 
-      if (coverFile) {
-        const up = await uploadOneShot('cover', coverFile);
-        newCoverUrl = up.url;
-      }
-      if (logoFile) {
-        const up = await uploadOneShot('avatar', logoFile);
-        newLogoUrl = up.url;
-      }
-
-      const input = {
+      const payload = {
         name: name || undefined,
         email: email || undefined,
         website: website || undefined,
         industry: industry || undefined,
         location: location || undefined,
         description: description || undefined,
-        profilePicture: newLogoUrl || undefined,
-        coverPhoto: newCoverUrl || undefined,
+        profilePicture: newLogo ?? null,
+        coverPhoto: newCover ?? null,
+        boolVerified: false,
+        subscriptionPlan: 'free',
       };
 
-      const resp = await gql<{ updateCompany: any }>(UPDATE_COMPANY, {
-        id: companyId,
-        input,
+      await restJson(`/api/company/${encodeURIComponent(companyId)}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      setLogoUrl(newLogoUrl ?? null);
-      setCoverUrl(newCoverUrl ?? null);
+
+      setLogoUrl(newLogo ?? null);
+      setCoverUrl(newCover ?? null);
       setLogoFile(null);
       setCoverFile(null);
       setOk('Empresa actualizada correctamente.');
@@ -235,7 +184,7 @@ export default function UpdateCompany() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || loading) {
     return (
       <div className={styles.loading}>
         <PropagateLoader />
@@ -243,66 +192,31 @@ export default function UpdateCompany() {
     ) as any;
   }
   if (authErr) return <div className={styles.error}>{authErr}</div> as any;
-
-  if (loading) {
-    return (
-      <div className={styles.loading}>
-        <PropagateLoader />
-      </div>
-    ) as any;
-  }
-
-  if (!companyId) {
-    return (
-      <div className={styles.error}>
-        No encontramos una empresa asociada a tu usuario.
-      </div>
-    ) as any;
-  }
+  if (!companyId) return <div className={styles.error}>No encontramos una empresa asociada.</div> as any;
 
   return (
     <>
       <header className={styles.header}>
         <h3 className={styles.title}>Editar mi empresa</h3>
-        <p className={styles.sub}>
-          Actualiza la información básica, logo y portada de tu empresa.
-        </p>
+        <p className={styles.sub}>Actualiza la información básica, logo y portada de tu empresa.</p>
       </header>
 
       <form onSubmit={onSubmit} className={styles.form}>
         <div className={styles.coverBox}>
-          {coverPreview ? (
-            <img src={coverPreview} alt="Cover" className={styles.coverImg} />
-          ) : (
-            <div className={styles.coverPlaceholder}>Imagen de portada</div>
-          )}
+          {coverPreview ? <img src={coverPreview} alt="Cover" className={styles.coverImg} /> : <div className={styles.coverPlaceholder}>Imagen de portada</div>}
           <label className={styles.coverBtn}>
             Cambiar portada
-            <input
-              type="file"
-              accept="image/*"
-              className={styles.file}
-              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-            />
+            <input type="file" accept="image/*" className={styles.file} onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)} />
           </label>
         </div>
 
         <div className={styles.avatarRow}>
           <div className={styles.avatarWrap}>
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo" className={styles.avatar} />
-            ) : (
-              <div className={styles.avatarFallback} />
-            )}
+            {logoPreview ? <img src={logoPreview} alt="Logo" className={styles.avatar} /> : <div className={styles.avatarFallback} />}
           </div>
           <label className={styles.avatarBtn}>
             Cambiar logo
-            <input
-              type="file"
-              accept="image/*"
-              className={styles.file}
-              onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-            />
+            <input type="file" accept="image/*" className={styles.file} onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} />
           </label>
           <span className={styles.hint}>PNG/JPG recomendado 512x512+</span>
         </div>
@@ -310,66 +224,32 @@ export default function UpdateCompany() {
         <div className={styles.grid}>
           <div className={styles.field}>
             <label className={styles.label}>Nombre</label>
-            <input
-              className={styles.input}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre de la empresa"
-              required
-            />
+            <input className={styles.input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre de la empresa" required />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Email</label>
-            <input
-              className={styles.input}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="empresa@correo.com"
-              type="email"
-            />
+            <input className={styles.input} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="empresa@correo.com" type="email" />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Industria</label>
-            <input
-              className={styles.input}
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              placeholder="Fintech, Retail, etc."
-            />
+            <input className={styles.input} value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="Fintech, Retail, etc." />
           </div>
 
           <div className={styles.field}>
             <label className={styles.label}>Ubicación</label>
-            <input
-              className={styles.input}
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Ciudad, País"
-            />
+            <input className={styles.input} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Ciudad, País" />
           </div>
 
           <div className={styles.fieldWide}>
             <label className={styles.label}>Sitio web</label>
-            <input
-              className={styles.input}
-              value={website}
-              onChange={(e) => setWebsite(e.target.value)}
-              placeholder="https://tuempresa.com"
-              type="url"
-            />
+            <input className={styles.input} value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://tuempresa.com" type="url" />
           </div>
 
           <div className={styles.fieldWide}>
             <label className={styles.label}>Descripción</label>
-            <textarea
-              className={styles.textarea}
-              rows={4}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe brevemente a tu empresa"
-            />
+            <textarea className={styles.textarea} rows={4} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe brevemente a tu empresa" />
           </div>
         </div>
 

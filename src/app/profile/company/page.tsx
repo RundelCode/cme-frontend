@@ -3,16 +3,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
-import styles from "../company/companyProfile.module.css"; // usa el mismo css del perfil
-import { gqlRequest } from "../../../../lib/gql";
+import styles from "../company/companyProfile.module.css";
 import CompanyRatingClient from "../company/rating/CompanyRatingClient";
 import CompanyOffers from "../company/offers/CompanyOffers";
+import { getOriginFromHeaders } from "../../../../lib/getOrigin";
 
 export const dynamic = "force-dynamic";
-const GRAPHQL_ENDPOINT = process.env.GRAPHQL_ENDPOINT!;
 
 type AuthMe = { id: string; email: string; role: string };
-type AuthMeResp = { authMe: AuthMe | null };
 
 type Company = {
   id: string;
@@ -32,50 +30,59 @@ type Company = {
   updatedAt?: string | null;
 };
 
-type CompanyByAdminResp = { companyByAdmin: Company | null };
-
-const AUTH_ME = `query { authMe { id email role } }`;
-
-const COMPANY_BY_ADMIN = `
-  query CompanyByAdmin($adminId: ID!) {
-    companyByAdmin(adminId: $adminId) {
-      id
-      name
-      email
-      website
-      description
-      industry
-      location
-      profilePicture
-      coverPhoto
-      companyRating
-      boolVerified
-      verifiedAt
-      subscriptionPlan
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
 async function getMeAndCompany() {
   const hdrs = await nextHeaders();
   const cookieHeader = (await nextCookies()).toString();
+  const origin = await getOriginFromHeaders();
 
-  const auth = await gqlRequest<AuthMeResp>(GRAPHQL_ENDPOINT, AUTH_ME, {}, hdrs, cookieHeader);
-  const me = auth?.authMe ?? null;
-
+  const meRes = await fetch(`${origin}/api/me`, {
+    method: "GET",
+    headers: {
+      cookie: cookieHeader,
+      Accept: "application/json",
+      "x-correlation-id": hdrs.get("x-correlation-id") || "",
+    },
+    cache: "no-store",
+  });
+  const meJson = await meRes.json().catch(() => null);
+  const me: AuthMe | null = meJson?.id ? { id: meJson.id, email: meJson?.user?.email ?? meJson?.email ?? "", role: meJson?.role ?? "" } : null;
   if (!me?.id) return { me: null as AuthMe | null, company: null as Company | null };
 
-  const data = await gqlRequest<CompanyByAdminResp>(
-    GRAPHQL_ENDPOINT,
-    COMPANY_BY_ADMIN,
-    { adminId: me.id },
-    hdrs,
-    cookieHeader
-  );
+  let company: Company | null = null;
 
-  return { me, company: data?.companyByAdmin ?? null };
+  const searchRes = await fetch(`${origin}/api/company/search`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      Accept: "application/json",
+      cookie: cookieHeader,
+    },
+    body: JSON.stringify({ input: { adminId: me.id, limit: 1 } }),
+    cache: "no-store",
+  });
+  const searchJson = await searchRes.json().catch(() => null);
+  const first = Array.isArray(searchJson?.items) ? searchJson.items[0] : null;
+  if (first?.id) {
+    company = {
+      id: String(first.id),
+      name: String(first.name ?? ""),
+      email: String(first.email ?? ""),
+      website: first.website ?? null,
+      description: first.description ?? null,
+      industry: first.industry ?? null,
+      location: first.location ?? null,
+      profilePicture: first.profilePicture ?? null,
+      coverPhoto: first.coverPhoto ?? null,
+      companyRating: typeof first.companyRating === "number" ? first.companyRating : Number(first.companyRating ?? 0),
+      boolVerified: !!first.boolVerified,
+      verifiedAt: first.verifiedAt ?? null,
+      subscriptionPlan: first.subscriptionPlan ?? null,
+      createdAt: first.createdAt ?? "",
+      updatedAt: first.updatedAt ?? null,
+    };
+  }
+
+  return { me, company };
 }
 
 export default async function MyCompanyPage() {

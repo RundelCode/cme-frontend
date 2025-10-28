@@ -1,26 +1,8 @@
+// src/app/profile/company/offers/CompanyOffers.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import styles from "../companyProfile.module.css";
-
-const GQL =
-  process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ??
-  process.env.GRAPHQL_ENDPOINT ??
-  "/api/graphql";
-
-async function gql<T>(query: string, variables?: any) {
-  const res = await fetch(GQL, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query, variables }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json?.errors?.length) {
-    throw new Error(json?.errors?.[0]?.message ?? `GraphQL failed (${res.status})`);
-  }
-  return json.data as T;
-}
 
 type JobOffer = {
   id: string;
@@ -31,26 +13,34 @@ type JobOffer = {
   created_at: string;
 };
 
-type JobSearchResult = {
-  total: number;
-  items: JobOffer[];
-};
+type RestSearchResponse =
+  | { total?: number; items?: JobOffer[] }
+  | JobOffer[]
+  | { jobs?: JobOffer[]; total?: number }
+  | { data?: { total?: number; items?: JobOffer[] } };
 
-const JOB_SEARCH = `
-  query JobSearch($input: JobSearchInput!, $limit: Int, $offset: Int) {
-    jobSearch(input: $input, limit: $limit, offset: $offset) {
-      total
-      items {
-        id
-        title
-        location
-        employment_type
-        status
-        created_at
-      }
-    }
+const API_SEARCH = "/api/jobs/search";
+
+function parseSearch(resp: RestSearchResponse): { items: JobOffer[]; total: number } {
+  if (resp && typeof resp === "object" && "data" in resp && (resp as any).data) {
+    const d = (resp as any).data;
+    const items = Array.isArray(d?.items) ? d.items : [];
+    const total = Number.isFinite(d?.total) ? d.total : items.length;
+    return { items, total };
   }
-`;
+  if (resp && typeof resp === "object" && "items" in resp) {
+    const items = Array.isArray((resp as any).items) ? (resp as any).items : [];
+    const total = Number.isFinite((resp as any).total) ? (resp as any).total : items.length;
+    return { items, total };
+  }
+  if (resp && typeof resp === "object" && "jobs" in resp) {
+    const items = Array.isArray((resp as any).jobs) ? (resp as any).jobs : [];
+    const total = Number.isFinite((resp as any).total) ? (resp as any).total : items.length;
+    return { items, total };
+  }
+  if (Array.isArray(resp)) return { items: resp, total: resp.length };
+  return { items: [], total: 0 };
+}
 
 export default function CompanyOffers({ companyId }: { companyId: string }) {
   const [offers, setOffers] = useState<JobOffer[]>([]);
@@ -60,36 +50,68 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
   const [page, setPage] = useState(0);
   const limit = 10;
 
-  const vars = useMemo(
-    () => ({
-      input: { companyId },
-      limit,
-      offset: page * limit,
-    }),
-    [companyId, page]
-  );
+  const qs = useMemo(() => {
+    const s = new URLSearchParams();
+    s.set("companyId", companyId);
+    s.set("limit", String(limit));
+    s.set("offset", String(page * limit));
+    s.set("orderBy", "created_at_desc");
+    return s.toString();
+  }, [companyId, page]);
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         setLoading(true);
         setErr(null);
-        const data = await gql<{ jobSearch: JobSearchResult }>(JOB_SEARCH, vars);
-        setOffers(data.jobSearch?.items ?? []);
-        setTotal(data.jobSearch?.total ?? 0);
+
+        const res = await fetch(`${API_SEARCH}?${qs}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+        });
+
+        const contentType = res.headers.get("content-type") || "";
+        const text = await res.text();
+        let json: any = null;
+
+        if (contentType.includes("application/json")) {
+          try { json = text ? JSON.parse(text) : null; } catch {
+            throw new Error(`Respuesta JSON inválida. Fragmento: ${text.slice(0, 180)}`);
+          }
+        } else {
+          const frag = text.slice(0, 180);
+          throw new Error(`Respuesta no JSON (${contentType || "desconocido"}). Fragmento: ${frag}`);
+        }
+
+        if (!res.ok) {
+          const msg = json?.error || json?.message || `Búsqueda falló (${res.status})`;
+          throw new Error(msg);
+        }
+
+        const parsed = parseSearch(json);
+        if (!cancelled) {
+          setOffers(parsed.items || []);
+          setTotal(parsed.total || 0);
+        }
       } catch (e: any) {
-        setErr(e?.message ?? "Error cargando ofertas");
+        if (!cancelled) {
+          setErr(e?.message ?? "Error cargando ofertas");
+          setOffers([]);
+          setTotal(0);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [vars]);
+    return () => { cancelled = true; };
+  }, [qs]);
 
   if (loading) return <p className={styles.muted}>Cargando ofertas…</p>;
   if (err) return <p className={styles.errorCard}>{err}</p>;
   if (!offers.length) return <p className={styles.muted}>Esta empresa no tiene ofertas públicas.</p>;
-
-  const canNext = (page + 1) * limit < total;
 
   return (
     <div className={styles.offersBlock}>
@@ -104,20 +126,12 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
               <span className={styles.dot}>·</span>
               <span className={styles.tag}>{o.status ?? "—"}</span>
             </div>
-            <a className={styles.offerLink} href={`/job?id=${o.id}`}>Ver oferta</a>
+            <a className={styles.offerLink} href={`/jobs/${o.id}`} target="_blank" rel="noreferrer">
+              Ver oferta
+            </a>
           </li>
         ))}
       </ul>
-
-      <div className={styles.offersPager}>
-        <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
-          Anterior
-        </button>
-        <span>Página {page + 1} / {Math.max(1, Math.ceil(total / limit))}</span>
-        <button disabled={!canNext} onClick={() => setPage((p) => p + 1)}>
-          Siguiente
-        </button>
-      </div>
     </div>
   );
 }

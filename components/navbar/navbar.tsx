@@ -45,7 +45,7 @@ async function getAuthAndProfile() {
     const me = await meRes.json().catch(() => null);
     const userId: string | null = me?.id ?? me?.user?.id ?? null;
     const roleRaw: string | null = me?.role ?? me?.user?.role ?? null;
-    if (!userId) return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
+    if (!userId) return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
 
     let profile: any = null;
     try {
@@ -57,7 +57,7 @@ async function getAuthAndProfile() {
       profile = Array.isArray(pdata?.profiles) ? pdata.profiles[0] ?? null : null;
     } catch {
       await logout();
-      return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
+      return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
     }
 
     const resolvedRole = normalizeRole(profile?.role ?? roleRaw ?? "");
@@ -78,15 +78,40 @@ async function getAuthAndProfile() {
       } catch { }
     }
 
-    return { isLogged: true, profile, authMe: { id: userId, role: resolvedRole, email: profile?.email ?? "" }, adminCompany, resolvedRole };
+    let unreadCount = 0;
+    try {
+      const limit = 100;
+      let offset = 0;
+      for (let i = 0; i < 5; i++) {
+        const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) }).toString();
+        const nRes = await fetch(`${origin}/api/notifications?${qs}`, {
+          headers: { cookie: cookieHeader, Accept: "application/json" },
+          cache: "no-store",
+        });
+        const njson = await nRes.json().catch(() => null);
+        const items: any[] = Array.isArray(njson?.items) ? njson.items : [];
+        unreadCount += items.filter((n: any) => !n?.read_at).length;
+        if (items.length < limit) break;
+        offset += limit;
+      }
+    } catch { }
+
+    return {
+      isLogged: true,
+      profile,
+      authMe: { id: userId, role: resolvedRole, email: profile?.email ?? "" },
+      adminCompany,
+      resolvedRole,
+      unreadCount,
+    };
   } catch {
     await logout();
-    return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "" };
+    return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
   }
 }
 
 export default async function Navbar() {
-  const { isLogged, profile, authMe, adminCompany, resolvedRole } = await getAuthAndProfile();
+  const { isLogged, profile, authMe, adminCompany, resolvedRole, unreadCount } = await getAuthAndProfile();
   const isCompanyAdmin = resolvedRole === "company_admin";
 
   return (
@@ -179,8 +204,13 @@ export default async function Navbar() {
             )}
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>
-              <Link href="/notifications" className={styles.option}>
-                <Image className={styles.navIcon} src={NotificationsIcon} alt="Notifications" width={320} height={320} priority />
+              <Link href="/notifications" className={styles.option} aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount})` : "Notificaciones"}>
+                <span className={styles.iconWithBadge}>
+                  <Image className={styles.navIcon} src={NotificationsIcon} alt="Notifications" width={320} height={320} priority />
+                  {unreadCount > 0 ? (
+                    <span className={styles.badge} aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                  ) : null}
+                </span>
                 Notificaciones
               </Link>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from './notifications.module.css';
 import { PropagateLoader } from 'react-spinners';
 
@@ -28,6 +28,8 @@ export default function Client() {
     const [limit, setLimit] = useState(25);
     const [offset, setOffset] = useState(0);
 
+    const hasAutoMarked = useRef(false);
+
     async function load() {
         setLoading(true);
         setErr(null);
@@ -43,7 +45,7 @@ export default function Client() {
         const raw = await res.text();
 
         let data: any = null;
-        try { data = raw ? JSON.parse(raw) : null; } catch {}
+        try { data = raw ? JSON.parse(raw) : null; } catch { }
 
         if (!res.ok) {
             setErr(data?.error || `HTTP ${res.status}`);
@@ -100,19 +102,51 @@ export default function Client() {
 
     async function markRead(id: string) {
         const res = await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
-        let data: any = null; try { data = await res.json(); } catch { /* ignore */ }
-        if (!res.ok) {
-            alert(data?.error || 'No se pudo marcar como leída');
-            return;
-        }
-        setItems(prev =>
-            prev.map(n =>
-                n.id === id
-                    ? { ...n, read_at: data?.read_at ?? data?.notification?.read_at ?? new Date().toISOString() }
-                    : n
-            )
-        );
+        let data: any = null; try { data = await res.json(); } catch { }
+        if (!res.ok) return;
+        const readAt = data?.read_at ?? data?.notification?.read_at ?? new Date().toISOString();
+        setItems(prev => prev.map(n => (n.id === id ? { ...n, read_at: readAt } : n)));
     }
+
+    useEffect(() => {
+        if (loading) return;
+        if (hasAutoMarked.current) return;
+        hasAutoMarked.current = true;
+
+        const t = setTimeout(async () => {
+            const unreadNow = items.filter(n => !n.read_at).map(n => n.id);
+            if (!unreadNow.length) return;
+
+            const batchSize = 8;
+            for (let i = 0; i < unreadNow.length; i += batchSize) {
+                const slice = unreadNow.slice(i, i + batchSize);
+                await Promise.allSettled(slice.map(id => markRead(id)));
+            }
+
+            (async () => {
+                const pageLimit = 200;
+                let pageOffset = 0;
+                for (let p = 0; p < 20; p++) {
+                    const q = new URLSearchParams({ limit: String(pageLimit), offset: String(pageOffset) }).toString();
+                    const r = await fetch(`/api/notifications?${q}`, { cache: 'no-store' });
+                    const raw = await r.text();
+                    let dj: any = null; try { dj = raw ? JSON.parse(raw) : null; } catch { }
+                    const arr: Notification[] = Array.isArray(dj?.items) ? dj.items : [];
+                    const unreadIds = arr.filter(n => !n.read_at).map(n => n.id);
+                    if (unreadIds.length) {
+                        for (let i = 0; i < unreadIds.length; i += batchSize) {
+                            const sl = unreadIds.slice(i, i + batchSize);
+                            await Promise.allSettled(sl.map(id => fetch(`/api/notifications/${id}/read`, { method: 'PATCH' })));
+                        }
+                    }
+                    if (arr.length < pageLimit) break;
+                    pageOffset += pageLimit;
+                }
+            })();
+        }, 0);
+
+        return () => clearTimeout(t);
+    }, [loading, items]);
 
     return (
         <div className={styles.page}>

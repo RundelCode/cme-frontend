@@ -317,6 +317,13 @@
   margin: 4px 4px 6px;
 }
 
+.badge{
+  color: #1B295B;
+  padding: 1px 4px;
+  border-radius: 100%;
+  aspect-ratio: 1/1;
+}
+
 @media (max-width: 1024px) {
 
   .profileMenu {

@@ -14,37 +14,31 @@ type JobOffer = {
 };
 
 type RestSearchResponse =
-  | { total?: number; items?: JobOffer[] }                // forma 1: { total, items }
-  | JobOffer[]                                           // forma 2: array directo
-  | { jobs?: JobOffer[]; total?: number }                // forma 3: { jobs, total }
-  | { data?: { total?: number; items?: JobOffer[] } };   // forma 4: { data: { total, items } }
+  | { total?: number; items?: JobOffer[] }
+  | JobOffer[]
+  | { jobs?: JobOffer[]; total?: number }
+  | { data?: { total?: number; items?: JobOffer[] } };
 
 const API_SEARCH = "/api/jobs/search";
 
 function parseSearch(resp: RestSearchResponse): { items: JobOffer[]; total: number } {
-  // forma 4
   if (resp && typeof resp === "object" && "data" in resp && (resp as any).data) {
     const d = (resp as any).data;
-    return {
-      items: Array.isArray(d?.items) ? d.items : [],
-      total: Number.isFinite(d?.total) ? d.total : (Array.isArray(d?.items) ? d.items.length : 0),
-    };
+    const items = Array.isArray(d?.items) ? d.items : [];
+    const total = Number.isFinite(d?.total) ? d.total : items.length;
+    return { items, total };
   }
-  // forma 1
   if (resp && typeof resp === "object" && "items" in resp) {
     const items = Array.isArray((resp as any).items) ? (resp as any).items : [];
     const total = Number.isFinite((resp as any).total) ? (resp as any).total : items.length;
     return { items, total };
   }
-  // forma 3
   if (resp && typeof resp === "object" && "jobs" in resp) {
     const items = Array.isArray((resp as any).jobs) ? (resp as any).jobs : [];
     const total = Number.isFinite((resp as any).total) ? (resp as any).total : items.length;
     return { items, total };
   }
-  // forma 2 (array)
   if (Array.isArray(resp)) return { items: resp, total: resp.length };
-
   return { items: [], total: 0 };
 }
 
@@ -61,7 +55,6 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
     s.set("companyId", companyId);
     s.set("limit", String(limit));
     s.set("offset", String(page * limit));
-    // Opcional: ordena por fecha desc si tu backend lo soporta
     s.set("orderBy", "created_at_desc");
     return s.toString();
   }, [companyId, page]);
@@ -79,9 +72,21 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
           cache: "no-store",
         });
 
+        const contentType = res.headers.get("content-type") || "";
         const text = await res.text();
         let json: any = null;
-        try { json = text ? JSON.parse(text) : null; } catch { }
+
+        if (contentType.includes("application/json")) {
+          try {
+            json = text ? JSON.parse(text) : null;
+          } catch {
+            throw new Error(`Respuesta JSON inválida. Fragmento: ${text.slice(0, 180)}`);
+          }
+        } else {
+          // HTML (<!DOCTYPE ...) u otro tipo: no intentes parsear como JSON
+          const frag = text.slice(0, 180);
+          throw new Error(`Respuesta no JSON (${contentType || "desconocido"}). Fragmento: ${frag}`);
+        }
 
         if (!res.ok) {
           const msg = json?.error || json?.message || `Búsqueda falló (${res.status})`;
@@ -105,8 +110,6 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
   if (err) return <p className={styles.errorCard}>{err}</p>;
   if (!offers.length) return <p className={styles.muted}>Esta empresa no tiene ofertas públicas.</p>;
 
-  const canNext = (page + 1) * limit < total;
-
   return (
     <div className={styles.offersBlock}>
       <ul className={styles.offerList}>
@@ -126,7 +129,6 @@ export default function CompanyOffers({ companyId }: { companyId: string }) {
           </li>
         ))}
       </ul>
-
     </div>
   );
 }

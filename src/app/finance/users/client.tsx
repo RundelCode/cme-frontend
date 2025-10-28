@@ -1,3 +1,4 @@
+// src/app/finance/users/client.tsx
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -14,7 +15,7 @@ type Payment = {
     company_id: string | null;
     amount: number | string;
     currency: string;
-    direction: PaymentDirection;
+    direction: PaymentDirection | string | null;
     psp_payment_id: string | null;
     status: PaymentStatus | string;
     created_at: string;
@@ -38,13 +39,27 @@ function fmtMoney(amount?: number | string, currency?: string) {
     }
 }
 
-function directionLabel(d: PaymentDirection) {
-    if (d === 'in') return 'Entrante';
-    if (d === 'out') return 'Saliente';
+function directionLabel(d: PaymentDirection | string | null | undefined) {
+    const v = (d ?? '').toString().toLowerCase();
+    if (v === 'in') return 'Entrante';
+    if (v === 'out') return 'Saliente';
     return '—';
 }
 
-function getMonthRange(ym: string): { from: string; to: string } | null {
+function statusLabel(s: string | null | undefined) {
+    switch ((s ?? '').toLowerCase()) {
+        case 'pending':
+            return 'Pendiente';
+        case 'succeeded':
+            return 'Completado';
+        case 'failed':
+            return 'Fallido';
+        default:
+            return s ?? '—';
+    }
+}
+
+function getMonthRange(ym: string): { fromIso: string; toIso: string } | null {
     const m = /^(\d{4})-(\d{2})$/.exec(ym);
     if (!m) return null;
     const y = Number(m[1]);
@@ -52,7 +67,7 @@ function getMonthRange(ym: string): { from: string; to: string } | null {
     if (mon < 1 || mon > 12) return null;
     const fromDate = new Date(Date.UTC(y, mon - 1, 1, 0, 0, 0, 0));
     const toDate = new Date(Date.UTC(y, mon, 0, 23, 59, 59, 999));
-    return { from: fromDate.toISOString(), to: toDate.toISOString() };
+    return { fromIso: fromDate.toISOString(), toIso: toDate.toISOString() };
 }
 
 function getDefaultMonth(): string {
@@ -62,8 +77,11 @@ function getDefaultMonth(): string {
     return `${y}-${m}`;
 }
 
-export default function FinanceUsersPage() {
-    const [month, setMonth] = useState<string>(getDefaultMonth()); // YYYY-MM
+export default function FinanceUsersClient() {
+    const [month, setMonth] = useState<string>(getDefaultMonth());
+    const [status, setStatus] = useState<string>('');
+    const [direction, setDirection] = useState<string>('');
+
     const [data, setData] = useState<PaymentsResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [err, setErr] = useState<string | null>(null);
@@ -73,46 +91,46 @@ export default function FinanceUsersPage() {
         if (month) {
             const range = getMonthRange(month);
             if (range) {
-                p.set('from', range.from);
-                p.set('to', range.to);
+                p.set('from', range.fromIso);
+                p.set('to', range.toIso);
             }
         }
+        if (status) p.set('status', status);
+        if (direction) p.set('direction', direction);
         return p.toString();
-    }, [month]);
-
-    function statusLabel(s: string | null | undefined) {
-        switch ((s ?? '').toLowerCase()) {
-            case 'pending':
-                return 'Pendiente';
-            case 'succeeded':
-                return 'Completado';
-            case 'failed':
-                return 'Fallido';
-            default:
-                return s ?? '—';
-        }
-    }
-
+    }, [month, status, direction]);
 
     async function fetchPayments() {
         setLoading(true);
         setErr(null);
         try {
-            const res = await fetch(`/api/finance/users?${qs}`, {
+            const url = qs ? `/api/finance/users?${qs}` : `/api/finance/users`;
+            const res = await fetch(url, {
                 method: 'GET',
                 cache: 'no-store',
                 credentials: 'include',
             });
-            const json = await res.json().catch(() => null);
+
+            const text = await res.text();
+            let json: any = null;
+            try { json = text ? JSON.parse(text) : null; } catch { }
+
             if (!res.ok) {
                 const isAuthErr = res.status === 401 || res.status === 403;
                 const msg = isAuthErr
                     ? 'No autenticado. Inicia sesión para ver tus pagos.'
-                    : (json?.error ?? 'Error al cargar pagos de usuario');
-                console.error('[FinanceUsers] /api/finance/users failed:', res.status, json);
+                    : (json?.error ?? `Error al cargar pagos de usuario (HTTP ${res.status})`);
                 throw new Error(msg);
             }
-            setData(json as PaymentsResponse);
+
+            const total = typeof json?.total === 'number'
+                ? json.total
+                : Array.isArray(json)
+                    ? json.length
+                    : (json?.items?.length ?? 0);
+
+            const items: Payment[] = Array.isArray(json) ? json : (json?.items ?? []);
+            setData({ total, items });
         } catch (e: any) {
             setErr(e?.message ?? 'Error inesperado');
             setData({ total: 0, items: [] });
@@ -123,9 +141,22 @@ export default function FinanceUsersPage() {
 
     useEffect(() => {
         fetchPayments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [qs]);
 
     const hasItems = (data?.items?.length ?? 0) > 0;
+
+    const totals = useMemo(() => {
+        const arr = data?.items ?? [];
+        const sumIn = arr
+            .filter(p => String(p.direction ?? '').toLowerCase() === 'in')
+            .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const sumOut = arr
+            .filter(p => String(p.direction ?? '').toLowerCase() === 'out')
+            .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+        const cur = arr[0]?.currency || 'USD';
+        return { sumIn, sumOut, cur };
+    }, [data]);
 
     return (
         <div className={styles.container}>
@@ -143,6 +174,35 @@ export default function FinanceUsersPage() {
                         placeholder="YYYY-MM"
                     />
                 </div>
+
+                <div className={styles.inputGroup}>
+                    <label htmlFor="status">Estado</label>
+                    <select
+                        id="status"
+                        value={status}
+                        onChange={(e) => setStatus(e.target.value)}
+                        className={styles.input}
+                    >
+                        <option value="">Todos</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="succeeded">Completado</option>
+                        <option value="failed">Fallido</option>
+                    </select>
+                </div>
+
+                <div className={styles.inputGroup}>
+                    <label htmlFor="direction">Operación</label>
+                    <select
+                        id="direction"
+                        value={direction}
+                        onChange={(e) => setDirection(e.target.value)}
+                        className={styles.input}
+                    >
+                        <option value="">Todas</option>
+                        <option value="in">Entrante</option>
+                        <option value="out">Saliente</option>
+                    </select>
+                </div>
             </div>
 
             {loading ? (
@@ -154,35 +214,52 @@ export default function FinanceUsersPage() {
             ) : !hasItems ? (
                 <div className={styles.empty}>Aún no tienes pagos registrados.</div>
             ) : (
-                <div className={styles.tableWrap}>
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Operación</th>
-                                <th>Monto</th>
-                                <th>Estado</th>
-                                <th>PSP ID</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data!.items.map((p) => {
-                                const dir = p.direction ?? null;
-                                const dirClass =
-                                    dir === 'in' ? styles.income : dir === 'out' ? styles.outcome : '';
-                                return (
-                                    <tr key={p.id}>
-                                        <td>{new Date(p.created_at).toLocaleString()}</td>
-                                        <td className={dirClass}>{directionLabel(dir)}</td>
-                                        <td>{fmtMoney(p.amount, p.currency)}</td>
-                                        <td>{statusLabel(p.status as string)}</td>
-                                        <td className={styles.psp}>{p.psp_payment_id ?? '-'}</td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <>
+                    <div className={styles.kpis} style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                        <div className={styles.kpiCard}>
+                            <div className={styles.kpiLabel}>Entrante</div>
+                            <div className={styles.kpiValue}>{fmtMoney(totals.sumIn, totals.cur)}</div>
+                        </div>
+                        <div className={styles.kpiCard}>
+                            <div className={styles.kpiLabel}>Saliente</div>
+                            <div className={styles.kpiValue}>{fmtMoney(totals.sumOut, totals.cur)}</div>
+                        </div>
+                    </div>
+
+                    <div className={styles.tableWrap}>
+                        <table className={styles.table}>
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Operación</th>
+                                    <th>Monto</th>
+                                    <th>Estado</th>
+                                    <th>PSP ID</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data!.items.map((p) => {
+                                    const dir = (p.direction ?? null) as PaymentDirection | string | null;
+                                    const dirClass =
+                                        (String(dir).toLowerCase() === 'in')
+                                            ? styles.income
+                                            : (String(dir).toLowerCase() === 'out')
+                                                ? styles.outcome
+                                                : '';
+                                    return (
+                                        <tr key={p.id}>
+                                            <td>{new Date(p.created_at).toLocaleString()}</td>
+                                            <td className={dirClass}>{directionLabel(dir)}</td>
+                                            <td>{fmtMoney(p.amount, p.currency)}</td>
+                                            <td>{statusLabel(p.status as string)}</td>
+                                            <td className={styles.psp}>{p.psp_payment_id ?? '-'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
         </div>
     );

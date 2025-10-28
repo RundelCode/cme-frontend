@@ -1,6 +1,6 @@
-// src/app/api/applications/route.ts
 import { NextResponse } from "next/server";
 
+/* ----------------- Tipos ----------------- */
 type ApplicationRow = {
   id: string;
   job_offer_id: string;
@@ -18,6 +18,7 @@ type ProfileMini = {
   reputation_score?: number | null;
 };
 
+/* ----------------- Helpers ----------------- */
 function getCookieValue(cookieHeader: string, name: string): string | null {
   if (!cookieHeader) return null;
   const parts = cookieHeader.split(/;\s*/);
@@ -28,6 +29,15 @@ function getCookieValue(cookieHeader: string, name: string): string | null {
     }
   }
   return null;
+}
+
+function buildAuthHeader(req: Request): string | undefined {
+  const h = req.headers.get("authorization");
+  if (h && h.trim() !== "") return h;
+  const cookieHeader = req.headers.get("cookie") ?? "";
+  const token = getCookieValue(cookieHeader, "access_token");
+  if (token && token.trim() !== "") return `Bearer ${token}`;
+  return undefined;
 }
 
 function resolveApiUrl(reqUrl: string) {
@@ -45,12 +55,22 @@ function resolveApiUrl(reqUrl: string) {
 }
 
 async function readJson(res: Response) {
+  const ct = res.headers.get("content-type") || "";
   const txt = await res.text();
-  let data: any = null;
-  try { data = txt ? JSON.parse(txt) : null; } catch { /* ignore */ }
-  return { data, txt };
+  if (ct.includes("application/json")) {
+    try { return { data: txt ? JSON.parse(txt) : null, txt }; } catch { /* fallthrough */ }
+  }
+  return { data: null as any, txt };
 }
 
+function jsonError(message: string, status = 400) {
+  return NextResponse.json({ error: message }, { status });
+}
+
+/* =========================================================
+   GET /api/applications
+   - Lista por jobOfferId (enriquece perfiles) o por candidateId
+   ========================================================= */
 export async function GET(req: Request) {
   try {
     const API = resolveApiUrl(req.url);
@@ -59,35 +79,29 @@ export async function GET(req: Request) {
     const candidateId = url.searchParams.get("candidateId") || undefined;
     const limit = Number(url.searchParams.get("limit") ?? "20");
     const offset = Number(url.searchParams.get("offset") ?? "0");
+    const accepted = url.searchParams.get("accepted") ?? undefined; // "true" | "false" | undefined
 
     if (!jobOfferId && !candidateId) {
-      return NextResponse.json(
-        { error: "jobOfferId o candidateId es requerido" },
-        { status: 400 }
-      );
+      return jsonError("jobOfferId o candidateId es requerido", 400);
     }
 
-    const cookieHeader = req.headers.get("cookie") ?? "";
-    const access = getCookieValue(cookieHeader, "access_token") ?? "";
-    const authHeaders = new Headers({
+    const auth = buildAuthHeader(req);
+    const baseHeaders: HeadersInit = {
       accept: "application/json",
-      ...(access ? { Authorization: `Bearer ${access}` } : {}),
-    });
+      ...(auth ? { Authorization: auth } : {}),
+    };
 
-    // 1) Intento: POST /applications/search (backend nuevo)
+    // 1) Intento moderno: POST /applications/search (si existiera)
     let list: ApplicationRow[] | null = null;
     try {
-      const body = { jobOfferId, candidateId, limit, offset };
+      const body: any = { jobOfferId, candidateId, limit, offset };
+      if (accepted !== undefined) body.accepted = accepted; // string "true"/"false" si tu search lo soporta
       const r = await fetch(`${API}/applications/search`, {
         method: "POST",
-        headers: new Headers({
-          "content-type": "application/json",
-          accept: "application/json",
-          ...(access ? { Authorization: `Bearer ${access}` } : {}),
-        }),
+        headers: { "content-type": "application/json", ...baseHeaders },
         body: JSON.stringify(body),
         cache: "no-store",
-        credentials: "include",
+        redirect: "manual",
       });
       const { data, txt } = await readJson(r);
       if (r.ok) {
@@ -98,28 +112,29 @@ export async function GET(req: Request) {
             : [];
       } else if (r.status !== 404 && r.status !== 405) {
         const msg = data?.error || data?.message || txt || "Error listando applications";
-        return NextResponse.json({ error: msg }, { status: r.status });
+        return jsonError(msg, r.status || 500);
       }
-    } catch {
-      /* cae al plan B */
-    }
+    } catch { /* fallback */ }
 
-    // 2) Fallback: GET /applications?...
+    // 2) Fallback oficial de tu controller: GET /applications
     if (!list) {
       const qs = new URLSearchParams();
       if (candidateId) qs.set("candidateId", candidateId);
       if (jobOfferId) qs.set("jobOfferId", jobOfferId);
+      if (accepted !== undefined) qs.set("accepted", accepted); // tu DTO usa IsBooleanString
       qs.set("limit", String(limit));
       qs.set("offset", String(offset));
 
       const r = await fetch(`${API}/applications?${qs.toString()}`, {
-        headers: authHeaders,
+        method: "GET",
+        headers: baseHeaders,
         cache: "no-store",
+        redirect: "manual",
       });
       const { data, txt } = await readJson(r);
       if (!r.ok) {
         const msg = data?.error || data?.message || txt || "Error listando applications";
-        return NextResponse.json({ error: msg }, { status: r.status });
+        return jsonError(msg, r.status || 500);
       }
       list = Array.isArray(data?.items)
         ? data.items
@@ -128,39 +143,31 @@ export async function GET(req: Request) {
           : [];
     }
 
-    // Si es list de interesados por oferta → enriquecer perfiles
+    // Enriquecimiento (solo cuando es por oferta)
     if (jobOfferId && !candidateId) {
-      const ids = Array.from(new Set(list?.map((a) => a.candidate_id))).filter(Boolean) as string[];
+      const ids = Array.from(new Set(list?.map(a => a.candidate_id))).filter(Boolean) as string[];
       if (ids.length === 0) {
-        return NextResponse.json({ limit, offset, count: list?.length, items: list, people: [] });
+        return NextResponse.json({ limit, offset, count: list?.length || 0, items: list, people: [] });
       }
 
-      // Intento 1: batch /profiles/search
-      let profilesById = new Map<
-        string,
-        { name: string | null; photo: string | null; occupation: string | null; reputation: number | null }
-      >();
+      let profilesById = new Map<string, { name: string | null; photo: string | null; occupation: string | null; reputation: number | null }>();
       let batchOk = false;
+
+      // Batch /profiles/search (si existe)
       try {
         const pr = await fetch(`${API}/profiles/search`, {
           method: "POST",
-          headers: new Headers({
-            "content-type": "application/json",
-            accept: "application/json",
-            ...(access ? { Authorization: `Bearer ${access}` } : {}),
-          }),
+          headers: { "content-type": "application/json", ...baseHeaders },
           body: JSON.stringify({ ids, sortBy: "reputation", order: "desc", limit: ids.length }),
           cache: "no-store",
+          redirect: "manual",
         });
         const { data } = await readJson(pr);
         if (pr.ok) {
-          const listProfiles: Array<ProfileMini> = Array.isArray(data?.profiles)
-            ? data.profiles
-            : Array.isArray(data?.items)
-              ? data.items
-              : Array.isArray(data)
-                ? data
-                : [];
+          const listProfiles: Array<ProfileMini> =
+            Array.isArray(data?.profiles) ? data.profiles :
+              Array.isArray(data?.items) ? data.items :
+                Array.isArray(data) ? data : [];
           profilesById = new Map(
             (listProfiles || []).map((p) => [
               String(p.id),
@@ -176,27 +183,25 @@ export async function GET(req: Request) {
         }
       } catch { /* fallback */ }
 
-      // Intento 2: GET /profiles/:id
       if (!batchOk) {
         const results = await Promise.all(
           ids.map(async (id) => {
             try {
               const r = await fetch(`${API}/profiles/${encodeURIComponent(id)}`, {
-                headers: authHeaders,
+                method: "GET",
+                headers: baseHeaders,
                 cache: "no-store",
+                redirect: "manual",
               });
               const { data } = await readJson(r);
               if (!r.ok) throw new Error();
               const p: ProfileMini = data?.profile ?? data ?? {};
-              return [
-                id,
-                {
-                  name: p?.full_name ?? null,
-                  photo: p?.profile_picture ?? null,
-                  occupation: p?.occupation ?? null,
-                  reputation: p?.reputation_score ?? null,
-                },
-              ] as const;
+              return [id, {
+                name: p?.full_name ?? null,
+                photo: p?.profile_picture ?? null,
+                occupation: p?.occupation ?? null,
+                reputation: p?.reputation_score ?? null,
+              }] as const;
             } catch {
               return [id, { name: null, photo: null, occupation: null, reputation: null }] as const;
             }
@@ -205,7 +210,7 @@ export async function GET(req: Request) {
         profilesById = new Map(results);
       }
 
-      const people = list?.map((a) => {
+      const people = (list || []).map((a) => {
         const p = profilesById.get(a.candidate_id);
         return {
           profileId: a.candidate_id,
@@ -216,86 +221,95 @@ export async function GET(req: Request) {
           appliedAt: a.created_at,
         };
       });
-      people?.sort((a, b) => (b.reputation ?? -1) - (a.reputation ?? -1));
+      people.sort((a, b) => (b.reputation ?? -1) - (a.reputation ?? -1));
 
-      return NextResponse.json({ limit, offset, count: list?.length, items: list, people });
+      return NextResponse.json({ limit, offset, count: list?.length || 0, items: list, people });
     }
 
-    // Caso candidato → devuelve items crudos normalizados
-    return NextResponse.json({ limit, offset, count: list?.length, items: list });
+    return NextResponse.json({ limit, offset, count: list?.length || 0, items: list });
   } catch (err: any) {
     const msg = String(err?.message || "Error listando applications");
-    if (msg.toLowerCase().includes("unauthorized")) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    return NextResponse.json({ error: msg }, { status: 400 });
+    if (msg.toLowerCase().includes("unauthorized")) return jsonError("No autorizado", 401);
+    return jsonError(msg, 400);
   }
 }
 
+/* =========================================================
+   POST /api/applications
+   - Envia exactamente lo que exige tu CreateApplicationDto:
+     { jobOfferId, candidateId, accepted:boolean, notes? }
+   ========================================================= */
 export async function POST(req: Request) {
   try {
     const API = resolveApiUrl(req.url);
-    const { jobId, notes } = await req.json().catch(() => ({}));
-    if (!jobId) {
-      return NextResponse.json({ error: "jobId es requerido" }, { status: 400 });
-    }
+    const bodyIn = await req.json().catch(() => ({}));
+    const jobOfferId: string | undefined = bodyIn.jobOfferId || bodyIn.jobId;
 
-    const cookieHeader = req.headers.get("cookie") ?? "";
-    const access = getCookieValue(cookieHeader, "access_token") ?? "";
+    if (!jobOfferId) return jsonError("jobId es requerido", 400);
 
-    // /auth/me para obtener candidateId
+    const auth = buildAuthHeader(req);
+    const baseHeaders: HeadersInit = {
+      accept: "application/json",
+      ...(auth ? { Authorization: auth } : {}),
+    };
+
+    // auth/me → obtener usuario (candidateId)
     const meRes = await fetch(`${API}/auth/me`, {
-      headers: new Headers({
-        accept: "application/json",
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      }),
+      method: "GET",
+      headers: baseHeaders,
       cache: "no-store",
+      redirect: "manual",
     });
     const { data: meData, txt: meTxt } = await readJson(meRes);
     if (!meRes.ok) {
       const msg = meData?.error || meData?.message || meTxt || "No autorizado";
-      return NextResponse.json({ error: msg }, { status: 401 });
+      return jsonError(msg, 401);
     }
     const me = meData?.user ?? meData ?? {};
-    const candidateId = me?.id || me?.user?.id;
-    if (!candidateId) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+    const candidateId: string | undefined = me?.id || me?.user?.id;
+    if (!candidateId) return jsonError("No autorizado", 401);
 
-    // Crear aplicación en backend
-    const createRes = await fetch(`${API}/applications`, {
+    // (Opcional) bloquear company_admin si así lo deseas:
+    // const role = String(me?.role || me?.user?.role || "").toLowerCase();
+    // if (role === "company_admin") return jsonError("Los company_admin no pueden aplicar a ofertas.", 403);
+
+    // Enviar EXACTO DTO: CreateApplicationDto
+    const payload = {
+      jobOfferId,
+      candidateId,
+      accepted: false,                 // ✅ requerido por tu DTO
+      notes: typeof bodyIn.notes === "string" ? bodyIn.notes : undefined,
+    };
+
+    const up = await fetch(`${API}/applications`, {
       method: "POST",
-      headers: new Headers({
-        "content-type": "application/json",
-        accept: "application/json",
-        ...(access ? { Authorization: `Bearer ${access}` } : {}),
-      }),
-      body: JSON.stringify({ job_offer_id: jobId, candidate_id: candidateId, notes }),
+      headers: { "content-type": "application/json", ...baseHeaders },
+      body: JSON.stringify(payload),
       cache: "no-store",
+      redirect: "manual",
     });
 
-    const { data, txt } = await readJson(createRes);
+    const { data, txt } = await readJson(up);
 
-    if (createRes.status === 409) {
-      const msg = data?.error || data?.message || "Ya aplicaste a esta oferta.";
-      return NextResponse.json({ error: msg }, { status: 409 });
+    if (up.status === 409) {
+      const msg = data?.error || data?.message || "Application already exists";
+      return jsonError(msg, 409);
     }
-    if (createRes.status === 401) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    if (!createRes.ok) {
+    if (up.status === 401) return jsonError("No autorizado", 401);
+    if (!up.ok) {
       const msg = data?.error || data?.message || txt || "Error creando aplicación";
-      return NextResponse.json({ error: msg }, { status: createRes.status });
+      return jsonError(msg, up.status || 500);
     }
 
     const app: ApplicationRow = data?.application ?? data;
     return NextResponse.json(app);
   } catch (err: any) {
     const msg = String(err?.message || "Error creando aplicación");
-    if (msg.includes("already_applied")) {
-      return NextResponse.json({ error: "Ya aplicaste a esta oferta." }, { status: 409 });
-    }
-    if (msg.toLowerCase().includes("unauthorized")) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-    return NextResponse.json({ error: msg }, { status: 400 });
+    if (msg.toLowerCase().includes("unauthorized")) return jsonError("No autorizado", 401);
+    return jsonError(msg, 400);
   }
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { status: 200 });
 }

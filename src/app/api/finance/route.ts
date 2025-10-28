@@ -1,3 +1,4 @@
+// src/app/api/finance/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -21,59 +22,83 @@ function resolveApiUrl(req: NextRequest) {
   return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
 
-async function fetchJson(url: string, init: RequestInit) {
-  const res = await fetch(url, init);
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const msg = data?.message || data?.error || `upstream_error (${res.status})`;
-    const err: any = new Error(msg);
-    err.status = res.status;
-    err.data = data;
-    throw err;
-  }
-  return data;
+async function readUpstream(res: Response) {
+  const text = await res.text().catch(() => "");
+  let data: any = null;
+  try { data = text ? JSON.parse(text) : null; } catch { }
+  return { ok: res.ok, status: res.status, data, text, url: res.url };
+}
+
+function getEpochFromTo(url: URL): { from?: string; to?: string } {
+  const rawFrom = url.searchParams.get("from");
+  const rawTo = url.searchParams.get("to");
+  const toMs = (v: string | null): string | undefined => {
+    if (!v) return undefined;
+    if (/^\d{10,}$/.test(v)) return v;
+    const t = Date.parse(v);
+    if (!Number.isNaN(t)) return String(t);
+    return undefined;
+  };
+  const from = toMs(rawFrom);
+  const to = toMs(rawTo);
+  return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+}
+
+function normalizePayments(payload: any) {
+  if (Array.isArray(payload)) return { total: payload.length, items: payload };
+  const items = payload?.items ?? payload?.rows ?? payload ?? [];
+  const total =
+    typeof payload?.total === "number"
+      ? payload.total
+      : typeof payload?.count === "number"
+        ? payload.count
+        : Array.isArray(items)
+          ? items.length
+          : 0;
+  return { total, items };
 }
 
 export async function GET(req: NextRequest) {
+  const debugOn = req.headers.get("x-debug") === "1" || new URL(req.url).searchParams.get("debug") === "1";
+  const debug: Record<string, any> = {};
   try {
     const API = resolveApiUrl(req);
     const url = new URL(req.url);
-    const from = url.searchParams.get("from");
-    const to = url.searchParams.get("to");
 
     const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
+
     const baseHeaders: HeadersInit = {
       Accept: "application/json",
       ...(authorization ? { Authorization: authorization } : {}),
       ...(cookie ? { cookie } : {}),
     };
 
-    let me: any = null;
-    try {
-      me = await fetchJson(`${API}/auth/me`, {
+    let meRes = await fetch(`${API}/auth/me`, {
+      method: "GET",
+      headers: baseHeaders,
+      cache: "no-store",
+      credentials: "include",
+    });
+    let meParsed = await readUpstream(meRes);
+    if (!meParsed.ok) {
+      const alt = await fetch(`${API}/profiles/me`, {
         method: "GET",
         headers: baseHeaders,
         cache: "no-store",
         credentials: "include",
       });
-    } catch (e: any) {
-      try {
-        me = await fetchJson(`${API}/profiles/me`, {
-          method: "GET",
-          headers: baseHeaders,
-          cache: "no-store",
-          credentials: "include",
-        });
-      } catch (e2: any) {
+      meParsed = await readUpstream(alt);
+      if (!meParsed.ok) {
+        const status = meParsed.status === 401 ? 401 : 500;
         return NextResponse.json(
-          { total: 0, items: [], error: e2?.message || "No autenticado" },
-          { status: e2?.status === 401 ? 401 : 500 }
+          { total: 0, items: [], error: meParsed.data?.message || meParsed.data?.error || "No autenticado", ...(debugOn ? { debug: { me: meParsed } } : {}) },
+          { status }
         );
       }
     }
 
-    const userId: string | undefined = me?.id;
+    const userId: string | undefined = meParsed.data?.id;
     if (!userId) {
       return NextResponse.json(
         { total: 0, items: [], error: "No autenticado (sin userId)" },
@@ -81,39 +106,111 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const company = await fetchJson(`${API}/companies/by-admin/${encodeURIComponent(userId)}`, {
-      method: "GET",
-      headers: baseHeaders,
-      cache: "no-store",
-      credentials: "include",
-    });
+    const companyTargets = [
+      `${API}/companies/by-admin/${encodeURIComponent(userId)}`,
+      `${API}/companies/search?adminId=${encodeURIComponent(userId)}&limit=1`,
+    ];
+    let companyPayload: any = null;
+    for (const t of companyTargets) {
+      const r = await fetch(t, { method: "GET", headers: baseHeaders, cache: "no-store", credentials: "include" });
+      const parsed = await readUpstream(r);
+      if (debugOn) debug.companyAttempt = { url: t, status: parsed.status, ok: parsed.ok };
+      if (parsed.ok) {
+        companyPayload = parsed.data ?? parsed.text;
+        break;
+      }
+    }
 
-    const companyId: string | undefined = company?.id;
+    let companyId: string | undefined;
+    if (companyPayload) {
+      if (companyPayload?.id) companyId = String(companyPayload.id);
+      else if (Array.isArray(companyPayload?.items) && companyPayload.items[0]?.id) companyId = String(companyPayload.items[0].id);
+      else if (Array.isArray(companyPayload) && companyPayload[0]?.id) companyId = String(companyPayload[0].id);
+    }
+
     if (!companyId) {
       return NextResponse.json(
-        { total: 0, items: [], note: "No se encontró empresa para este admin" },
+        { total: 0, items: [], note: "No se encontró empresa para este admin", ...(debugOn ? { debug } : {}) },
         { status: 200 }
       );
     }
 
-    const qs = new URLSearchParams();
-    qs.set("companyId", companyId);
-    if (from) qs.set("from", from);
-    if (to) qs.set("to", to);
+    const outQs = new URLSearchParams();
+    outQs.set("companyId", companyId);
 
-    const payments = await fetchJson(`${API}/payments?${qs.toString()}`, {
-      method: "GET",
-      headers: baseHeaders,
-      cache: "no-store",
-      credentials: "include",
-    });
+    const limit = url.searchParams.get("limit");
+    const offset = url.searchParams.get("offset");
+    const status = url.searchParams.get("status");
+    const direction = url.searchParams.get("direction");
+    if (limit) outQs.set("limit", limit);
+    if (offset) outQs.set("offset", offset);
+    if (status) outQs.set("status", status);
+    if (direction) outQs.set("direction", direction);
 
-    return NextResponse.json(payments);
+    const { from, to } = getEpochFromTo(url);
+    if (from) outQs.set("from", from);
+    if (to) outQs.set("to", to);
+
+    const targets = [
+      `${API}/payments?${outQs.toString()}`,
+      `${API}/finance/payments?${outQs.toString()}`,
+      `${API}/payments/company?${outQs.toString()}`,
+    ];
+
+    let upstreamOk = false;
+    let upstreamPayload: any = null;
+    let upstreamStatus = 502;
+    let lastParsed: any = null;
+
+    for (const t of targets) {
+      const r = await fetch(t, { method: "GET", headers: baseHeaders, cache: "no-store", credentials: "include" });
+      const parsed = await readUpstream(r);
+      if (debugOn) debug.paymentsAttempt = { urlTried: t, status: parsed.status, ok: parsed.ok, snippet: typeof parsed.data === "object" ? undefined : parsed.text?.slice(0, 300) };
+      if (parsed.ok) {
+        upstreamOk = true;
+        upstreamStatus = parsed.status;
+        upstreamPayload = parsed.data ?? parsed.text;
+        break;
+      } else {
+        upstreamStatus = parsed.status;
+        lastParsed = parsed;
+      }
+    }
+
+    if (!upstreamOk) {
+      const msg =
+        (lastParsed?.data && typeof lastParsed.data === "object" && (lastParsed.data.message || lastParsed.data.error)) ||
+        `payments_upstream_${upstreamStatus}`;
+      return NextResponse.json(
+        { total: 0, items: [], error: msg, ...(debugOn ? { debug: { ...debug, last: { status: upstreamStatus, url: lastParsed?.url, body: lastParsed?.text?.slice(0, 600) } } } : {}) },
+        { status: upstreamStatus || 500 }
+      );
+    }
+
+    const normalized = normalizePayments(upstreamPayload);
+    const items = (normalized.items || []).map((p: any) => ({
+      id: p?.id,
+      job_offer_id: p?.job_offer_id ?? p?.jobOfferId ?? null,
+      headhunter_id: p?.headhunter_id ?? p?.headhunterId ?? null,
+      company_id: p?.company_id ?? p?.companyId ?? null,
+      amount: typeof p?.amount === "string" ? Number(p.amount) : p?.amount,
+      currency: p?.currency ?? "USD",
+      direction: (p?.direction ?? null) as any,
+      psp_payment_id: p?.psp_payment_id ?? p?.pspPaymentId ?? null,
+      status: p?.status,
+      created_at: p?.created_at ?? p?.createdAt,
+      updated_at: p?.updated_at ?? p?.updatedAt ?? null,
+    }));
+
+    return NextResponse.json(
+      { total: normalized.total, items, ...(debugOn ? { debug } : {}) },
+      { status: 200 }
+    );
   } catch (e: any) {
     const msg = e?.message || "finance_proxy_error";
     const isAuth = /unauthorized|forbidden|token|auth/i.test(msg);
     return NextResponse.json(
-      { total: 0, items: [], error: msg },
+      { total: 0, items: [], error: msg, ...(debugOn ? { debug: { error: msg } } : {}) },
       { status: isAuth ? 401 : e?.status || 500 }
     );
   }
