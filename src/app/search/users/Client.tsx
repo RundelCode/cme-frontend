@@ -1,29 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import styles from "./users.module.css";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
-import UserIcon from "../../../../public/images/icons/Nav/Users.png";
-import SearchIcon from "../../../../public/images/icons/search.png";
+import styles from "./users.module.css";
 import { PropagateLoader } from "react-spinners";
 import ProfilePlaceholder from "../../../../public/images/placeholders/company.png";
 import { UserProfile } from "../../../../lib/profile-types";
 import { searchProfiles } from "../../../../lib/profile-client";
-import Link from "next/link";
 
-function renderStars(value: number | null | undefined, max = 5) {
+function initials(name?: string | null) {
+    if (!name) return "•";
+    const parts = name.trim().split(/\s+/).slice(0, 2);
+    return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "•";
+}
+
+function Stars({ value, max = 5 }: { value?: number | null; max?: number }) {
     if (value == null || Number.isNaN(value)) return null;
-    const rating = Math.min(5, Math.max(0, value));
+    const rating = Math.min(max, Math.max(0, Number(value)));
     const rounded = Math.round(rating);
-    const stars = [];
-    for (let i = 1; i <= max; i++) {
-        stars.push(<span key={i}>{i <= rounded ? "★" : "☆"}</span>);
-    }
     return (
-        <>
-            {stars}
+        <div className={styles.rating}>
+            {Array.from({ length: max }, (_, i) => (
+                <span key={i} aria-hidden>
+                    {i + 1 <= rounded ? "★" : "☆"}
+                </span>
+            ))}
             <span className={styles.ratingNumber}>({rating.toFixed(1)})</span>
-        </>
+        </div>
     );
 }
 
@@ -37,15 +41,8 @@ export default function UserSearchClient() {
         setLoading(true);
         setErr(null);
         try {
-            const res = await searchProfiles({
-                q,
-                sortBy: "reputation",
-                order: "DESC",
-                limit: 20,
-            });
+            const res = await searchProfiles({ q, sortBy: "reputation", order: "DESC", limit: 20 });
             setItems(res);
-        } catch (e: any) {
-            setErr(e?.message ?? "Error");
         } finally {
             setLoading(false);
         }
@@ -58,90 +55,91 @@ export default function UserSearchClient() {
     const placeholderSrc =
         (ProfilePlaceholder as unknown as { src: string }).src ?? "/images/placeholders/company.png";
 
+    const results = useMemo(() => items ?? [], [items]);
+
     return (
-        <div className={styles.main}>
-            <div className={styles.blueLine} />
+        <div className={styles.page}>
+            <div className={styles.main}>
+                <header className={styles.pageHeader}>
+                    <h1 className={styles.title}>Usuarios</h1>
+                </header>
 
-            <div className={styles.title}>
-                <Image
-                    className={styles.companyIcon}
-                    src={UserIcon}
-                    alt="Users"
-                    width={320}
-                    height={320}
-                    priority
-                    style={{ width: "auto", height: "auto" }}
-                />
-                <h2>Usuarios</h2>
-            </div>
-
-            <form
-                className={styles.searchForm}
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    run();
-                }}
-            >
-                <div className={styles.searchInput}>
-                    <Image
-                        src={SearchIcon}
-                        alt="Search"
-                        className={styles.searchIcon}
-                        width={16}
-                        height={16}
-                        style={{ width: "auto", height: "auto" }}
-                    />
+                <form
+                    className={styles.searchBar}
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        run();
+                    }}
+                >
                     <input
-                        type="text"
-                        placeholder="Buscar usuarios..."
+                        className={styles.searchInput}
+                        placeholder="Buscar usuarios…"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
-                        className={styles.searchField}
                     />
-                </div>
-                <button type="submit" className={styles.submitButton}>
-                    Buscar
-                </button>
-            </form>
+                    <button className={styles.searchBtn} type="submit">
+                        Buscar
+                    </button>
+                </form>
 
-            {loading ? (
-                <div className={styles.loader}>
-                    <PropagateLoader />
-                </div>
-            ) : (
-                <ul className={styles.results}>
-                    {(items ?? []).map((u) => {
-                        const rep = Number(u.reputation_score);
-                        const hasRep = u.reputation_score != null && !Number.isNaN(rep);
-                        return (
-                            <li key={u.id} className={styles.card}>
-                                <Link href={`/profiles/users?id=${u.id}`} className={styles.cardLink}>
-                                    <Image
-                                        className={styles.profilePicture}
-                                        src={u.profile_picture || placeholderSrc}
-                                        alt={u.full_name ?? u.email}
-                                        width={100}
-                                        height={100}
-                                        priority
-                                    />
+                {err && <div className={styles.error}>{err}</div>}
 
-                                    <div className={styles.profileInfo}>
-                                        <div className={styles.profileTitle}>
-                                            {u.full_name ?? u.email}
-                                        </div>
+                {loading ? (
+                    <div className={styles.loading}>
+                        <PropagateLoader />
+                    </div>
+                ) : (
+                    <section className={styles.section}>
+                        <h2 className={styles.sectionTitle}>Resultados</h2>
+                        {results.length === 0 ? (
+                            <div className={styles.empty}>Sin resultados</div>
+                        ) : (
+                            <ul className={styles.list}>
+                                {results.map((u) => {
+                                    const src = u.profile_picture || placeholderSrc;
+                                    return (
+                                        <li className={styles.cardItem} key={u.id}>
+                                            <Link href={`/profiles/users?id=${u.id}`} className={styles.cardLink}>
+                                                <div className={styles.media}>
+                                                    {u.profile_picture ? (
+                                                        <Image
+                                                            className={styles.avatarImg}
+                                                            src={src}
+                                                            alt={u.full_name ?? u.email}
+                                                            width={56}
+                                                            height={56}
+                                                            priority
+                                                        />
+                                                    ) : (
+                                                        <div className={styles.avatarFallback}>
+                                                            {initials(u.full_name ?? u.email)}
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                        <div>{u.occupation ?? "—"}</div>
+                                                <div className={styles.content}>
+                                                    <div className={styles.rowTop}>
+                                                        <div className={styles.userBlock}>
+                                                            <div className={styles.userName}>{u.full_name ?? u.email}</div>
+                                                            <div className={styles.userSub}>{u.occupation ?? "—"}</div>
+                                                        </div>
+                                                    </div>
 
-                                        {hasRep && <div className={styles.rating}>{renderStars(rep)}</div>}
-                                    </div>
-                                </Link>
-                            </li>
-                        );
-                    })}
-                    {(items && items.length === 0) && <li className={styles.empty}>Sin resultados</li>}
-                </ul>
-            )}
-            {err && <p>{err}</p>}
+                                                    <div className={styles.rowBottom}>
+                                                        <span className={styles.date}>
+                                                            {u.email}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+                )}
+            </div>
         </div>
     );
 }

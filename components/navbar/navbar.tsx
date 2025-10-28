@@ -16,13 +16,39 @@ import { getOriginFromHeaders } from "../../lib/getOrigin";
 
 export const dynamic = "force-dynamic";
 
-type CompanyLite = {
-  id: string;
-  name: string;
-};
+type CompanyLite = { id: string; name: string };
 
-function normalizeRole(role: unknown): string {
-  return typeof role === "string" ? role.trim().toLowerCase() : "";
+function norm(v: unknown) {
+  return typeof v === "string" ? v.trim().toLowerCase() : "";
+}
+function isCompanyAdminFrom(me: any, profile: any) {
+  const candidates: string[] = [];
+  if (me?.role) candidates.push(norm(me.role));
+  if (me?.user?.role) candidates.push(norm(me.user.role));
+  if (profile?.role) candidates.push(norm(profile.role));
+  const arrays: any[] = [me?.roles, me?.user?.roles, me?.claims?.roles, profile?.roles, profile?.permissions, me?.permissions];
+  for (const arr of arrays) {
+    if (Array.isArray(arr)) for (const r of arr) candidates.push(norm(r));
+  }
+  const flags = [
+    me?.is_company_admin,
+    profile?.is_company_admin,
+    profile?.company_admin,
+    me?.user?.is_company_admin,
+    profile?.isCompanyAdmin,
+    me?.isCompanyAdmin,
+  ].some(Boolean);
+  const aliases = new Set([
+    "company_admin",
+    "companyadmin",
+    "employer",
+    "company-owner",
+    "company_owner",
+    "org_admin",
+    "employer_admin",
+  ]);
+  const hit = candidates.some((r) => aliases.has(r));
+  return flags || hit;
 }
 
 async function getAuthAndProfile() {
@@ -31,88 +57,95 @@ async function getAuthAndProfile() {
   const cookieHeader = cookies.toString();
   const origin = await getOriginFromHeaders();
 
-  const logout = async () => {
-    try {
-      await fetch(`${origin}/api/logout`, { method: "POST", cache: "no-store" });
-    } catch { }
-  };
+  const meRes = await fetch(`${origin}/api/me`, {
+    headers: {
+      cookie: cookieHeader,
+      Accept: "application/json",
+      "x-correlation-id": hdrs.get("x-correlation-id") || "",
+    },
+    cache: "no-store",
+  });
+  const me = await meRes.json().catch(() => null);
+  const userId: string | null = me?.id ?? me?.user?.id ?? null;
+  if (!userId)
+    return { isLogged: false, profile: null, isCompanyAdmin: false, adminCompany: null, unreadCount: 0 };
 
+  let profile: any = null;
   try {
-    const meRes = await fetch(`${origin}/api/me`, {
-      headers: { cookie: cookieHeader, Accept: "application/json", "x-correlation-id": hdrs.get("x-correlation-id") || "" },
+    const pRes = await fetch(`${origin}/api/profiles?ids=${encodeURIComponent(userId)}`, {
+      headers: { cookie: cookieHeader, Accept: "application/json" },
       cache: "no-store",
     });
-    const me = await meRes.json().catch(() => null);
-    const userId: string | null = me?.id ?? me?.user?.id ?? null;
-    const roleRaw: string | null = me?.role ?? me?.user?.role ?? null;
-    if (!userId) return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
+    const pdata = await pRes.json().catch(() => null);
+    profile = Array.isArray(pdata?.profiles) ? pdata.profiles[0] ?? null : null;
+  } catch {
+    return { isLogged: false, profile: null, isCompanyAdmin: false, adminCompany: null, unreadCount: 0 };
+  }
 
-    let profile: any = null;
+  const isCompanyAdmin = isCompanyAdminFrom(me, profile);
+
+  let adminCompany: CompanyLite | null = null;
+  if (isCompanyAdmin) {
     try {
-      const pRes = await fetch(`${origin}/api/profiles?ids=${encodeURIComponent(userId)}`, {
+      const cRes = await fetch(`${origin}/api/company/search`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          Accept: "application/json",
+          cookie: cookieHeader,
+        },
+        body: JSON.stringify({ input: { adminId: userId, limit: 1 } }),
+        cache: "no-store",
+      });
+      const cjson = await cRes.json().catch(() => null);
+      const items: any[] = Array.isArray(cjson?.items) ? cjson.items : [];
+      const mine = items.find(
+        (it) =>
+          String(
+            it?.adminId ??
+              it?.admin_id ??
+              it?.ownerId ??
+              it?.owner_id ??
+              it?.userId ??
+              it?.user_id ??
+              ""
+          ) === userId
+      );
+      if (mine?.id) adminCompany = { id: String(mine.id), name: String(mine.name ?? "Mi empresa") };
+    } catch {
+      adminCompany = null;
+    }
+  }
+
+  let unreadCount = 0;
+  try {
+    const limit = 100;
+    let offset = 0;
+    for (let i = 0; i < 5; i++) {
+      const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) }).toString();
+      const nRes = await fetch(`${origin}/api/notifications?${qs}`, {
         headers: { cookie: cookieHeader, Accept: "application/json" },
         cache: "no-store",
       });
-      const pdata = await pRes.json().catch(() => null);
-      profile = Array.isArray(pdata?.profiles) ? pdata.profiles[0] ?? null : null;
-    } catch {
-      await logout();
-      return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
+      const njson = await nRes.json().catch(() => null);
+      const items: any[] = Array.isArray(njson?.items) ? njson.items : [];
+      unreadCount += items.filter((n: any) => !n?.read_at).length;
+      if (items.length < limit) break;
+      offset += limit;
     }
+  } catch {}
 
-    const resolvedRole = normalizeRole(profile?.role ?? roleRaw ?? "");
-    const isCompanyAdmin = resolvedRole === "company_admin";
-
-    let adminCompany: CompanyLite | null = null;
-    if (isCompanyAdmin) {
-      try {
-        const cRes = await fetch(`${origin}/api/company/search`, {
-          method: "POST",
-          headers: { "content-type": "application/json", Accept: "application/json", cookie: cookieHeader },
-          body: JSON.stringify({ input: { adminId: userId, limit: 1 } }),
-          cache: "no-store",
-        });
-        const cjson = await cRes.json().catch(() => null);
-        const first = Array.isArray(cjson?.items) ? cjson.items[0] : null;
-        if (first?.id) adminCompany = { id: String(first.id), name: String(first.name ?? "Mi empresa") };
-      } catch { }
-    }
-
-    let unreadCount = 0;
-    try {
-      const limit = 100;
-      let offset = 0;
-      for (let i = 0; i < 5; i++) {
-        const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) }).toString();
-        const nRes = await fetch(`${origin}/api/notifications?${qs}`, {
-          headers: { cookie: cookieHeader, Accept: "application/json" },
-          cache: "no-store",
-        });
-        const njson = await nRes.json().catch(() => null);
-        const items: any[] = Array.isArray(njson?.items) ? njson.items : [];
-        unreadCount += items.filter((n: any) => !n?.read_at).length;
-        if (items.length < limit) break;
-        offset += limit;
-      }
-    } catch { }
-
-    return {
-      isLogged: true,
-      profile,
-      authMe: { id: userId, role: resolvedRole, email: profile?.email ?? "" },
-      adminCompany,
-      resolvedRole,
-      unreadCount,
-    };
-  } catch {
-    await logout();
-    return { isLogged: false, profile: null, authMe: null, adminCompany: null, resolvedRole: "", unreadCount: 0 };
-  }
+  return {
+    isLogged: true,
+    profile,
+    isCompanyAdmin,
+    adminCompany,
+    unreadCount,
+  };
 }
 
 export default async function Navbar() {
-  const { isLogged, profile, authMe, adminCompany, resolvedRole, unreadCount } = await getAuthAndProfile();
-  const isCompanyAdmin = resolvedRole === "company_admin";
+  const { isLogged, profile, isCompanyAdmin, adminCompany, unreadCount } = await getAuthAndProfile();
 
   return (
     <div className={styles.navbarMain}>
@@ -164,15 +197,6 @@ export default async function Navbar() {
                 )}
               </div>
             )}
-            {isCompanyAdmin && (
-              <div className={styles.category}>
-                <p className={styles.navTitle}>Finanzas</p>
-                <Link href="/finance" className={styles.option}>
-                  <Image className={styles.navIcon} src={BillingIcon} alt="Billing" width={320} height={320} priority />
-                  Resumen
-                </Link>
-              </div>
-            )}
             {!isCompanyAdmin && (
               <>
                 <div className={styles.category}>
@@ -204,11 +228,13 @@ export default async function Navbar() {
             )}
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>
-              <Link href="/notifications" className={styles.option} aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount})` : "Notificaciones"}>
+              <Link href="/notifications" className={styles.option} aria-label="Notificaciones">
                 <span className={styles.iconWithBadge}>
                   <Image className={styles.navIcon} src={NotificationsIcon} alt="Notifications" width={320} height={320} priority />
                   {unreadCount > 0 ? (
-                    <span className={styles.badge} aria-hidden="true">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                    <span className={styles.badge} aria-hidden="true">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
                   ) : null}
                 </span>
                 Notificaciones
@@ -222,7 +248,7 @@ export default async function Navbar() {
           <ProfileMini
             name={profile?.full_name || profile?.email?.split("@")[0] || "Usuario"}
             email={profile?.email || ""}
-            role={resolvedRole}
+            role={isCompanyAdmin ? "company_admin" : "candidate"}
             imageUrl={profile?.profile_picture || null}
           />
         ) : (

@@ -4,46 +4,18 @@ import React, { useEffect, useMemo, useState } from "react";
 import styles from "./createCompany.module.css";
 import { useRouter } from "next/navigation";
 
-const GRAPHQL_ENDPOINT = process.env.NEXT_PUBLIC_GRAPHQL_ENDPOINT ?? "/api/graphql";
-
-async function gql<T>(q: string, variables?: any) {
-  const res = await fetch(GRAPHQL_ENDPOINT, {
-    method: "POST",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: q, variables }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || json?.errors?.length) {
-    console.error("🟥 GraphQL error:", json);
-    throw new Error(json?.errors?.[0]?.message ?? `GraphQL failed (${res.status})`);
-  }
-  return json.data as T;
-}
-
-const AUTH_ME = `query { authMe { id email role } }`;
-
 type UploadKind = "avatar" | "cover";
 
 async function uploadSelf(kind: UploadKind, file: File) {
   const fd = new FormData();
   fd.append("file", file, file.name);
-
   const res = await fetch(`/api/uploads/self/${kind}`, {
     method: "POST",
     credentials: "include",
     body: fd,
   });
-
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg =
-      json?.error ||
-      (json?.message && (Array.isArray(json.message) ? json.message.join(", ") : json.message)) ||
-      `Fallo subiendo ${kind} (${res.status})`;
-    throw new Error(msg);
-  }
-  if (!json?.url) throw new Error(`Respuesta inválida al subir ${kind}`);
+  if (!res.ok || !json?.url) throw new Error(json?.error || `Fallo subiendo ${kind}`);
   return json as { url: string; bucket: string; path: string };
 }
 
@@ -54,44 +26,50 @@ type CreateCompanyPayload = {
   description?: string;
   industry?: string;
   location?: string;
-  subscriptionPlan?: "FREE";
-  companyRating?: number;
+  profilePicture?: string;
+  coverPhoto?: string;
+  subscriptionPlan?: "free" | "basic" | "pro";
   boolVerified?: boolean;
-  verifiedAt?: string | null;
-  profilePicture?: string | null;
-  coverPhoto?: string | null;  
-  adminId?: string;            
 };
 
 export default function Client() {
   const router = useRouter();
 
-  const [role, setRole] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [authErr, setAuthErr] = useState<string | null>(null);
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authErr, setAuthErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        setAuthLoading(true);
-        const me = await gql<{ authMe: { id: string; role: string | null } }>(AUTH_ME);
-        const r = me?.authMe?.role ?? null;
-        const uid = me?.authMe?.id ?? null;
-        setRole(r);
-        setUserId(uid);
-        if ((r ?? "").toLowerCase() !== "company_admin") {
-          setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear empresas.");
-        }
-      } catch (e: any) {
-        setAuthErr(e?.message ?? "No autenticado");
+        const meRes = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+        const me = await meRes.json().catch(() => null);
+        const roles: string[] = []
+          .concat(me?.role || [])
+          .concat(me?.user?.role || [])
+          .concat(Array.isArray(me?.roles) ? me.roles : [])
+          .concat(Array.isArray(me?.user?.roles) ? me.user.roles : []);
+        const roleStrs = roles.map((r) => String(r).trim().toLowerCase());
+        const flags = [me?.is_company_admin, me?.user?.is_company_admin].some(Boolean);
+        const aliases = new Set([
+          "company_admin",
+          "companyadmin",
+          "employer",
+          "company-owner",
+          "company_owner",
+          "org_admin",
+          "employer_admin",
+        ]);
+        const hit = roleStrs.some((r) => aliases.has(r));
+        setIsCompanyAdmin(Boolean(flags || hit));
+        if (!(flags || hit)) setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear empresas.");
+      } catch {
+        setAuthErr("No autenticado");
       } finally {
         setAuthLoading(false);
       }
     })();
   }, []);
-
-  const isCompanyAdmin = useMemo(() => (role ?? "").toLowerCase() === "company_admin", [role]);
 
   const [form, setForm] = useState<CreateCompanyPayload>({
     name: "",
@@ -100,22 +78,23 @@ export default function Client() {
     description: "",
     industry: "",
     location: "",
-    subscriptionPlan: "FREE",
-    companyRating: 0,
-    boolVerified: false,
-    verifiedAt: null,
-    profilePicture: null,
-    coverPhoto: null,
   });
 
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+
   const logoPreview = useMemo(() => (logoFile ? URL.createObjectURL(logoFile) : undefined), [logoFile]);
   const coverPreview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : undefined), [coverFile]);
 
-  useEffect(() => () => {
-    try { if (logoPreview?.startsWith("blob:")) URL.revokeObjectURL(logoPreview); } catch { }
-    try { if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview); } catch { }
+  useEffect(() => {
+    return () => {
+      try {
+        if (logoPreview?.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
+      } catch { }
+      try {
+        if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
+      } catch { }
+    };
   }, [logoPreview, coverPreview]);
 
   const [loading, setLoading] = useState(false);
@@ -132,7 +111,6 @@ export default function Client() {
             : e.currentTarget.type === "checkbox"
               ? (e.currentTarget as HTMLInputElement).checked
               : e.currentTarget.value;
-
         setForm((f) => ({ ...f, [key]: value as any }));
       };
 
@@ -140,21 +118,16 @@ export default function Client() {
     e.preventDefault();
     setError(null);
     setCreated(null);
-
     if (!isCompanyAdmin) {
       setError("No tienes permisos para crear empresas.");
       return;
     }
-    if (!userId) {
-      setError("No se pudo identificar al administrador (userId). Vuelve a iniciar sesión.");
-      return;
-    }
     if (!form.name?.trim()) {
-      setError("El campo 'name' es obligatorio");
+      setError("El campo 'Nombre' es obligatorio.");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email || "")) {
-      setError("Ingresa un email válido");
+      setError("Ingresa un email válido.");
       return;
     }
 
@@ -179,23 +152,20 @@ export default function Client() {
         description: form.description?.trim() || undefined,
         industry: form.industry?.trim() || undefined,
         location: form.location?.trim() || undefined,
-        subscriptionPlan: "FREE",
-        companyRating: 0,
+        profilePicture: logoUrl || undefined,
+        coverPhoto: coverUrl || undefined,
+        subscriptionPlan: "free",
         boolVerified: false,
-        verifiedAt: undefined,
-        profilePicture: logoUrl ?? undefined,
-        coverPhoto: coverUrl ?? undefined,
-        adminId: userId,
       };
 
       const res = await fetch("/api/company/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ input: payload }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || "No se pudo crear la empresa");
-
       setCreated(json.company);
       setShowModal(true);
     } catch (err: any) {
@@ -306,7 +276,7 @@ export default function Client() {
                 <label className={styles.label}>Industria</label>
                 <input
                   className={styles.input}
-                  placeholder="Industria a la que pertenece tu empresa"
+                  placeholder="Industria"
                   value={form.industry || ""}
                   onChange={onChange("industry")}
                   disabled={!isCompanyAdmin}
@@ -359,12 +329,6 @@ export default function Client() {
                     description: "",
                     industry: "",
                     location: "",
-                    subscriptionPlan: "FREE",
-                    companyRating: 0,
-                    boolVerified: false,
-                    verifiedAt: null,
-                    profilePicture: null,
-                    coverPhoto: null,
                   });
                   setError(null);
                   setCreated(null);
@@ -385,7 +349,9 @@ export default function Client() {
             <h3 className={styles.modalTitle}>¡Empresa creada!</h3>
             <p className={styles.modalBody}>
               {created?.name ? (
-                <>La empresa <b>{created.name}</b> se creó correctamente.</>
+                <>
+                  La empresa <b>{created.name}</b> se creó correctamente.
+                </>
               ) : (
                 "La empresa se creó correctamente."
               )}

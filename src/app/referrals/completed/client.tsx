@@ -96,12 +96,6 @@ function companyLogo(c?: CompanyMin | null): string | null {
   );
 }
 
-function pickCompanyFromResponse(r: any): CompanyMin | null {
-  const c = r?.company ?? r?.data ?? r ?? null;
-  if (c && typeof c === 'object') return c as CompanyMin;
-  return null;
-}
-
 export default function CompletedReferralsPage() {
   const [refs, setRefs] = useState<RefItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -121,40 +115,45 @@ export default function CompletedReferralsPage() {
         const rdata = await j<any>(`/api/referrals?candidateId=${encodeURIComponent(candidateId)}&limit=200&offset=0`);
         const rawRefs: Referral[] = Array.isArray(rdata) ? rdata : rdata?.items ?? rdata ?? [];
 
-        // Jobs
-        const jobIds = Array.from(new Set(rawRefs.map((x) => x.job_offer_id)));
+        const jobIds = Array.from(new Set(rawRefs.map((x) => x.job_offer_id).filter(Boolean)));
         const jobsMap: Record<string, JobMin | null> = {};
-        const jobsResp = await Promise.all(jobIds.map(async (jid) => {
-          try {
-            const jd = await j<{ job?: JobMin; jobOffer?: JobMin }>(`/api/jobs/${encodeURIComponent(jid)}`);
-            const job = (jd as any).job ?? (jd as any).jobOffer ?? jd ?? null;
-            return { jid, job: job || null };
-          } catch {
-            return { jid, job: null };
-          }
-        }));
-        for (const { jid, job } of jobsResp) jobsMap[jid] = job;
+        const companyById: Record<string, CompanyMin> = {};
 
-        // Companies by company_id
-        const companyIds = Array.from(
-          new Set(
-            jobsResp.map(({ job }) => job?.company_id).filter(Boolean) as string[]
-          )
+        const jobsResp = await Promise.all(
+          jobIds.map(async (jid) => {
+            try {
+              const jd = await j<{ job: JobMin | null; company: CompanyMin | null }>(`/api/jobs/${encodeURIComponent(jid)}`);
+              const job = jd?.job ?? null;
+              const inlineCompany = jd?.company ?? null;
+              return { jid, job, inlineCompany };
+            } catch {
+              return { jid, job: null, inlineCompany: null };
+            }
+          })
         );
 
-        const companyById: Record<string, CompanyMin | null> = {};
-        await Promise.all(companyIds.map(async (cid) => {
-          try {
-            const c1 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
-            const comp1 = pickCompanyFromResponse(c1);
-            if (comp1) { companyById[cid] = comp1; return; }
-          } catch { }
-          try {
-            const c2 = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
-            const comp2 = pickCompanyFromResponse(c2);
-            if (comp2) companyById[cid] = comp2;
-          } catch { }
-        }));
+        await Promise.all(
+          jobsResp.map(async ({ jid, job, inlineCompany }) => {
+            if (job) jobsMap[jid] = job;
+            if (inlineCompany?.id) {
+              companyById[inlineCompany.id] = inlineCompany;
+              return;
+            }
+            const cid = job?.company_id;
+            if (!cid) return;
+            try {
+              const up = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
+              const c = (up?.company ?? up?.data ?? up) as CompanyMin | null;
+              if (c?.id) companyById[c.id] = c;
+            } catch {
+              try {
+                const up2 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
+                const c2 = (up2?.company ?? up2?.data ?? up2) as CompanyMin | null;
+                if (c2?.id) companyById[c2.id] = c2;
+              } catch { }
+            }
+          })
+        );
 
         const expanded: RefItem[] = rawRefs.map((ref) => {
           const jobOffer = jobsMap[ref.job_offer_id] ?? null;
@@ -211,7 +210,9 @@ export default function CompletedReferralsPage() {
                         {logo ? (
                           <img className={styles.avatarImg} src={logo} alt={company?.name ?? 'Empresa'} loading="lazy" />
                         ) : (
-                          <div className={styles.avatarFallback}>{initials(company?.name)}</div>
+                          <div className={styles.avatarFallback}>
+                            {(company?.name || '•').trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('') || '•'}
+                          </div>
                         )}
                       </div>
 

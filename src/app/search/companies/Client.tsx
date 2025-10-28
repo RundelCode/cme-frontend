@@ -1,23 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import styles from "./company.module.css";
+import { PropagateLoader } from "react-spinners";
 import { searchCompanies } from "../../../../lib/company-client";
 import { Company } from "../../../../lib/company-types";
-import styles from "./company.module.css";
-import Image from "next/image";
-import CompanyIcon from "../../../../public/images/icons/Nav/Companies.png";
-import SearchIcon from "../../../../public/images/icons/search.png";
-import { PropagateLoader } from "react-spinners";
 import ProfilePlaceholder from "../../../../public/images/placeholders/company.png";
-import Link from "next/link";
 
-function renderStars(rating: number, max = 5) {
-    const stars = [];
+function initials(name?: string | null) {
+    if (!name) return "•";
+    const parts = name.trim().split(/\s+/).slice(0, 2);
+    return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "•";
+}
+
+function Stars({ value, max = 5 }: { value?: number | null; max?: number }) {
+    if (value == null || Number.isNaN(value)) return null;
+    const rating = Math.min(max, Math.max(0, Number(value)));
     const rounded = Math.round(rating);
-    for (let i = 1; i <= max; i++) {
-        stars.push(<span key={i}>{i <= rounded ? "★" : "☆"}</span>);
-    }
-    return stars;
+    return (
+        <div className={styles.rating}>
+            {Array.from({ length: max }, (_, i) => (
+                <span key={i} aria-hidden>
+                    {i + 1 <= rounded ? "★" : "☆"}
+                </span>
+            ))}
+            <span className={styles.ratingNumber}>({rating.toFixed(1)})</span>
+        </div>
+    );
 }
 
 export default function CompanySearchClient() {
@@ -30,15 +41,8 @@ export default function CompanySearchClient() {
         setLoading(true);
         setErr(null);
         try {
-            const res = await searchCompanies({
-                q,
-                sortBy: "RATING",
-                order: "DESC",
-                limit: 20,
-            });
+            const res = await searchCompanies({ q, sortBy: "RATING", order: "DESC", limit: 20 });
             setItems(res);
-        } catch (e: any) {
-            setErr(e?.message ?? "Error");
         } finally {
             setLoading(false);
         }
@@ -48,94 +52,92 @@ export default function CompanySearchClient() {
         run();
     }, []);
 
+    const placeholderSrc =
+        (ProfilePlaceholder as unknown as { src: string }).src ?? "/images/placeholders/company.png";
+
+    const results = useMemo(() => items ?? [], [items]);
+
     return (
-        <div className={styles.main}>
-            <div className={styles.blueLine} />
+        <div className={styles.page}>
+            <div className={styles.main}>
+                <header className={styles.pageHeader}>
+                    <h1 className={styles.title}>Empresas</h1>
+                </header>
 
-            <div className={styles.title}>
-                <Image
-                    className={styles.companyIcon}
-                    src={CompanyIcon}
-                    alt="Jobs"
-                    width={320}
-                    height={320}
-                    priority
-                    style={{ width: "auto", height: "auto" }}
-                />
-                <h2>Empresas</h2>
-            </div>
-
-            <form
-                className={styles.searchForm}
-                onSubmit={(e) => {
-                    e.preventDefault();
-                    run();
-                }}
-            >
-                <div className={styles.searchInput}>
-                    <Image
-                        src={SearchIcon}
-                        alt="Search"
-                        className={styles.searchIcon}
-                        width={16}
-                        height={16}
-                        style={{ width: "auto", height: "auto" }}
-                    />
+                <form
+                    className={styles.searchBar}
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        run();
+                    }}
+                >
                     <input
-                        type="text"
-                        placeholder="Buscar empresas..."
+                        className={styles.searchInput}
+                        placeholder="Buscar empresas…"
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
-                        className={styles.searchField}
                     />
-                </div>
-                <button type="submit" className={styles.submitButton}>
-                    Buscar
-                </button>
-            </form>
+                    <button className={styles.searchBtn} type="submit">
+                        Buscar
+                    </button>
+                </form>
 
-            {loading ? (
-                <div className={styles.loader}>
-                    <PropagateLoader />
-                </div>
-            ) : (
-                <ul className={styles.results}>
-                    {(items ?? []).map((c) => (
-                        <li key={c.id} className={styles.card}>
-                            <Link href={`/profiles/companies?id=${c.id}`} className={styles.cardLink}>
-                                <Image
-                                    className={styles.profilePicture}
-                                    src={c.profilePicture || (ProfilePlaceholder as unknown as { src: string }).src}
-                                    alt={c.name}
-                                    width={100}
-                                    height={100}
-                                    priority
-                                />
+                {err && <div className={styles.error}>{err}</div>}
 
-                                <div className={styles.profileInfo}>
-                                    <div className={styles.profileTitle}>
-                                        {c.name}
-                                        {c.boolVerified && <span className={styles.verifiedStar}>★</span>}
-                                    </div>
+                {loading ? (
+                    <div className={styles.loading}>
+                        <PropagateLoader />
+                    </div>
+                ) : (
+                    <section className={styles.section}>
+                        <h2 className={styles.sectionTitle}>Resultados</h2>
+                        {results.length === 0 ? (
+                            <div className={styles.empty}>Sin resultados</div>
+                        ) : (
+                            <ul className={styles.list}>
+                                {results.map((c) => {
+                                    const src = c.profilePicture || placeholderSrc;
+                                    return (
+                                        <li className={styles.cardItem} key={c.id}>
+                                            <Link href={`/profiles/companies?id=${c.id}`} className={styles.cardLink}>
+                                                <div className={styles.media}>
+                                                    {c.profilePicture ? (
+                                                        <Image
+                                                            className={styles.avatarImg}
+                                                            src={src}
+                                                            alt={c.name}
+                                                            width={56}
+                                                            height={56}
+                                                            priority
+                                                        />
+                                                    ) : (
+                                                        <div className={styles.avatarFallback}>{initials(c.name)}</div>
+                                                    )}
+                                                </div>
 
-                                    <div>{c.industry ?? "—"} · {c.location ?? "—"}</div>
-
-                                    {c.companyRating != null && !isNaN(Number(c.companyRating)) && (
-                                        <div className={styles.rating}>
-                                            {renderStars(Number(c.companyRating))}
-                                            <span className={styles.ratingNumber}>
-                                                ({Number(c.companyRating).toFixed(1)})
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                            </Link>
-                        </li>
-                    ))}
-                    {(items && items.length === 0) && <li className={styles.empty}>Sin resultados</li>}
-                </ul>
-            )}
-            {err && <p>{err}</p>}
+                                                <div className={styles.content}>
+                                                    <div className={styles.rowTop}>
+                                                        <div className={styles.companyBlock}>
+                                                            <div className={styles.companyName}>
+                                                                {c.name}
+                                                                {c.boolVerified && <span className={styles.verifiedStar}>★</span>}
+                                                            </div>
+                                                            <div className={styles.companySub}>
+                                                                {c.industry ?? "—"} • {c.location ?? "—"}
+                                                            </div>
+                                                        </div>
+                                                        <Stars value={Number(c.companyRating)} />
+                                                    </div>
+                                                </div>
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+                )}
+            </div>
         </div>
     );
 }

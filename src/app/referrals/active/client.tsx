@@ -125,14 +125,8 @@ function companyLogo(c?: CompanyMin | null): string | null {
     );
 }
 
-function pickCompanyFromResponse(r: any): CompanyMin | null {
-    const c = r?.company ?? r?.data ?? r ?? null;
-    if (c && typeof c === 'object') return c as CompanyMin;
-    return null;
-}
-
 export default function MyReferralsPage() {
-    const [month, setMonth] = useState<string>(getDefaultMonth());
+    const [month] = useState<string>(getDefaultMonth());
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
     const [items, setItems] = useState<Referral[]>([]);
@@ -162,36 +156,41 @@ export default function MyReferralsPage() {
                 const refData = await j<any>(`/api/referrals/active${qs.toString() ? `?${qs.toString()}` : ''}`);
                 const refs: Referral[] = Array.isArray(refData) ? refData : refData?.items ?? refData ?? [];
 
-                // Jobs
-                const jobIds = Array.from(new Set(refs.map((x) => x.job_offer_id)));
+                const jobIds = Array.from(new Set(refs.map((x) => x.job_offer_id).filter(Boolean)));
                 const jobsMap: Record<string, JobMin> = {};
-                await Promise.all(jobIds.map(async (jid) => {
-                    try {
-                        const jd = await j<{ job?: JobMin; jobOffer?: JobMin }>(`/api/jobs/${encodeURIComponent(jid)}`);
-                        const job = (jd as any).job ?? (jd as any).jobOffer ?? null;
-                        if (job) jobsMap[jid] = job;
-                    } catch { }
-                }));
-
-                // Companies by company_id (from jobs)
-                const companyIds = Array.from(new Set(Object.values(jobsMap).map(j => j.company_id).filter(Boolean)));
                 const companiesMap: Record<string, CompanyMin> = {};
-                await Promise.all(companyIds.map(async (cid) => {
-                    try {
-                        // singular
-                        const c1 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
-                        const comp1 = pickCompanyFromResponse(c1);
-                        if (comp1) { companiesMap[cid] = comp1; return; }
-                        // fallthrough to plural
-                    } catch { }
-                    try {
-                        const c2 = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
-                        const comp2 = pickCompanyFromResponse(c2);
-                        if (comp2) companiesMap[cid] = comp2;
-                    } catch { }
-                }));
 
-                // Profiles (igual)
+                await Promise.all(
+                    jobIds.map(async (jid) => {
+                        try {
+                            const jd = await j<{ job: JobMin | null; company: CompanyMin | null }>(`/api/jobs/${encodeURIComponent(jid)}`);
+                            const job = jd?.job ?? null;
+                            const inlineCompany = jd?.company ?? null;
+                            if (job) jobsMap[jid] = job;
+
+                            if (inlineCompany?.id) {
+                                companiesMap[inlineCompany.id] = inlineCompany;
+                                return;
+                            }
+                            const cid = job?.company_id;
+                            if (!cid) return;
+
+                            try {
+                                const up = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
+                                const c = (up?.company ?? up?.data ?? up) as CompanyMin | null;
+                                if (c?.id) companiesMap[c.id] = c;
+
+                            } catch {
+                                try {
+                                    const up2 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
+                                    const c2 = (up2?.company ?? up2?.data ?? up2) as CompanyMin | null;
+                                    if (c2?.id) companiesMap[c2.id] = c2;
+                                } catch { }
+                            }
+                        } catch { }
+                    })
+                );
+
                 const candIds = Array.from(new Set(refs.map((x) => x.candidate_id).filter(Boolean))) as string[];
                 const profilesMap: Record<string, ProfileLite> = {};
                 if (candIds.length) {
@@ -228,34 +227,6 @@ export default function MyReferralsPage() {
                         } catch { }
                     }
 
-                    if (!loaded) {
-                        try {
-                            const body = {
-                                query: `
-                  query ProfilesByIds($ids: [ID!]!) {
-                    profilesByIds(ids: $ids) {
-                      id
-                      full_name
-                      email
-                      phone
-                      profile_picture
-                    }
-                  }
-                `,
-                                variables: { ids: candIds },
-                                operationName: 'ProfilesByIds',
-                            };
-                            const r2 = await fetch(`/api/graphql`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(body),
-                                credentials: 'include',
-                            });
-                            const j2 = await r2.json();
-                            const arr: ProfileLite[] = j2?.data?.profilesByIds ?? [];
-                            for (const p of arr) profilesMap[p.id] = p;
-                        } catch { }
-                    }
                 }
 
                 if (!alive) return;
@@ -272,6 +243,7 @@ export default function MyReferralsPage() {
         })();
         return () => { alive = false; };
     }, [monthRange]);
+
 
     const filtered = useMemo(() => {
         if (!monthRange) return items;

@@ -56,9 +56,7 @@ async function j<T = any>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, { credentials: "include", cache: "no-store", ...init });
   const txt = await res.text();
   let data: any = null;
-  try {
-    data = txt ? JSON.parse(txt) : null;
-  } catch { }
+  try { data = txt ? JSON.parse(txt) : null; } catch { }
   if (!res.ok) {
     const msg = (data && (data.error || data.message)) || txt || `HTTP ${res.status}`;
     throw new Error(msg);
@@ -113,6 +111,22 @@ function statusClass(s?: string, css?: any) {
   }
 }
 
+// ===== Helpers de normalización =====
+function normalizeJob(job: any): JobMin | null {
+  if (!job || typeof job !== "object") return null;
+  const company_id = job.company_id ?? job.companyId ?? null;
+  return {
+    ...job,
+    company_id: company_id == null ? undefined as any : String(company_id),
+  } as JobMin;
+}
+function pickCompany(payload: any): CompanyMin | null {
+  if (!payload || typeof payload !== "object") return null;
+  const c = payload.company ?? payload.data ?? payload;
+  if (c && typeof c === "object" && c.id) return c as CompanyMin;
+  return null;
+}
+
 export default function Client() {
   const [apps, setApps] = useState<AppItem[]>([]);
   const [refs, setRefs] = useState<RefItem[]>([]);
@@ -130,6 +144,8 @@ export default function Client() {
         const candidateId = me?.id || me?.user?.id;
         if (!candidateId) throw new Error("No autorizado");
 
+        console.debug("[applications] candidateId=", candidateId);
+
         const [appsResp, refsResp] = await Promise.all([
           j<{ items?: Application[]; count?: number }>(
             `/api/applications?candidateId=${encodeURIComponent(candidateId)}&limit=50&offset=0`
@@ -141,52 +157,91 @@ export default function Client() {
 
         const applicationsRaw: Application[] = appsResp?.items ?? [];
         const referrals: Referral[] = refsResp?.items ?? [];
+        console.debug("[applications] applicationsRaw=", applicationsRaw.length, "referrals=", referrals.length);
 
         const referredJobIds = new Set(referrals.map((r) => r.job_offer_id));
         const applications = applicationsRaw.filter((a) => !referredJobIds.has(a.job_offer_id));
+        console.debug("[applications] apps after filter (not referred)=", applications.length);
 
         const jobCache = new Map<string, JobMin | null>();
         const companyCache = new Map<string, CompanyMin | null>();
 
-        async function getJob(id: string): Promise<JobMin | null> {
-          if (jobCache.has(id)) return jobCache.get(id) ?? null;
+        async function getJobAndMaybeCompany(id: string): Promise<{ job: JobMin | null; companyInline: CompanyMin | null }> {
+          if (jobCache.has(id)) {
+            const cached = jobCache.get(id) ?? null;
+            // no podemos saber si había company inline en cache; igual devolvemos null para no romper
+            return { job: cached, companyInline: null };
+          }
           try {
-            const d = await j<{ job?: JobMin }>(`/api/jobs/${encodeURIComponent(id)}`);
-            const job = d?.job ?? null;
-            jobCache.set(id, job);
-            return job;
-          } catch {
+            const d = await j<{ job?: JobMin; company?: CompanyMin }>(`/api/jobs/${encodeURIComponent(id)}`);
+            const rawJob = (d as any)?.job ?? (d as any)?.jobOffer ?? d ?? null;
+            const job = normalizeJob(rawJob);
+            const inlineCompany = pickCompany(d);
+
+            jobCache.set(id, job ?? null);
+
+            if (inlineCompany?.id) {
+              companyCache.set(inlineCompany.id, inlineCompany);
+              console.debug("[applications] /api/jobs returned inline company for job", id, "companyId=", inlineCompany.id);
+            } else {
+              console.debug("[applications] /api/jobs NO inline company for job", id);
+            }
+            return { job, companyInline: inlineCompany ?? null };
+          } catch (e: any) {
+            console.warn("[applications] getJob fail:", id, e?.message);
             jobCache.set(id, null);
-            return null;
+            return { job: null, companyInline: null };
           }
         }
 
-        async function getCompany(id: string): Promise<CompanyMin | null> {
-          if (companyCache.has(id)) return companyCache.get(id) ?? null;
+        async function getCompanyByIdMaybeFetch(id: string | undefined | null): Promise<CompanyMin | null> {
+          if (!id) return null;
+          const key = String(id);
+          if (companyCache.has(key)) return companyCache.get(key) ?? null;
           try {
-            const d = await j<{ company?: CompanyMin }>(`/api/company/${encodeURIComponent(id)}`);
-            const company = d?.company ?? null;
-            companyCache.set(id, company);
-            return company;
-          } catch {
-            companyCache.set(id, null);
+            const d = await j<{ company?: CompanyMin }>(`/api/company/${encodeURIComponent(key)}`);
+            const company = pickCompany(d);
+            if (company?.id) {
+              companyCache.set(company.id, company);
+              return company;
+            }
+            companyCache.set(key, null);
+            return null;
+          } catch (e: any) {
+            console.warn("[applications] getCompany fail:", key, e?.message);
+            companyCache.set(key, null);
             return null;
           }
         }
 
         const appsExpanded: AppItem[] = await Promise.all(
           applications.map(async (a) => {
-            const jobOffer = await getJob(a.job_offer_id);
-            const company = jobOffer?.company_id ? await getCompany(jobOffer.company_id) : null;
-            return { application: a, jobOffer, company };
+            const { job, companyInline } = await getJobAndMaybeCompany(a.job_offer_id);
+            const cid = job?.company_id ?? (job as any)?.companyId;
+            const company =
+              companyInline ??
+              (cid ? await getCompanyByIdMaybeFetch(cid) : null);
+
+            if (!job?.company_id && (job as any)?.companyId) {
+            }
+            if (!company) {
+            }
+            return { application: a, jobOffer: job, company };
           })
         );
 
         const refsExpanded: RefItem[] = await Promise.all(
           referrals.map(async (r) => {
-            const jobOffer = await getJob(r.job_offer_id);
-            const company = jobOffer?.company_id ? await getCompany(jobOffer.company_id) : null;
-            return { referral: r, jobOffer, company };
+            const { job, companyInline } = await getJobAndMaybeCompany(r.job_offer_id);
+            const cid = job?.company_id ?? (job as any)?.companyId;
+            const company =
+              companyInline ??
+              (cid ? await getCompanyByIdMaybeFetch(cid) : null);
+
+            if (!company) {
+              console.debug("[applications][refs] company NOT resolved for jobOffer", r.job_offer_id, "cid=", cid);
+            }
+            return { referral: r, jobOffer: job, company };
           })
         );
 
@@ -217,7 +272,6 @@ export default function Client() {
       <div className={styles.main}>
         <header className={styles.pageHeader}>
           <h1 className={styles.title}>Mis postulaciones</h1>
-          <p className={styles.subtitle}>Tus intereses y el estado de tus referencias.</p>
         </header>
 
         {err && <div className={styles.error}>{err}</div>}
@@ -242,16 +296,9 @@ export default function Client() {
                       <li className={styles.card} key={application.id}>
                         <div className={styles.media}>
                           {logo ? (
-                            <img
-                              className={styles.avatarImg}
-                              src={logo}
-                              alt={company?.name ?? "Empresa"}
-                              loading="lazy"
-                            />
+                            <img className={styles.avatarImg} src={logo} alt={company?.name ?? "Empresa"} loading="lazy" />
                           ) : (
-                            <div className={styles.avatarFallback}>
-                              {initials(company?.name)}
-                            </div>
+                            <div className={styles.avatarFallback}>{initials(company?.name)}</div>
                           )}
                         </div>
 
@@ -259,9 +306,7 @@ export default function Client() {
                           <div className={styles.rowTop}>
                             <div className={styles.companyBlock}>
                               <div className={styles.companyName}>{company?.name ?? "Empresa"}</div>
-                              <div className={styles.companySub}>
-                                {company?.location ?? company?.city ?? "—"}
-                              </div>
+                              <div className={styles.companySub}>{company?.location ?? company?.city ?? "—"}</div>
                             </div>
                             <span className={`${styles.pill} ${styles.pillMuted}`}>Pendiente</span>
                           </div>
@@ -273,9 +318,7 @@ export default function Client() {
                               <span>•</span>
                               <span>{jobOffer?.employment_type ?? "—"}</span>
                               <span>•</span>
-                              <span className={`${styles.pill} ${styles.pillInfo}`}>
-                                {jobOffer?.status ?? "—"}
-                              </span>
+                              <span className={`${styles.pill} ${styles.pillInfo}`}>{jobOffer?.status ?? "—"}</span>
                             </div>
                           </div>
 
@@ -298,7 +341,7 @@ export default function Client() {
             </section>
 
             <section className={styles.section}>
-              <h2 className={styles.sectionTitle}>Estado de mis postulaciones</h2>
+              <h2 className={styles.sectionTitle}>Estado de mis referencias</h2>
               {refsFiltered.length === 0 ? (
                 <div className={styles.empty}>No tienes procesos activos.</div>
               ) : (
@@ -309,16 +352,9 @@ export default function Client() {
                       <li className={styles.card} key={referral.id}>
                         <div className={styles.media}>
                           {logo ? (
-                            <img
-                              className={styles.avatarImg}
-                              src={logo}
-                              alt={company?.name ?? "Empresa"}
-                              loading="lazy"
-                            />
+                            <img className={styles.avatarImg} src={logo} alt={company?.name ?? "Empresa"} loading="lazy" />
                           ) : (
-                            <div className={styles.avatarFallback}>
-                              {initials(company?.name)}
-                            </div>
+                            <div className={styles.avatarFallback}>{initials(company?.name)}</div>
                           )}
                         </div>
 
@@ -326,9 +362,7 @@ export default function Client() {
                           <div className={styles.rowTop}>
                             <div className={styles.companyBlock}>
                               <div className={styles.companyName}>{company?.name ?? "Empresa"}</div>
-                              <div className={styles.companySub}>
-                                {company?.location ?? company?.city ?? "—"}
-                              </div>
+                              <div className={styles.companySub}>{company?.location ?? company?.city ?? "—"}</div>
                             </div>
                             <span className={`${styles.pill} ${statusClass(referral.status, styles)}`}>
                               {humanStatus(referral.status)}
@@ -342,9 +376,7 @@ export default function Client() {
                               <span>•</span>
                               <span>{jobOffer?.employment_type ?? "—"}</span>
                               <span>•</span>
-                              <span className={`${styles.pill} ${styles.pillInfo}`}>
-                                {jobOffer?.status ?? "—"}
-                              </span>
+                              <span className={`${styles.pill} ${styles.pillInfo}`}>{jobOffer?.status ?? "—"}</span>
                             </div>
                           </div>
 

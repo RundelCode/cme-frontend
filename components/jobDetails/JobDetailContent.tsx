@@ -499,9 +499,6 @@ Este es tu codigo de referido: ${referralCode}
                             </span>
                           ) : null}
                         </div>
-                        <div className={styles.rating}>
-                          {renderStars(p.reputation)}
-                        </div>
                       </div>
                       <button
                         className={styles.modalReferButton}

@@ -1,186 +1,229 @@
-.page{
+.page {
   width: 100%;
-  min-height: 100dvh;
+  min-height: 100dvh
 }
 
-.main{
+.main {
   margin-left: var(--nav-w, 18%);
-  min-height: 100dvh;
-  overflow-y: auto;
+  min-height: calc(100% - 16px);
+  padding: 36px 16px 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
+  gap: 20px
 }
 
-.blueLine{
-  width: 100%;
-  height: 56px;
-  background-color: #152048;
+.pageHeader {
+  text-align: center;
+  width: 100%
 }
 
-.title{
-  width: calc(100% - 40px);
-  min-height: 64px;
-  padding: 0 20px;
+.title {
+  font-size: 26px;
+  font-weight: 800;
+  margin: 0;
+  color: #101828
+}
+
+.searchBar {
+  width: min(820px, 95vw);
   display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.companyIcon{
-  width: auto;
-  height: 30px;
-}
-
-.searchForm{
-  width: calc(100% - 40px);
-  max-width: 1200px;
-  display: flex;
-  align-items: center;
   gap: 8px;
-  margin-top: 8px;
-}
-
-.searchInput{
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-  max-width: 400px;
-}
-
-.searchIcon{
-  position: absolute;
-  left: 10px;
-  pointer-events: none;
-}
-
-.searchField{
-  width: 100%;
-  padding: 10px 12px 10px 36px;
-  border: 2px solid #EAECF2;
-  border-radius: 8px;
-  outline: none;
-  font-size: 14px;
-}
-
-.searchField:focus{
-  border-color: #152048;
-}
-
-.submitButton{
-  height: 40px;
-  width: 80px;
-  background-color: #152048;
-  display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.searchInput {
+  flex: 1;
+  height: 30px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+  background: #fff
+}
+
+.searchInput:focus {
+  border-color: #152148;
+  box-shadow: 0 0 0 2px #15214820
+}
+
+.searchBtn {
+  height: 40px;
+  padding: 10px 5px;
+  border-radius: 10px;
+  background: #152148;
+  color: #fff;
+  font-weight: 800;
+  border: 0;
   cursor: pointer;
   transition: .2s;
-  color: #FFFFFF;
-  font-weight: 600;
-}
-
-.submitButton:hover{
-  background-color: #1b295b;
-}
-
-.loader {
-  width: 95%;
-  min-height: 50vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 24px;
 }
 
-.results{
-  width: 95%;
+.searchBtn:hover {
+  background: #1b295b
+}
+
+.loading {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-  align-items: start;
-  height: auto;
-  margin-top: 24px;
+  place-items: center;
+  padding: 40px;
+  color: #475467;
+  min-height: 55vh
 }
 
-.card{
+.error {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  padding: 10px 12px;
+  border-radius: 10px
+}
+
+.empty {
+  background: #f8fafc;
+  border: 1px dashed #e5e7eb;
+  color: #64748b;
+  padding: 16px;
+  border-radius: 12px
+}
+
+.section {
+  width: min(820px, 95vw);
+  display: grid;
+  gap: 14px
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0;
+  color: #0f172a;
+  text-align: left
+}
+
+.list {
   list-style: none;
-  text-decoration: none;
-  color: #000000;
-  min-height: 120px;
-  border: 1px solid #EAECF2;
-  padding: 12px;
-  border-radius: 12px;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  background: #fff;
-  transition: transform .12s ease, box-shadow .12s ease, background-color .2s ease, border-color .2s ease;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 14px
 }
 
-.card:hover{
-  background-color: #f9fafb;
+.cardItem {
+  list-style: none
+}
+
+.cardLink {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, .08);
+  border: 1px solid #e5e7eb;
+  text-decoration: none;
+  color: #111827;
+  transition: transform .12s ease, box-shadow .12s ease, background-color .2s ease, border-color .2s ease
+}
+
+.cardLink:hover {
+  background: #f9fafb;
   border-color: #dfe3ec;
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  box-shadow: 0 10px 30px rgba(16, 24, 40, .12)
 }
 
-.profilePicture{
+.media {
+  width: 56px;
+  height: 56px
+}
+
+.avatarImg {
   width: 56px;
   height: 56px;
-  flex: 0 0 56px;
-  border-radius: 50%;
+  border-radius: 9999px;
   object-fit: cover;
+  box-shadow: 0 0 0 1px #e5e7eb inset;
+  background: #f3f4f6
 }
 
-.profileInfo{
+.avatarFallback {
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  display: grid;
+  place-items: center;
+  background: #e5e7eb;
+  color: #334155;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px #e5e7eb inset
+}
+
+.content {
+  display: grid;
+  gap: 10px
+}
+
+.rowTop {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  flex: 1;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px
 }
 
-.profileTitle{
-  font-weight: 700;
-  font-size: 0.98rem;
-  line-height: 1.2;
+.userBlock {
+  display: grid;
+  gap: 2px
+}
+
+.userName {
+  font-weight: 800;
+  color: #111827
+}
+
+.userSub {
+  font-size: 12px;
+  color: #6b7280
+}
+
+.rowBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap
+}
+
+.link {
+  color: #1f3bb3;
+  font-weight: 800;
+  text-decoration: none
+}
+
+.link:hover {
+  text-decoration: underline
+}
+
+.date {
+  font-size: 12px;
+  color: #6b7280
+}
+
+.rating {
   display: flex;
   align-items: center;
   gap: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.rating{
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 1rem;
   color: #152048;
+  font-size: 14px
 }
 
-.ratingNumber{
-  font-size: 0.85rem;
-  color: #667085;
-}
-
-.verifiedStar{
-  color: #f5c518;
-  font-size: 1rem;
-}
-
-@media (max-width: 768px){
-  .companyIcon{ height: 26px; }
-  .results{ grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-  .profilePicture{ width: 48px; height: 48px; flex-basis: 48px; }
-  .card{ padding: 10px; border-radius: 10px; }
-}
-
-@media (min-width: 1400px){
-  .results{ gap: 20px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.ratingNumber {
+  font-size: 12px;
+  color: #667085
 }

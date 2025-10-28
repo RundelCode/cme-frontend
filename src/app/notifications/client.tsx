@@ -224,18 +224,6 @@ export default function Client() {
                                                     </div>
                                                 </div>
 
-                                                <div className={styles.metaRow}>
-                                                    <span className={styles.metaItem}>
-                                                        <span className={styles.metaKey}>Relacionado:</span>
-                                                        {n.related_id ? <code className={styles.metaValue}>{n.related_id}</code> : '—'}
-                                                    </span>
-                                                    {n.read_at && (
-                                                        <span className={styles.metaItem}>
-                                                            <span className={styles.metaKey}>Leída:</span>
-                                                            <span className={styles.date}>{new Date(n.read_at).toLocaleString()}</span>
-                                                        </span>
-                                                    )}
-                                                </div>
                                             </div>
                                         </li>
                                     );
