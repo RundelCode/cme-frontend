@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+// src/app/api/notifications/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 
 function buildAuthHeader(req: Request): string | undefined {
   const fromHeader = req.headers.get("authorization");
@@ -36,57 +37,88 @@ async function readJson(res: Response) {
   return { data, raw };
 }
 
-export async function GET(req: Request, ctx: { params?: { id?: string } }) {
+export async function GET(req: NextRequest, context: any) {
   const url = new URL(req.url);
-  const debug = url.searchParams.get("__debug") === "1" || req.headers.get("x-debug") === "1";
+  const debug =
+    url.searchParams.get("__debug") === "1" ||
+    req.headers.get("x-debug") === "1";
+
   try {
-    const id = ctx?.params?.id;
-    if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
+    const id = context?.params?.id;
+    if (!id) {
+      return NextResponse.json({ error: "missing_id" }, { status: 400 });
+    }
 
     const API = resolveApiUrl(req.url);
     const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
 
-    const upstream = await fetch(`${API}/notifications/${encodeURIComponent(id)}`, {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
-        ...(authorization ? { Authorization: authorization } : {}),
-        ...(cookie ? { cookie } : {}),
-      },
-      cache: "no-store",
-      credentials: "include",
-    });
+    const upstream = await fetch(
+      `${API}/notifications/${encodeURIComponent(id)}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          ...(authorization ? { Authorization: authorization } : {}),
+          ...(cookie ? { cookie } : {}),
+        },
+        cache: "no-store",
+        credentials: "include",
+      }
+    );
 
     const { data, raw } = await readJson(upstream);
 
     if (!upstream.ok || !data?.id) {
-      const msg = data?.error || data?.message || `notifications_upstream_${upstream.status}`;
-      const payload = debug ? { error: msg, __debug: { status: upstream.status, raw: data ?? raw } } : { error: msg };
+      const msg =
+        data?.error ||
+        data?.message ||
+        `notifications_upstream_${upstream.status}`;
+      const payload = debug
+        ? { error: msg, __debug: { status: upstream.status, raw: data ?? raw } }
+        : { error: msg };
       return NextResponse.json(payload, { status: upstream.status || 500 });
     }
 
-    return NextResponse.json(debug ? { notification: data, __debug: { status: upstream.status } } : { notification: data }, { status: 200 });
+    return NextResponse.json(
+      debug
+        ? { notification: data, __debug: { status: upstream.status } }
+        : { notification: data },
+      { status: 200 }
+    );
   } catch (e: any) {
-    const payload = { error: e?.message || "notification_get_failed", __debug: e?.__raw || null };
+    const payload = {
+      error: e?.message || "notification_get_failed",
+      __debug: e?.__raw || null,
+    };
     return NextResponse.json(payload, { status: 500 });
   }
 }
 
-export async function PATCH(req: Request, ctx: { params?: { id?: string } }) {
+export async function PATCH(req: NextRequest, context: any) {
   const url = new URL(req.url);
-  const debug = url.searchParams.get("__debug") === "1" || req.headers.get("x-debug") === "1";
+  const debug =
+    url.searchParams.get("__debug") === "1" ||
+    req.headers.get("x-debug") === "1";
+
   try {
-    const id = ctx?.params?.id;
-    if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
+    const id = context?.params?.id;
+    if (!id) {
+      return NextResponse.json({ error: "missing_id" }, { status: 400 });
+    }
 
     const body = await req.json().catch(() => ({} as any));
-    const status: string | undefined = typeof body?.status === "string" && body.status.trim() ? body.status : undefined;
+    const status: string | undefined =
+      typeof body?.status === "string" && body.status.trim()
+        ? body.status
+        : undefined;
 
     const rawReadAt = body?.readAt as unknown;
     let readAt: string | undefined;
-    if (rawReadAt === true || rawReadAt === "now") readAt = new Date().toISOString();
-    else if (typeof rawReadAt === "string" && rawReadAt.trim()) readAt = rawReadAt;
+    if (rawReadAt === true || rawReadAt === "now")
+      readAt = new Date().toISOString();
+    else if (typeof rawReadAt === "string" && rawReadAt.trim())
+      readAt = rawReadAt;
 
     if (!status && !readAt) {
       return NextResponse.json({ error: "nothing_to_update" }, { status: 400 });
@@ -96,30 +128,46 @@ export async function PATCH(req: Request, ctx: { params?: { id?: string } }) {
     const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
 
-    const upstream = await fetch(`${API}/notifications/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        ...(authorization ? { Authorization: authorization } : {}),
-        ...(cookie ? { cookie } : {}),
-      },
-      body: JSON.stringify({ status, readAt }),
-      cache: "no-store",
-      credentials: "include",
-    });
+    const upstream = await fetch(
+      `${API}/notifications/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...(authorization ? { Authorization: authorization } : {}),
+          ...(cookie ? { cookie } : {}),
+        },
+        body: JSON.stringify({ status, readAt }),
+        cache: "no-store",
+        credentials: "include",
+      }
+    );
 
     const { data, raw } = await readJson(upstream);
 
     if (!upstream.ok) {
-      const msg = data?.error || data?.message || `notifications_upstream_${upstream.status}`;
-      const payload = debug ? { error: msg, __debug: { status: upstream.status, raw: data ?? raw } } : { error: msg };
+      const msg =
+        data?.error ||
+        data?.message ||
+        `notifications_upstream_${upstream.status}`;
+      const payload = debug
+        ? { error: msg, __debug: { status: upstream.status, raw: data ?? raw } }
+        : { error: msg };
       return NextResponse.json(payload, { status: upstream.status || 500 });
     }
 
-    return NextResponse.json(debug ? { notification: data, __debug: { status: upstream.status } } : { notification: data }, { status: 200 });
+    return NextResponse.json(
+      debug
+        ? { notification: data, __debug: { status: upstream.status } }
+        : { notification: data },
+      { status: 200 }
+    );
   } catch (e: any) {
-    const payload = { error: e?.message || "notification_update_failed", __debug: e?.__raw || null };
+    const payload = {
+      error: e?.message || "notification_update_failed",
+      __debug: e?.__raw || null,
+    };
     return NextResponse.json(payload, { status: 500 });
   }
 }
