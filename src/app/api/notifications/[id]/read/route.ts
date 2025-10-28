@@ -1,5 +1,5 @@
 // src/app/api/notifications/[id]/read/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 
 function buildAuthHeader(req: Request): string | undefined {
     const fromHeader = req.headers.get("authorization");
@@ -24,30 +24,35 @@ function resolveApiUrl(reqUrl: string) {
     }
 }
 
-export async function PATCH(
-    req: Request,
-    ctx: { params?: { id?: string } }
-) {
+export async function PATCH(req: NextRequest, context: any) {
     try {
-        const id = ctx?.params?.id;
-        if (!id) return NextResponse.json({ error: "missing_notification_id" }, { status: 400 });
+        const id = context?.params?.id;
+        if (!id) {
+            return NextResponse.json(
+                { error: "missing_notification_id" },
+                { status: 400 }
+            );
+        }
 
         const API = resolveApiUrl(req.url);
         const authorization = buildAuthHeader(req);
         const cookie = req.headers.get("cookie") ?? "";
 
-        const upstream = await fetch(`${API}/notifications/${encodeURIComponent(id)}/read`, {
-            method: "PATCH",
-            headers: {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                ...(authorization ? { Authorization: authorization } : {}),
-                ...(cookie ? { cookie } : {}),
-            },
-            credentials: "include",
-            cache: "no-store",
-            body: JSON.stringify({ readAt: new Date().toISOString() }),
-        });
+        const upstream = await fetch(
+            `${API}/notifications/${encodeURIComponent(id)}/read`,
+            {
+                method: "PATCH",
+                headers: {
+                    Accept: "application/json",
+                    "Content-Type": "application/json",
+                    ...(authorization ? { Authorization: authorization } : {}),
+                    ...(cookie ? { cookie } : {}),
+                },
+                credentials: "include",
+                cache: "no-store",
+                body: JSON.stringify({ readAt: new Date().toISOString() }),
+            }
+        );
 
         const raw = await upstream.text();
         let data: any = null;
@@ -61,7 +66,10 @@ export async function PATCH(
         }
 
         if (!upstream.ok) {
-            const msg = data?.error || data?.message || `notifications_upstream_${upstream.status}`;
+            const msg =
+                data?.error ||
+                data?.message ||
+                `notifications_upstream_${upstream.status}`;
             return NextResponse.json({ error: msg }, { status: upstream.status || 500 });
         }
 
