@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-function buildAuthHeader(req: Request): string | undefined {
+function buildAuthHeader(req: NextRequest): string | undefined {
   const fromHeader = req.headers.get('authorization');
   if (fromHeader && fromHeader.trim() !== '') return fromHeader;
   const cookieHeader = req.headers.get('cookie') ?? '';
@@ -41,12 +41,8 @@ function normalizeOptional(v: any) {
   return v;
 }
 
-export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const params = 'then' in ctx.params ? await ctx.params : (ctx.params as any);
     const id = params?.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
@@ -77,12 +73,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const params = 'then' in ctx.params ? await ctx.params : (ctx.params as any);
     const id = params?.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
@@ -112,7 +104,6 @@ export async function PATCH(
     };
 
     Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
-
     payload.boolVerified = body?.boolVerified == null ? false : !!body.boolVerified;
 
     const up = await fetch(`${API}/companies/${encodeURIComponent(id)}`, {
