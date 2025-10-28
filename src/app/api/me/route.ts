@@ -8,12 +8,12 @@ function resolveApiUrl() {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "http://localhost:3000/api";
+    "cme-monolith.vercel.app/api";
   try {
     new URL(base);
     return base.replace(/\/+$/, "");
   } catch {
-    return "http://localhost:3000/api";
+    return "cme-monolith.vercel.app/api";
   }
 }
 

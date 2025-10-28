@@ -42,12 +42,9 @@ function normalizeOptional(v: any) {
   return v;
 }
 
-export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, context: any) {
   try {
-    const id = context.params.id;
+    const id = context?.params?.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
     const API = resolveApiUrl(req.url);
@@ -84,12 +81,9 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, context: any) {
   try {
-    const id = context.params.id;
+    const id = context?.params?.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
     const API = resolveApiUrl(req.url);

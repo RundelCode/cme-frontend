@@ -17,7 +17,7 @@ function resolveReferralsBase(req: NextRequest) {
         process.env.REFERRALS_BASE ||
         process.env.NEXT_PUBLIC_API_URL ||
         process.env.API_URL ||
-        "http://localhost:3000/api"; // fallback al gateway solo si no hay envs
+        "cme-monolith.vercel.app/api"; // fallback al gateway solo si no hay envs
     if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
     return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
