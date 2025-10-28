@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 function buildAuthHeader(req: Request): string | undefined {
   const fromHeader = req.headers.get("authorization");
@@ -58,14 +58,14 @@ type CompanyRaw = {
   updated_at?: string | null;
 };
 
-export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> | { id: string } }
-) {
+export async function GET(req: NextRequest, context: any) {
   try {
-    const params = "then" in ctx.params ? await (ctx.params as Promise<{ id: string }>) : (ctx.params as { id: string });
-    const { id } = params;
-    if (!id) return NextResponse.json({ job: null, company: null, error: "missing_job_id" }, { status: 400 });
+    const id = context?.params?.id;
+    if (!id)
+      return NextResponse.json(
+        { job: null, company: null, error: "missing_job_id" },
+        { status: 400 }
+      );
 
     const API = resolveApiUrl(req.url);
     const authorization = buildAuthHeader(req);
@@ -77,6 +77,7 @@ export async function GET(
       ...(cookie ? { cookie } : {}),
     };
 
+    // Fetch job
     const jobRes = await fetch(`${API}/jobs/${encodeURIComponent(id)}`, {
       method: "GET",
       headers,
@@ -94,24 +95,43 @@ export async function GET(
       const msg = (() => {
         try {
           const parsed = jobRaw ? JSON.parse(jobRaw) : null;
-          return parsed?.error || parsed?.message || `jobs_upstream_${jobRes.status}`;
+          return (
+            parsed?.error ||
+            parsed?.message ||
+            `jobs_upstream_${jobRes.status}`
+          );
         } catch {
           return `jobs_upstream_${jobRes.status}`;
         }
       })();
-      return NextResponse.json({ job: null, company: null, error: msg }, { status: jobRes.status || 400 });
+      return NextResponse.json(
+        { job: null, company: null, error: msg },
+        { status: jobRes.status || 400 }
+      );
     }
 
-    let company: { name?: string | null; profilePicture?: string | null; coverPhoto?: string | null; location?: string | null } | null = null;
+    // Fetch company if exists
+    let company: {
+      name?: string | null;
+      profilePicture?: string | null;
+      coverPhoto?: string | null;
+      location?: string | null;
+    } | null = null;
+
     if (job.company_id) {
       try {
-        const compRes = await fetch(`${API}/companies/${encodeURIComponent(job.company_id)}`, {
-          method: "GET",
-          headers,
-          cache: "no-store",
-        });
+        const compRes = await fetch(
+          `${API}/companies/${encodeURIComponent(job.company_id)}`,
+          {
+            method: "GET",
+            headers,
+            cache: "no-store",
+          }
+        );
         if (compRes.ok) {
-          const comp = (await compRes.json().catch(() => null)) as CompanyRaw | null;
+          const comp = (await compRes.json().catch(() => null)) as
+            | CompanyRaw
+            | null;
           if (comp?.id) {
             company = {
               name: comp.name ?? null,
