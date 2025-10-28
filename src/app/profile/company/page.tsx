@@ -166,14 +166,6 @@ export default async function MyCompanyPage() {
                   <span>{company.location ?? "—"}</span>
                 </div>
 
-                <div className={styles.ratingRow}>
-                  <CompanyRatingClient
-                    companyId={company.id}
-                    initialRating={company.companyRating ?? 0}
-                    className={styles.stars}
-                    valueClassName={styles.ratingValue}
-                  />
-                </div>
               </div>
             </div>
 

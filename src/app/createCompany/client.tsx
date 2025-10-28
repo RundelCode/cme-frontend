@@ -7,17 +7,45 @@ import { useRouter } from "next/navigation";
 type UploadKind = "avatar" | "cover";
 
 async function uploadSelf(kind: UploadKind, file: File) {
+  console.log("[uploadSelf] 🚀 Iniciando subida", {
+    kind,
+    name: file?.name,
+    size: file?.size,
+    type: file?.type,
+  });
+
   const fd = new FormData();
   fd.append("file", file, file.name);
+
   const res = await fetch(`/api/uploads/self/${kind}`, {
     method: "POST",
     credentials: "include",
     body: fd,
   });
-  const json = await res.json().catch(() => ({}));
+
+  const raw = await res.text();
+  let json: any = null;
+  try { json = raw ? JSON.parse(raw) : null; } catch { json = null; }
+
+  console.log("[uploadSelf] 📥 Respuesta del servidor", {
+    status: res.status,
+    ok: res.ok,
+    raw,
+    json,
+  });
+
   if (!res.ok || !json?.url) throw new Error(json?.error || `Fallo subiendo ${kind}`);
+
+  console.log("[uploadSelf] ✅ URL generada correctamente", {
+    kind,
+    url: json.url,
+    bucket: json.bucket,
+    path: json.path,
+  });
+
   return json as { url: string; bucket: string; path: string };
 }
+
 
 type CreateCompanyPayload = {
   name: string;
@@ -44,6 +72,7 @@ export default function Client() {
       try {
         const meRes = await fetch("/api/me", { credentials: "include", cache: "no-store" });
         const me = await meRes.json().catch(() => null);
+        console.log("[createCompany] /api/me", { status: meRes.status, ok: meRes.ok, me });
         const roles: string[] = []
           .concat(me?.role || [])
           .concat(me?.user?.role || [])
@@ -51,19 +80,12 @@ export default function Client() {
           .concat(Array.isArray(me?.user?.roles) ? me.user.roles : []);
         const roleStrs = roles.map((r) => String(r).trim().toLowerCase());
         const flags = [me?.is_company_admin, me?.user?.is_company_admin].some(Boolean);
-        const aliases = new Set([
-          "company_admin",
-          "companyadmin",
-          "employer",
-          "company-owner",
-          "company_owner",
-          "org_admin",
-          "employer_admin",
-        ]);
+        const aliases = new Set(["company_admin", "companyadmin", "employer", "company-owner", "company_owner", "org_admin", "employer_admin"]);
         const hit = roleStrs.some((r) => aliases.has(r));
         setIsCompanyAdmin(Boolean(flags || hit));
         if (!(flags || hit)) setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear empresas.");
-      } catch {
+      } catch (e) {
+        console.error("[createCompany] auth error", e);
         setAuthErr("No autenticado");
       } finally {
         setAuthLoading(false);
@@ -88,12 +110,8 @@ export default function Client() {
 
   useEffect(() => {
     return () => {
-      try {
-        if (logoPreview?.startsWith("blob:")) URL.revokeObjectURL(logoPreview);
-      } catch { }
-      try {
-        if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview);
-      } catch { }
+      try { if (logoPreview?.startsWith("blob:")) URL.revokeObjectURL(logoPreview); } catch { }
+      try { if (coverPreview?.startsWith("blob:")) URL.revokeObjectURL(coverPreview); } catch { }
     };
   }, [logoPreview, coverPreview]);
 
@@ -118,18 +136,9 @@ export default function Client() {
     e.preventDefault();
     setError(null);
     setCreated(null);
-    if (!isCompanyAdmin) {
-      setError("No tienes permisos para crear empresas.");
-      return;
-    }
-    if (!form.name?.trim()) {
-      setError("El campo 'Nombre' es obligatorio.");
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email || "")) {
-      setError("Ingresa un email válido.");
-      return;
-    }
+    if (!isCompanyAdmin) { setError("No tienes permisos para crear empresas."); return; }
+    if (!form.name?.trim()) { setError("El campo 'Nombre' es obligatorio."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email || "")) { setError("Ingresa un email válido."); return; }
 
     setLoading(true);
     try {
@@ -137,12 +146,16 @@ export default function Client() {
       let logoUrl: string | undefined;
 
       if (coverFile) {
+        console.log("[createCompany] uploading cover...");
         const up = await uploadSelf("cover", coverFile);
         coverUrl = up.url;
+        console.log("[createCompany] cover uploaded", { coverUrl });
       }
       if (logoFile) {
+        console.log("[createCompany] uploading avatar...");
         const up = await uploadSelf("avatar", logoFile);
         logoUrl = up.url;
+        console.log("[createCompany] avatar uploaded", { logoUrl });
       }
 
       const payload: CreateCompanyPayload = {
@@ -158,17 +171,24 @@ export default function Client() {
         boolVerified: false,
       };
 
+      console.log("[createCompany] request payload -> /api/company/create", payload);
+
       const res = await fetch("/api/company/create", {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ input: payload }),
       });
-      const json = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      let json: any = null;
+      try { json = raw ? JSON.parse(raw) : null; } catch { json = null; }
+      console.log("[createCompany] response /api/company/create", { status: res.status, ok: res.ok, raw, json });
       if (!res.ok) throw new Error(json?.error || "No se pudo crear la empresa");
+
       setCreated(json.company);
       setShowModal(true);
     } catch (err: any) {
+      console.error("[createCompany] submit error", err);
       setError(err?.message || "Error inesperado");
     } finally {
       setLoading(false);
@@ -187,157 +207,67 @@ export default function Client() {
           <h2 className={styles.title}>Crear empresa</h2>
           <p className={styles.subtitle}>Completa los datos de tu empresa.</p>
 
-          {authLoading ? (
-            <div className={styles.statusNote}>Cargando…</div>
-          ) : authErr ? (
-            <div className={styles.statusError}>{authErr}</div>
-          ) : null}
+          {authLoading ? <div className={styles.statusNote}>Cargando…</div> : authErr ? <div className={styles.statusError}>{authErr}</div> : null}
 
           <form onSubmit={handleSubmit} className={styles.formGrid} aria-disabled={!isCompanyAdmin}>
             <div className={styles.coverBlock}>
               <div className={styles.cover} aria-hidden="true">
-                {coverPreview ? (
-                  <img src={coverPreview} alt="Cover preview" className={styles.coverImg} />
-                ) : (
-                  <span className={styles.coverText}>Imagen de portada</span>
-                )}
+                {coverPreview ? <img src={coverPreview} alt="Cover preview" className={styles.coverImg} /> : <span className={styles.coverText}>Imagen de portada</span>}
               </div>
-              <input
-                type="file"
-                accept="image/*"
-                className={styles.fileInput}
-                onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-                disabled={!isCompanyAdmin}
-                aria-label="Subir portada"
-              />
+              <input type="file" accept="image/*" className={styles.fileInput} onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)} disabled={!isCompanyAdmin} aria-label="Subir portada" />
             </div>
 
             <div className={styles.logoRow}>
               <div className={styles.logoWrapper}>
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo preview" className={styles.logoPreview} />
-                ) : (
-                  <div className={styles.logoPlaceholder} />
-                )}
+                {logoPreview ? <img src={logoPreview} alt="Logo preview" className={styles.logoPreview} /> : <div className={styles.logoPlaceholder} />}
               </div>
               <div className={styles.logoActions}>
                 <label className={styles.small}>Logo / foto de perfil</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className={styles.fileInput}
-                  onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
-                  disabled={!isCompanyAdmin}
-                  aria-label="Subir logo"
-                />
+                <input type="file" accept="image/*" className={styles.fileInput} onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)} disabled={!isCompanyAdmin} aria-label="Subir logo" />
                 <span className={styles.helperText}>PNG/JPG recomendado 512x512+</span>
               </div>
             </div>
 
             <div className={styles.formField}>
               <label className={styles.label}>Nombre *</label>
-              <input
-                className={styles.input}
-                placeholder="Nombre de tu empresa"
-                value={form.name}
-                onChange={onChange("name")}
-                required
-                disabled={!isCompanyAdmin}
-              />
+              <input className={styles.input} placeholder="Nombre de tu empresa" value={form.name} onChange={onChange("name")} required disabled={!isCompanyAdmin} />
             </div>
 
             <div className={styles.formField}>
               <label className={styles.label}>Email *</label>
-              <input
-                className={styles.input}
-                placeholder="ejemplo@gmail.com"
-                value={form.email}
-                onChange={onChange("email")}
-                type="email"
-                required
-                disabled={!isCompanyAdmin}
-              />
+              <input className={styles.input} placeholder="ejemplo@gmail.com" value={form.email} onChange={onChange("email")} type="email" required disabled={!isCompanyAdmin} />
             </div>
 
             <div className={styles.formField}>
               <label className={styles.label}>Sitio web</label>
-              <input
-                className={styles.input}
-                placeholder="https://ejemplo.com"
-                value={form.website || ""}
-                onChange={onChange("website")}
-                type="url"
-                disabled={!isCompanyAdmin}
-              />
+              <input className={styles.input} placeholder="https://ejemplo.com" value={form.website || ""} onChange={onChange("website")} type="url" disabled={!isCompanyAdmin} />
             </div>
 
             <div className={styles.twoCols}>
               <div className={styles.formField}>
                 <label className={styles.label}>Industria</label>
-                <input
-                  className={styles.input}
-                  placeholder="Industria"
-                  value={form.industry || ""}
-                  onChange={onChange("industry")}
-                  disabled={!isCompanyAdmin}
-                />
+                <input className={styles.input} placeholder="Industria" value={form.industry || ""} onChange={onChange("industry")} disabled={!isCompanyAdmin} />
               </div>
               <div className={styles.formField}>
                 <label className={styles.label}>Ubicación</label>
-                <input
-                  className={styles.input}
-                  placeholder="Ciudad, País"
-                  value={form.location || ""}
-                  onChange={onChange("location")}
-                  disabled={!isCompanyAdmin}
-                />
+                <input className={styles.input} placeholder="Ciudad, País" value={form.location || ""} onChange={onChange("location")} disabled={!isCompanyAdmin} />
               </div>
             </div>
 
             <div className={styles.formField}>
               <label className={styles.label}>Descripción</label>
-              <textarea
-                className={styles.textarea}
-                placeholder="Describe tu empresa"
-                value={form.description || ""}
-                onChange={onChange("description")}
-                rows={4}
-                disabled={!isCompanyAdmin}
-              />
+              <textarea className={styles.textarea} placeholder="Describe tu empresa" value={form.description || ""} onChange={onChange("description")} rows={4} disabled={!isCompanyAdmin} />
             </div>
 
             {error && <div className={styles.statusError}>{error}</div>}
-            {created && !showModal && (
-              <div className={styles.statusOk}>
-                <b>Empresa creada:</b> {created.name} (ID: {created.id})
-              </div>
-            )}
+            {created && !showModal && <div className={styles.statusOk}><b>Empresa creada:</b> {created.name} (ID: {created.id})</div>}
 
             <div className={styles.actions}>
-              <button className={styles.primaryBtn} disabled={loading || !isCompanyAdmin} type="submit">
-                {loading ? "Creando…" : "Crear empresa"}
-              </button>
-              <button
-                className={styles.secundaryBtn}
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setForm({
-                    name: "",
-                    email: "",
-                    website: "",
-                    description: "",
-                    industry: "",
-                    location: "",
-                  });
-                  setError(null);
-                  setCreated(null);
-                  setLogoFile(null);
-                  setCoverFile(null);
-                }}
-              >
-                Limpiar
-              </button>
+              <button className={styles.primaryBtn} disabled={loading || !isCompanyAdmin} type="submit">{loading ? "Creando…" : "Crear empresa"}</button>
+              <button className={styles.secundaryBtn} type="button" disabled={loading} onClick={() => {
+                setForm({ name: "", email: "", website: "", description: "", industry: "", location: "" });
+                setError(null); setCreated(null); setLogoFile(null); setCoverFile(null);
+              }}>Limpiar</button>
             </div>
           </form>
         </div>
@@ -347,19 +277,9 @@ export default function Client() {
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">
           <div className={styles.modalCard}>
             <h3 className={styles.modalTitle}>¡Empresa creada!</h3>
-            <p className={styles.modalBody}>
-              {created?.name ? (
-                <>
-                  La empresa <b>{created.name}</b> se creó correctamente.
-                </>
-              ) : (
-                "La empresa se creó correctamente."
-              )}
-            </p>
+            <p className={styles.modalBody}>{created?.name ? <>La empresa <b>{created.name}</b> se creó correctamente.</> : "La empresa se creó correctamente."}</p>
             <div className={styles.modalActions}>
-              <button className={styles.primaryBtn} onClick={handleModalAccept}>
-                Aceptar
-              </button>
+              <button className={styles.primaryBtn} onClick={handleModalAccept}>Aceptar</button>
             </div>
           </div>
         </div>
