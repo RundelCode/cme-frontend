@@ -26,8 +26,9 @@ function resolveApiUrl(reqUrl: string) {
 async function readJson(res: Response) {
   const raw = await res.text();
   let data: any = null;
-  try { data = raw ? JSON.parse(raw) : null; }
-  catch {
+  try {
+    data = raw ? JSON.parse(raw) : null;
+  } catch {
     const e: any = new Error('upstream_not_json');
     e.status = res.status;
     e.raw = raw?.slice(0, 800);
@@ -41,9 +42,12 @@ function normalizeOptional(v: any) {
   return v;
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = params?.id;
+    const id = context.params.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
     const API = resolveApiUrl(req.url);
@@ -64,18 +68,28 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const { data, raw } = await readJson(up);
     if (!up.ok) {
-      const msg = data?.error || data?.message || `companies_upstream_${up.status}`;
-      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 404 });
+      const msg =
+        data?.error || data?.message || `companies_upstream_${up.status}`;
+      return NextResponse.json(
+        { error: msg, raw: data ?? raw },
+        { status: up.status || 404 }
+      );
     }
     return NextResponse.json(data);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'companies_id_error', raw: e?.raw ?? null }, { status: e?.status || 500 });
+    return NextResponse.json(
+      { error: e?.message || 'companies_id_error', raw: e?.raw ?? null },
+      { status: e?.status || 500 }
+    );
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: NextRequest,
+  context: { params: { id: string } }
+) {
   try {
-    const id = params?.id;
+    const id = context.params.id;
     if (!id) return NextResponse.json({ error: 'missing_id' }, { status: 400 });
 
     const API = resolveApiUrl(req.url);
@@ -103,8 +117,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       verifiedAt: normalizeOptional(body?.verifiedAt),
     };
 
-    Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
-    payload.boolVerified = body?.boolVerified == null ? false : !!body.boolVerified;
+    Object.keys(payload).forEach(
+      (k) => payload[k] === undefined && delete payload[k]
+    );
+    payload.boolVerified =
+      body?.boolVerified == null ? false : !!body.boolVerified;
 
     const up = await fetch(`${API}/companies/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -116,11 +133,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const { data, raw } = await readJson(up);
     if (!up.ok) {
-      const msg = data?.error || data?.message || `companies_patch_upstream_${up.status}`;
-      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 502 });
+      const msg =
+        data?.error || data?.message || `companies_patch_upstream_${up.status}`;
+      return NextResponse.json(
+        { error: msg, raw: data ?? raw },
+        { status: up.status || 502 }
+      );
     }
     return NextResponse.json(data);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'companies_patch_error', raw: e?.raw ?? null }, { status: e?.status || 500 });
+    return NextResponse.json(
+      { error: e?.message || 'companies_patch_error', raw: e?.raw ?? null },
+      { status: e?.status || 500 }
+    );
   }
 }
