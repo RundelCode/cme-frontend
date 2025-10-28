@@ -50,11 +50,19 @@ async function getProfileById(id: string): Promise<Profile | null> {
   try {
     const origin = await getOrigin();
     const ck = await nextCookies();
-    const cookieHeader = ck.getAll().map((c) => `${c.name}=${encodeURIComponent(c.value)}`).join("; ");
-    const res = await fetch(`${origin}/api/profiles/${encodeURIComponent(id)}`, {
-      cache: "no-store",
-      headers: cookieHeader ? { cookie: cookieHeader, Accept: "application/json" } : { Accept: "application/json" },
-    });
+    const cookieHeader = ck
+      .getAll()
+      .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
+      .join("; ");
+    const res = await fetch(
+      `${origin}/api/profiles/${encodeURIComponent(id)}`,
+      {
+        cache: "no-store",
+        headers: cookieHeader
+          ? { cookie: cookieHeader, Accept: "application/json" }
+          : { Accept: "application/json" },
+      }
+    );
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     if (!data) return null;
@@ -89,12 +97,8 @@ function hasValidEducation(edu: EducationItem[] | null | undefined) {
   );
 }
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams?: { id?: string };
-}) {
-  const id = searchParams?.id?.trim();
+export default async function Page(context: any) {
+  const id = context?.searchParams?.id?.trim();
   const profile = id ? await getProfileById(id) : null;
 
   return (
