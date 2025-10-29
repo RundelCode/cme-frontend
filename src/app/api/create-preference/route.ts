@@ -15,36 +15,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing MP_ACCESS_TOKEN' }, { status: 500 });
     }
 
-    // Body opcional: { amount, currency, title }
     const body = await req.json().catch(() => ({} as any));
     const rawAmount = Number(body?.amount);
     const rawCurrency = toUpper(body?.currency);
     const rawTitle = (body?.title ?? '').toString().trim();
 
-    // Saneamos/decidimos si usamos dinámico o fallback
     const hasDynamic =
       Number.isFinite(rawAmount) && rawAmount > 0 && !!rawCurrency;
 
-    // Currency y monto saneados
     const currency_id = hasDynamic ? rawCurrency : 'COP';
     let unit_price = hasDynamic ? rawAmount : 10000;
 
-    // Reglas de redondeo (MP maneja centavos; COP no usa decimales)
     if (currency_id === 'COP') {
-      unit_price = Math.round(unit_price); // sin decimales
+      unit_price = Math.round(unit_price);
     } else {
-      unit_price = Math.round(unit_price * 100) / 100; // máx 2 decimales
+      unit_price = Math.round(unit_price * 100) / 100;
     }
 
-    // Título del item
     const title =
       (hasDynamic && rawTitle) ? rawTitle.slice(0, 255)
       : (hasDynamic ? `Fee contratación` : 'Producto de prueba');
 
-    // URL base para back_urls
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/+$/, '');
 
-    const buyerEmail = 'test_user_XXXXXXXX@testuser.com'; // MP sandbox
+    const buyerEmail = 'test_user_XXXXXXXX@testuser.com';
 
     const payload = {
       items: [

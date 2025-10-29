@@ -10,14 +10,12 @@ export default function AuthCallback() {
   const params = useMemo(() => {
     const isBrowser = typeof window !== "undefined";
 
-    // solo leer hash/query en el navegador
     const hash = new URLSearchParams(isBrowser ? window.location.hash.slice(1) : "");
     const query = new URLSearchParams(isBrowser ? window.location.search : "");
 
     const access_token = hash.get("access_token") || query.get("access_token") || "";
     const refresh_token = hash.get("refresh_token") || query.get("refresh_token") || "";
 
-    // ⚠️ proteger sessionStorage en SSR
     let next = "/";
     if (isBrowser) {
       next = query.get("next") || window.sessionStorage.getItem("post_login_next") || "/";
@@ -64,7 +62,6 @@ export default function AuthCallback() {
           return window.location.replace("/login");
         }
 
-        // Limpia tokens de la URL
         try {
           const url = new URL(window.location.href);
           url.hash = "";
@@ -73,7 +70,6 @@ export default function AuthCallback() {
           window.history.replaceState({}, "", url.toString());
         } catch { }
 
-        // Verifica sesión
         const r2 = await fetch("/api/me", {
           method: "GET",
           credentials: "include",

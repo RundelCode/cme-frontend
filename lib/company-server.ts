@@ -21,7 +21,7 @@ export type Company = {
 };
 
 function resolveBaseUrl() {
-  const app = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  const app = process.env.APP_URL ?? process.env.NEXT_PUBLIC_API_URL;
   if (app) return app.replace(/\/+$/, "");
   const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;
@@ -33,7 +33,7 @@ export async function getCompanyServer(id: string): Promise<Company> {
   const cookieStore = await nextCookies();
   const cookieHeader = cookieStore.toString();
   const hdrs = await nextHeaders();
-  const auth = hdrs.get("authorization") ?? undefined; 
+  const auth = hdrs.get("authorization") ?? undefined;
 
   const res = await fetch(`${base}/api/company`, {
     method: "POST",

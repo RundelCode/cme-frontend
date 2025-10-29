@@ -3,7 +3,7 @@ import { cookies as nextCookies, headers as nextHeaders } from "next/headers";
 import { SearchProfilesInput, UserProfile } from "./profile-types";
 
 function resolveBaseUrl() {
-  const app = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  const app = process.env.APP_URL ?? process.env.NEXT_PUBLIC_API_URL;
   if (app) return app.replace(/\/+$/, "");
   const vercel = process.env.VERCEL_URL;
   if (vercel) return `https://${vercel}`;

@@ -6,7 +6,7 @@ function resolveApiUrl(reqUrl: string) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api"; // <-- backend en 3000
+    "cme-monolith.vercel.app/api";
   try {
     new URL(base);
     return base.replace(/\/$/, "");
@@ -48,13 +48,12 @@ export async function POST(req: Request) {
 
     const API = resolveApiUrl(req.url);
 
-    // 🔁 Cambiado a /auth/oauth (tu backend Nest)
     const upstream = await fetch(`${API}/auth/oauth`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: `Bearer ${incomingToken}`, // por si tu service lo lee
+        Authorization: `Bearer ${incomingToken}`,
       },
       body: JSON.stringify({
         access_token: incomingToken,
@@ -77,7 +76,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Normalizamos: varios backends devuelven shapes distintos
     const user = data?.user ?? data?.profile ?? data?.me ?? null;
     const session = data?.session ?? data;
 
@@ -104,9 +102,8 @@ export async function POST(req: Request) {
     const sameSiteVal =
       (process.env.COOKIE_SAMESITE as any) || (isProd ? "none" : "lax");
 
-    // TTL (como en tu login normal)
-    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60; // 7d o 1h
-    const REFRESH_TTL = 60 * 60 * 24 * 30; // 30d
+    const ACCESS_TTL = rememberMe ? 60 * 60 * 24 * 7 : 60 * 60;
+    const REFRESH_TTL = 60 * 60 * 24 * 30
 
     const res = NextResponse.json({ ok: true, user });
 
