@@ -178,8 +178,11 @@ export default function Client() {
                 if (!userId) throw new Error('No autenticado');
                 if (role !== 'company_admin') throw new Error("Solo los usuarios con rol 'company_admin' pueden ver sus ofertas.");
                 setAuth({ id: userId, role });
-                const c = await restJson<{ items?: Company[] }>('/api/company/search', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ input: { adminId: userId, limit: 1 } }) });
-                const comp = Array.isArray(c?.items) ? c.items[0] ?? null : null;
+
+                // OBTENER EMPRESA POR /api/company/byAdmin?id=USER_ID (misma forma que en Navbar)
+                const byAdmin = await restJson<any>(`/api/company/byAdmin?id=${encodeURIComponent(userId)}`);
+                const arr = Array.isArray(byAdmin) ? byAdmin : (Array.isArray(byAdmin?.items) ? byAdmin.items : (byAdmin ? [byAdmin] : []));
+                const comp = arr[0] ?? null;
                 if (!comp?.id) throw new Error('No tienes una empresa asociada aún.');
                 setCompany(comp);
             } catch (e: any) {

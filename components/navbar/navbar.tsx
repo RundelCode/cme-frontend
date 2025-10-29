@@ -51,6 +51,17 @@ function isCompanyAdminFrom(me: any, profile: any) {
   return flags || hit;
 }
 
+function pickMyCompany(arr: any[], userId: string): CompanyLite | null {
+  if (!Array.isArray(arr) || !userId) return null;
+  // Busca coincidencia estricta con adminId/admin_id
+  const mine =
+    arr.find((it) => String(it?.adminId ?? it?.admin_id ?? "") === userId) ??
+    null;
+  if (mine?.id) return { id: String(mine.id), name: String(mine.name ?? "Mi empresa") };
+  // Si no hay coincidencia exacta, NO tomamos la primera para evitar “otra empresa”
+  return null;
+}
+
 async function getAuthAndProfile() {
   const hdrs = await nextHeaders();
   const cookies = await nextCookies();
@@ -65,10 +76,12 @@ async function getAuthAndProfile() {
     },
     cache: "no-store",
   });
-  const me = await meRes.json().catch(() => null);
+  const meOk = meRes.ok;
+  const me = meOk ? await meRes.json().catch(() => null) : null;
+
   const userId: string | null = me?.id ?? me?.user?.id ?? null;
   if (!userId)
-    return { isLogged: false, profile: null, isCompanyAdmin: false, adminCompany: null, unreadCount: 0 };
+    return { isLogged: false, profile: null, isCompanyAdmin: false, adminCompany: null as CompanyLite | null, unreadCount: 0 };
 
   let profile: any = null;
   try {
@@ -79,42 +92,22 @@ async function getAuthAndProfile() {
     const pdata = await pRes.json().catch(() => null);
     profile = Array.isArray(pdata?.profiles) ? pdata.profiles[0] ?? null : null;
   } catch {
-    return { isLogged: false, profile: null, isCompanyAdmin: false, adminCompany: null, unreadCount: 0 };
+    return { isLogged: true, profile: null, isCompanyAdmin: false, adminCompany: null as CompanyLite | null, unreadCount: 0 };
   }
 
-  const isCompanyAdmin = isCompanyAdminFrom(me, profile);
-
   let adminCompany: CompanyLite | null = null;
-  if (isCompanyAdmin) {
-    try {
-      const cRes = await fetch(`${origin}/api/company/search`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          Accept: "application/json",
-          cookie: cookieHeader,
-        },
-        body: JSON.stringify({ input: { adminId: userId, limit: 1 } }),
-        cache: "no-store",
-      });
+  try {
+    const cRes = await fetch(`${origin}/api/company/byAdmin?id=${encodeURIComponent(userId)}`, {
+      headers: { cookie: cookieHeader, Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (cRes.ok) {
       const cjson = await cRes.json().catch(() => null);
-      const items: any[] = Array.isArray(cjson?.items) ? cjson.items : [];
-      const mine = items.find(
-        (it) =>
-          String(
-            it?.adminId ??
-              it?.admin_id ??
-              it?.ownerId ??
-              it?.owner_id ??
-              it?.userId ??
-              it?.user_id ??
-              ""
-          ) === userId
-      );
-      if (mine?.id) adminCompany = { id: String(mine.id), name: String(mine.name ?? "Mi empresa") };
-    } catch {
-      adminCompany = null;
+      const arr = Array.isArray(cjson) ? cjson : Array.isArray(cjson?.items) ? cjson.items : (cjson ? [cjson] : []);
+      adminCompany = pickMyCompany(arr, userId); // <- SOLO toma la que sea realmente tuya
     }
+  } catch {
+    adminCompany = null;
   }
 
   let unreadCount = 0;
@@ -133,7 +126,10 @@ async function getAuthAndProfile() {
       if (items.length < limit) break;
       offset += limit;
     }
-  } catch {}
+  } catch { }
+
+  // Es admin si lo dice el perfil O si ya encontramos una empresa suya
+  const isCompanyAdmin = isCompanyAdminFrom(me, profile) || !!adminCompany;
 
   return {
     isLogged: true,
@@ -176,7 +172,11 @@ export default async function Navbar() {
                 <p className={styles.navTitle}>Empresa</p>
                 {adminCompany?.id ? (
                   <>
-                    <Link href={`/profile/company?id=${adminCompany.id}`} className={styles.option} title={adminCompany.name}>
+                    <Link
+                      href={`/profile/company?id=${encodeURIComponent(adminCompany.id)}`}
+                      className={styles.option}
+                      title={adminCompany.name}
+                    >
                       <Image className={styles.navIcon} src={CompanyIcon} alt="Mi empresa" width={320} height={320} priority />
                       Mi empresa
                     </Link>
@@ -229,12 +229,12 @@ export default async function Navbar() {
 
             {isCompanyAdmin && (
               <div className={styles.category}>
-                  <p className={styles.navTitle}>Finanzas</p>
-                  <Link href="/finance" className={styles.option}>
-                    <Image className={styles.navIcon} src={BillingIcon} alt="Billing" width={320} height={320} priority />
-                    Resumen
-                  </Link>
-                </div>
+                <p className={styles.navTitle}>Finanzas</p>
+                <Link href="/finance" className={styles.option}>
+                  <Image className={styles.navIcon} src={BillingIcon} alt="Billing" width={320} height={320} priority />
+                  Resumen
+                </Link>
+              </div>
             )}
             <div className={styles.category}>
               <p className={styles.navTitle}>Bandeja de Entrada</p>

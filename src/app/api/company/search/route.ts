@@ -1,4 +1,3 @@
-// app/api/company/search/route.ts
 import { NextRequest, NextResponse } from "next/server";
 
 function buildAuthHeader(req: NextRequest): string | undefined {
@@ -13,7 +12,7 @@ function buildAuthHeader(req: NextRequest): string | undefined {
 function resolveApiUrl(req: NextRequest) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
-    "cme-monolith.vercel.app/api";
+    "http://localhost:3000/api";
   if (/^https?:\/\//i.test(base)) return base.replace(/\/+$/, "");
   return new URL(base, req.nextUrl.origin).toString().replace(/\/+$/, "");
 }

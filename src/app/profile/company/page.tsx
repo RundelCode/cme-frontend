@@ -4,7 +4,6 @@ import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
 import Navbar from "../../../../components/navbar/navbar";
 import styles from "../company/companyProfile.module.css";
-import CompanyRatingClient from "../company/rating/CompanyRatingClient";
 import CompanyOffers from "../company/offers/CompanyOffers";
 import { getOriginFromHeaders } from "../../../../lib/getOrigin";
 
@@ -35,6 +34,7 @@ async function getMeAndCompany() {
   const cookieHeader = (await nextCookies()).toString();
   const origin = await getOriginFromHeaders();
 
+  // 1) /api/me
   const meRes = await fetch(`${origin}/api/me`, {
     method: "GET",
     headers: {
@@ -45,41 +45,68 @@ async function getMeAndCompany() {
     cache: "no-store",
   });
   const meJson = await meRes.json().catch(() => null);
-  const me: AuthMe | null = meJson?.id ? { id: meJson.id, email: meJson?.user?.email ?? meJson?.email ?? "", role: meJson?.role ?? "" } : null;
+  const me: AuthMe | null = meJson?.id
+    ? {
+      id: String(meJson.id),
+      email: String(meJson?.user?.email ?? meJson?.email ?? ""),
+      role: String(meJson?.role ?? meJson?.user?.role ?? ""),
+    }
+    : null;
+
   if (!me?.id) return { me: null as AuthMe | null, company: null as Company | null };
+
+  // 2) /api/company/byAdmin?id=:userId  (usa el proxy nuevo)
+  const byAdminRes = await fetch(
+    `${origin}/api/company/byAdmin?id=${encodeURIComponent(me.id)}`,
+    {
+      method: "GET",
+      headers: {
+        cookie: cookieHeader,
+        Accept: "application/json",
+        "x-correlation-id": hdrs.get("x-correlation-id") || "",
+      },
+      cache: "no-store",
+    }
+  );
 
   let company: Company | null = null;
 
-  const searchRes = await fetch(`${origin}/api/company/search`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      Accept: "application/json",
-      cookie: cookieHeader,
-    },
-    body: JSON.stringify({ input: { adminId: me.id, limit: 1 } }),
-    cache: "no-store",
-  });
-  const searchJson = await searchRes.json().catch(() => null);
-  const first = Array.isArray(searchJson?.items) ? searchJson.items[0] : null;
-  if (first?.id) {
-    company = {
-      id: String(first.id),
-      name: String(first.name ?? ""),
-      email: String(first.email ?? ""),
-      website: first.website ?? null,
-      description: first.description ?? null,
-      industry: first.industry ?? null,
-      location: first.location ?? null,
-      profilePicture: first.profilePicture ?? null,
-      coverPhoto: first.coverPhoto ?? null,
-      companyRating: typeof first.companyRating === "number" ? first.companyRating : Number(first.companyRating ?? 0),
-      boolVerified: !!first.boolVerified,
-      verifiedAt: first.verifiedAt ?? null,
-      subscriptionPlan: first.subscriptionPlan ?? null,
-      createdAt: first.createdAt ?? "",
-      updatedAt: first.updatedAt ?? null,
-    };
+  if (byAdminRes.ok) {
+    const data = await byAdminRes.json().catch(() => null);
+
+    // Normalizamos: puede venir como array, {items:[]}, o un objeto único
+    const listRaw =
+      Array.isArray(data) ? data :
+        Array.isArray(data?.items) ? data.items :
+          (data ? [data] : []);
+
+    const first = listRaw[0] ?? null;
+
+    if (first?.id) {
+      company = {
+        id: String(first.id),
+        name: String(first.name ?? first.company_name ?? ""),
+        email: String(first.email ?? ""),
+        website: first.website ?? null,
+        description: first.description ?? null,
+        industry: first.industry ?? null,
+        location: first.location ?? null,
+        profilePicture: first.profilePicture ?? first.profile_picture ?? null,
+        coverPhoto: first.coverPhoto ?? first.cover_photo ?? null,
+        companyRating:
+          typeof first.companyRating === "number"
+            ? first.companyRating
+            : Number(first.company_rating ?? first.companyRating ?? 0),
+        boolVerified:
+          typeof first.boolVerified === "boolean"
+            ? first.boolVerified
+            : !!first.bool_verified,
+        verifiedAt: first.verifiedAt ?? first.verified_at ?? null,
+        subscriptionPlan: first.subscriptionPlan ?? first.subscription_plan ?? null,
+        createdAt: String(first.createdAt ?? first.created_at ?? ""),
+        updatedAt: first.updatedAt ?? first.updated_at ?? null,
+      };
+    }
   }
 
   return { me, company };
@@ -165,7 +192,6 @@ export default async function MyCompanyPage() {
                   <span className={styles.dot}>·</span>
                   <span>{company.location ?? "—"}</span>
                 </div>
-
               </div>
             </div>
 

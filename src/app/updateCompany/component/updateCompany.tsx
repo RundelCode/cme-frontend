@@ -93,12 +93,9 @@ export default function UpdateCompany() {
       try {
         setLoading(true);
         setErr(null);
-        const search = await restJson<{ items: CompanyCamel[] }>('/api/company/search', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ input: { adminId: meId, limit: 1 } }),
-        });
-        const c = search.items?.[0];
+        const byAdmin = await restJson<any>(`/api/company/byAdmin?id=${encodeURIComponent(meId)}`);
+        const arr = Array.isArray(byAdmin) ? byAdmin : (Array.isArray(byAdmin?.items) ? byAdmin.items : (byAdmin ? [byAdmin] : []));
+        const c: CompanyCamel | null = arr?.[0] ?? null;
         if (!c?.id) {
           setCompanyId(null);
           setOk(null);
@@ -112,8 +109,8 @@ export default function UpdateCompany() {
         setIndustry(c.industry ?? '');
         setLocation(c.location ?? '');
         setDescription(c.description ?? '');
-        setLogoUrl(c.profilePicture ?? null);
-        setCoverUrl(c.coverPhoto ?? null);
+        setLogoUrl((c as any).profilePicture ?? (c as any).profile_picture ?? null);
+        setCoverUrl((c as any).coverPhoto ?? (c as any).cover_photo ?? null);
       } catch (e: any) {
         setErr(e?.message ?? 'Error cargando la empresa');
       } finally {
