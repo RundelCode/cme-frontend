@@ -287,7 +287,6 @@
   border-radius: 8px;
 }
 
-
 .modalActions {
   display: flex;
   justify-content: space-around;
@@ -390,4 +389,93 @@
   color: #475569;
   font-size: 13px;
   width: 50%;
+}
+
+@media (max-width: 768px){
+  .modal{
+    width: 100%;
+    position: absolute;
+    right: 0;
+  }
+  .modalOverlay{
+    width: 80vw;
+    position: absolute;
+    right: 0;
+  }
+}
+
+
+
+@media (max-width: 768px) {
+  .cover {
+    height: 150px;
+  }
+  .infoSection {
+    width: 94%;
+    margin-top: -32px;
+    gap: 12px;
+  }
+  .logoWrapper,
+  .logoImg,
+  .logoPlaceholder {
+    width: 60px;
+    height: 60px;
+  }
+  .title {
+    font-size: 18px;
+  }
+  .meta,
+  .infoSection b,
+  .infoSection p {
+    font-size: 13px;
+  }
+  .textSection {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .skills {
+    justify-content: flex-start;
+  }
+  .actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .modalOverlay{
+    width: 100%;
+    position: absolute;
+    left: 0;
+  }
+  .modalCard {
+    width: calc(90% - 16px);
+    padding: 16px 16px 14px;
+  }
+  .modalTitle {
+    font-size: 17px;
+  }
+  .personLink {
+    gap: 10px;
+    padding: 10px;
+  }
+  .avatar {
+    width: 44px;
+    height: 44px;
+  }
+  .modalSubActions {
+    gap: 8px;
+  }
+  .pager {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .pageNav {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .pageLabel {
+    width: auto;
+  }
+  .personAppliedAt{
+    display: none;
+  }
 }

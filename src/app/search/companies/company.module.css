@@ -92,7 +92,7 @@
 }
 
 .section {
-  width: min(820px, 95vw);
+  width: 95vw;
   display: grid;
   gap: 14px
 }
@@ -233,4 +233,12 @@
 .verifiedStar {
   color: #f5c518;
   font-size: 14px
+}
+
+
+@media (max-width: 768px){
+  .main{
+    margin: 0;
+    padding: 70px 20px 20px 20px;
+  }
 }

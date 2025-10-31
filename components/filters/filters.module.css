@@ -108,3 +108,24 @@
 .clearButton:hover {
     background: #f3f4f6;
 }
+
+
+@media (max-width: 768px) {
+
+    .filtersForm select,
+    .submitButton,
+    .filtersForm input,
+    .clearButton {
+        display: none;
+    }
+
+    .searchInput{
+        min-width: 100%;
+    }
+
+    .searchInput input {
+        display: flex;
+        height: 30px;
+        width: 100%;
+    }
+}

@@ -287,3 +287,33 @@
 .modalClose {
   display: none;
 }
+
+
+@media (max-width: 768px){
+  .body{
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .companyRow{
+    width: 100%;
+  }
+
+  .chipsRow{
+    flex-direction: row;
+  }
+
+  .infoSection{
+    width: 100%;
+  }
+
+  .actions{
+    width: 100%;
+  }
+  .modalOverlay{
+    width: 100%;
+  }
+  .modalBody{
+    width: 85%;
+  }
+}

@@ -1,4 +1,4 @@
-.main{
+.main {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -7,7 +7,7 @@
     background-color: #152048;
 }
 
-.mainInnerContainer{
+.mainInnerContainer {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -16,7 +16,7 @@
     background-color: #FFFFFF;
 }
 
-.loginFormContainer{
+.loginFormContainer {
     width: 50%;
     height: 100%;
     display: flex;
@@ -26,17 +26,17 @@
     gap: 20px;
 }
 
-.subtitle{
+.subtitle {
     color: #152048;
 }
 
 
-.cmeLogo{
+.cmeLogo {
     width: 250px;
     height: auto;
 }
 
-.divider{
+.divider {
     color: #152048;
     font-weight: bolder;
     font-size: larger;
@@ -47,25 +47,25 @@
     gap: 10px;
 }
 
-.line{
+.line {
     width: 30%;
     height: 0px;
     border: solid 1px #152048;
 }
 
-.loginPhoto{
+.loginPhoto {
     width: 50%;
     height: 100%;
 }
 
-.loginForm{
-    width:60%;
+.loginForm {
+    width: 60%;
     display: flex;
     gap: 10px;
     flex-direction: column;
 }
 
-.loginForm input{
+.loginForm input {
     width: calc(100% - 20px);
     height: 40px;
     padding-left: 20px;
@@ -75,38 +75,39 @@
     border-radius: 5px;
 }
 
-.loginForm input::placeholder{
+.loginForm input::placeholder {
     font-weight: bolder;
     color: #15204856;
 }
 
-.loginForm input:focus{
+.loginForm input:focus {
     border: 2px solid #152048;
     color: #152048;
 }
-.formOptions{
+
+.formOptions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     width: 100%;
 }
 
-.loginForm p{
-    font-size:small;
+.loginForm p {
+    font-size: small;
     color: #152048;
 }
 
-.loginForm a{
+.loginForm a {
     font-size: small;
     color: #1b708c;
 }
 
-.formOptions input{
+.formOptions input {
     width: 15px;
     border-color: #15204830;
 }
 
-.rememberMe{
+.rememberMe {
     display: flex;
     flex-direction: row;
     justify-content: flex-start;
@@ -114,7 +115,7 @@
     gap: 5px;
 }
 
-.registerLink{
+.registerLink {
     display: flex;
     justify-content: center;
     align-items: center;
@@ -122,7 +123,7 @@
     gap: 5px;
 }
 
-.sendButton{
+.sendButton {
     width: 100%;
     height: 40px;
     border-radius: 5px;
@@ -134,11 +135,11 @@
     transition: .2s;
 }
 
-.sendButton:hover{
+.sendButton:hover {
     background-color: #1b295b;
 }
 
-.socialMediaLoginButtion{
+.socialMediaLoginButtion {
     width: 100%;
     height: 40px;
     display: flex;
@@ -155,11 +156,11 @@
 
 }
 
-.socialMediaLoginButtion:hover{
+.socialMediaLoginButtion:hover {
     background-color: #1520481a;
 }
 
-.socialMediaLoginButtion img{
+.socialMediaLoginButtion img {
     position: absolute;
     left: 10px;
 
@@ -167,41 +168,62 @@
 
 
 .passwordField {
-  position: relative;
+    position: relative;
 }
 
 
 .togglePassword {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font-size: 16px;
-  line-height: 1;
-  padding: 4px;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 4px;
 }
 
 
 .passwordField input {
-  width: calc(100% - 36px - 20px);
-  padding-right: 36px;
+    width: calc(100% - 36px - 20px);
+    padding-right: 36px;
 }
 
 
 .formError {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #fee2e2;     
-  color: #7f1d1d;          
-  border: 1px solid #fecaca;
-  font-size: 0.80rem;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #fee2e2;
+    color: #7f1d1d;
+    border: 1px solid #fecaca;
+    font-size: 0.80rem;
 }
 
 .sendButton[disabled] {
-  opacity: 0.6;
-  cursor: not-allowed;
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+
+@media (max-width: 768px) {
+    .loginPhoto {
+        display: none;
+    }
+    .mainInnerContainer{
+        width: 90%;
+        justify-content: center;
+        align-items: center;
+    }
+    .loginFormContainer{
+        width: 100%;
+    }
+    .line{
+        width: 40%;
+    }
+    .loginForm{
+        width: 90%;
+    }
 }

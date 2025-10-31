@@ -220,7 +220,6 @@ export default async function MyCompanyPage() {
                 </div>
               </dl>
             </div>
-
             <div className={styles.section}>
               <h3>Ofertas de trabajo</h3>
               <CompanyOffers companyId={company.id} />

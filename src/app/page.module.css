@@ -44,5 +44,5 @@
 }
 
 @media (max-width: 768px) {
-  .main { margin-left: var(--nav-w, 18%); }
+  .main { margin-left: 0; }
 }

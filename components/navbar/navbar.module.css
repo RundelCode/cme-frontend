@@ -70,7 +70,6 @@
   background-color: #EAECF2;
 }
 
-
 .rightHeader {
   display: flex;
   align-items: center;
@@ -101,7 +100,6 @@
   justify-content: center;
   align-items: center;
   transition: .2s;
-
 }
 
 .ctaBtnOutline {
@@ -182,7 +180,6 @@
   align-items: flex-start;
   flex-direction: column;
   overflow: hidden;
-  
 }
 
 .profileName {
@@ -317,15 +314,66 @@
   margin: 4px 4px 6px;
 }
 
-.badge{
+.badge {
   color: #1B295B;
   padding: 1px 4px;
   border-radius: 100%;
   aspect-ratio: 1/1;
 }
 
-@media (max-width: 1024px) {
+.mobileTopbar {
+  display: none;
+  width: 100%;
+}
 
+.burgerBtn {
+  appearance: none;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  padding: 10px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  margin-right: 8px;
+}
+
+.burgerBar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: #111827;
+  border-radius: 2px;
+  margin: 2px 0;
+}
+
+.mobileBrand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.mobileBrand img{
+  width: auto;
+  height: 60%;
+}
+
+.mobileBrandText {
+  font-weight: 700;
+  color: #111827;
+  font-size: 0.95rem;
+}
+
+.navOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, .35);
+  backdrop-filter: saturate(120%) blur(1px);
+  z-index: 999;
+  display: none;
+}
+
+@media (max-width: 1024px) {
   .profileMenu {
     width: 240px;
   }
@@ -337,17 +385,54 @@
 
 @media (max-width: 768px) {
 
-  .navTitle,
-  .profileText {
+  .mobileTopbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    padding: 0px 15px;
+    width: calc(100vw - 20px);
+    background: #fff;
+    border-bottom: 1px solid #00000010;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    z-index: 1200;
+  }
+
+  .navbarMain {
+    width: 80vw;
+    max-width: 320px;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    padding-top: 70px;
+    top: 0;
+    z-index: 10000;
+  }
+
+  .navTitle {
     display: none;
   }
 
   .option {
-    justify-content: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 10px;
+    height: 40px;
+    font-size: large;
   }
 
-  .navbarMain {
-    width: 72px;
+  :global(body.nav-open) .navbarMain {
+    transform: translateX(0);
+  }
+
+  :global(body.nav-open) .navOverlay {
+    display: block;
+  }
+
+  .cmeLogo {
+    width: 42%;
+    margin-bottom: 40px;
   }
 }

@@ -1,4 +1,3 @@
-// src/app/profile/company/page.tsx
 import Image from "next/image";
 import Link from "next/link";
 import { headers as nextHeaders, cookies as nextCookies } from "next/headers";
@@ -17,8 +16,8 @@ type Company = {
   description?: string | null;
   industry?: string | null;
   location?: string | null;
-  profilePicture?: string | null; // camelCase usado por la vista
-  coverPhoto?: string | null;     // camelCase usado por la vista
+  profilePicture?: string | null;
+  coverPhoto?: string | null;
   companyRating?: number | null;
   boolVerified?: boolean | null;
   verifiedAt?: string | null;
@@ -27,7 +26,6 @@ type Company = {
   updatedAt?: string | null;
 };
 
-// Utilidad: toma el valor camel si existe; si no, el snake; si no, null
 function coalesce<T>(...vals: (T | null | undefined)[]): T | null {
   for (const v of vals) if (v !== undefined && v !== null) return v as T;
   return null;
@@ -49,7 +47,6 @@ async function getCompanyById(id: string): Promise<Company | null> {
       .map((c) => `${c.name}=${encodeURIComponent(c.value)}`)
       .join("; ");
 
-    // Nota: este proxy devuelve lo que venga del backend (snake o camel).
     const res = await fetch(`${origin}/api/company/${encodeURIComponent(id)}`, {
       cache: "no-store",
       headers: cookieHeader
@@ -62,7 +59,6 @@ async function getCompanyById(id: string): Promise<Company | null> {
     const raw = data?.company ?? data ?? null;
     if (!raw?.id) return null;
 
-    // 🔁 Normalizamos snake → camel para lo que consume la UI
     const company: Company = {
       id: raw.id,
       name: raw.name,
@@ -175,15 +171,6 @@ export default async function Page({
                   <span>{company.industry ?? "—"}</span>
                   <span className={styles.dot}>·</span>
                   <span>{company.location ?? "—"}</span>
-                </div>
-
-                <div className={styles.ratingRow}>
-                  <CompanyRatingClient
-                    companyId={company.id}
-                    initialRating={company.companyRating ?? 0}
-                    className={styles.stars}
-                    valueClassName={styles.ratingValue}
-                  />
                 </div>
               </div>
             </div>

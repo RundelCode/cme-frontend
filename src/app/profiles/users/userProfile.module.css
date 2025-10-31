@@ -419,8 +419,31 @@
   border-color: #c7d2fe;
 }
 
-@media (max-width: 1024px) {
-  .bodyGrid {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .main {
+    padding: 0px;
   }
+
+  .page {
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .content {
+    padding: 0%;
+  }
+
+  .card {
+    margin: 0;
+    border-radius: 0px;
+    min-height: 100vh;
+  }
+
+  .detailRow {
+    grid-template-columns: 100px 1fr;
+  }
+
+
 }
