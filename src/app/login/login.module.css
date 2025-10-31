@@ -214,6 +214,8 @@
     }
     .mainInnerContainer{
         width: 90%;
+        height: auto;
+        padding: 40px 0px 50px 0px;
         justify-content: center;
         align-items: center;
     }

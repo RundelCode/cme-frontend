@@ -598,25 +598,12 @@
     transform: translateX(18px);
 }
 
-@media (max-width: 720px) {
-    .filters {
-        grid-template-columns: 1fr;
+
+@media (max-width: 768px){
+    .main{
+        width: calc(100% - 32px);
+        min-height: calc(100vh - 7vh - 60px);
+        padding-top: 7vh;
+        margin: 0;
     }
-
-    .toolbar {
-        width: 100%;
-    }
 }
-
-.hidden {
-    display: none !important;
-}
-
-.nowrap {
-    white-space: nowrap;
-}
-
-.break {
-    word-break: break-word;
-}
-

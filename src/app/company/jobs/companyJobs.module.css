@@ -5,8 +5,8 @@
 
 .main {
     margin-left: var(--nav-w, 18%);
-    min-height: calc(100dvh - 96px);
-    padding: 36px 16px 60px;
+    min-height: calc(100dvh - 72px);
+    padding: 36px 16px 36px;
     display: flex;
     flex-direction: column;
     gap: 20px;
@@ -582,9 +582,22 @@
     backdrop-filter: blur(2px);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+    .main{
+        margin: 0;
+        padding-top: 80px;
+        min-height: calc(100vh - 80px - 36px);
+    }
+    .modalOverlay{
+        margin: 0;
+        position: absolute;
+        left: 0;
+        width: 100%;
+        min-height: 100vh;
+        padding: 0;
+    }
     .modalCard {
-        width: 96vw;
+        width: 90%;
     }
 
     .payRow {
@@ -595,5 +608,9 @@
 
     .payActions {
         justify-content: stretch;
+    }
+
+    .pageSize{
+        display: none;
     }
 }

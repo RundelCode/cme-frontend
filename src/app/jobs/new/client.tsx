@@ -72,6 +72,12 @@ function isCompanyAdminFrom(me: any, profile: any) {
   const hit = candidates.some((r) => aliases.has(r));
   return flags || hit;
 }
+function pickMyCompany(arr: any[], userId: string): CompanyLite | null {
+  if (!Array.isArray(arr) || !userId) return null;
+  const mine = arr.find((it) => String(it?.adminId ?? it?.admin_id ?? "") === userId) ?? null;
+  if (mine?.id) return { id: String(mine.id), name: String(mine.name ?? "Mi empresa") };
+  return null;
+}
 
 export default function Client() {
   const router = useRouter();
@@ -116,29 +122,35 @@ export default function Client() {
   }, []);
 
   useEffect(() => {
-    if (!isCompanyAdmin || !userId) return;
+    if (!userId) return;
     (async () => {
       setCompanyLoading(true);
       try {
-        const cRes = await fetch(`/api/company/search`, {
-          method: "POST",
-          headers: { "content-type": "application/json", Accept: "application/json" },
+        const cRes = await fetch(`/api/company/byAdmin?id=${encodeURIComponent(userId)}`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
           credentials: "include",
-          body: JSON.stringify({ input: { adminId: userId, limit: 1 } }),
           cache: "no-store",
         });
-        const cjson = await cRes.json().catch(() => null);
-        const items: any[] = Array.isArray(cjson?.items) ? cjson.items : [];
-        const mine = items.find((it: any) => String(it?.adminId ?? it?.admin_id ?? it?.ownerId ?? it?.owner_id ?? it?.userId ?? it?.user_id ?? "") === userId);
-        if (mine?.id) setAdminCompany({ id: String(mine.id), name: String(mine.name ?? "Mi empresa") });
-        else setAdminCompany(null);
+        if (cRes.ok) {
+          const cjson = await cRes.json().catch(() => null);
+          const arr = Array.isArray(cjson) ? cjson : Array.isArray(cjson?.items) ? cjson.items : (cjson ? [cjson] : []);
+          const mine = pickMyCompany(arr, userId);
+          setAdminCompany(mine);
+          if (mine) {
+            setIsCompanyAdmin(true);
+            setAuthErr(null);
+          }
+        } else {
+          setAdminCompany(null);
+        }
       } catch {
         setAdminCompany(null);
       } finally {
         setCompanyLoading(false);
       }
     })();
-  }, [isCompanyAdmin, userId]);
+  }, [userId]);
 
   const [form, setForm] = useState<FormState>({
     companyId: "",
@@ -260,7 +272,7 @@ export default function Client() {
 
           {authLoading ? (
             <div className={styles.statusNote}>Cargando…</div>
-          ) : authErr ? (
+          ) : authErr && !isCompanyAdmin ? (
             <div className={styles.statusError}>{authErr}</div>
           ) : companyLoading ? (
             <div className={styles.statusNote}>Validando tu empresa…</div>

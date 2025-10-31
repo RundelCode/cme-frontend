@@ -435,4 +435,8 @@
     width: 42%;
     margin-bottom: 40px;
   }
+  .profileMenu{
+    left: calc(100% - 260px);
+    bottom: 30px;
+  }
 }
