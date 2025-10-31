@@ -292,7 +292,7 @@
 @media (max-width: 768px){
   .body{
     flex-direction: column;
-    width: 100%;
+    width: calc(100% - 32px);
   }
 
   .companyRow{

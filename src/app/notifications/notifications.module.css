@@ -606,4 +606,7 @@
         padding-top: 7vh;
         margin: 0;
     }
+    .card{
+        width: 100%;
+    }
 }

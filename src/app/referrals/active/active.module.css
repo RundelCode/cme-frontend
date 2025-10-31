@@ -232,3 +232,13 @@
   color: #374151;
   border-color: #e5e7eb;
 }
+
+
+@media (max-width: 768px){
+  .main{
+    margin: 0;
+    width: calc(100% - 32px);
+    padding-top: 7vh;
+    min-height: calc(100vh - 7vh - 60px);
+  }
+}
