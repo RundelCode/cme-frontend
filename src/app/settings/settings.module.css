@@ -16,8 +16,9 @@
 .card {
   width: 70%;
   background: #fff;
-  display: grid;
-  grid-template-columns: 22% 1fr;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
   border-radius: 1rem;
   border: 1px solid #e5e7eb;
   box-shadow: 0 0.625rem 1.875rem rgba(16, 24, 40, .08);
@@ -95,9 +96,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px 0px;
+  padding: 20px 10px;
   width: calc(100% - 5px);
   overflow: auto;
+  width: 98%;
+
 }
 
 .contentWrap {
@@ -124,13 +127,21 @@
   width: 100%;
 }
 
-@media (max-width: 768px){
-  .main{
+
+
+.settingNav {
+  display: none;
+}
+
+
+
+@media (max-width: 768px) {
+  .main {
     width: 100%;
     margin: 0;
     min-height: calc(100vh - 7vh);
   }
-  .card{
+  .card {
     margin: 0;
     width: 100%;
     padding-top: 7vh;
@@ -138,12 +149,5 @@
     display: flex;
     justify-content: center;
     align-items: center;
-  }
-  .settingNav{
-    display: none;
-  }
-  .activeOption{
-    width: 98%;
-    padding: 0;
   }
 }
