@@ -92,7 +92,7 @@
 }
 
 .section {
-  width: 95vw;
+  width: min(820px, 95vw);
   display: grid;
   gap: 14px
 }

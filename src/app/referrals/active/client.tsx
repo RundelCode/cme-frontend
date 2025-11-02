@@ -60,8 +60,8 @@ async function j<T = any>(input: RequestInfo, init?: RequestInit): Promise<T> {
 
 function getDefaultMonth(): string {
     const d = new Date();
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
     return `${y}-${m}`;
 }
 
@@ -71,8 +71,8 @@ function getMonthRange(ym: string): { from: number; to: number } | null {
     const y = Number(m[1]);
     const mon = Number(m[2]);
     if (mon < 1 || mon > 12) return null;
-    const from = Date.UTC(y, mon - 1, 1, 0, 0, 0, 0);
-    const to = Date.UTC(y, mon, 0, 23, 59, 59, 999);
+    const from = new Date(y, mon - 1, 1, 0, 0, 0, 0).getTime();
+    const to = new Date(y, mon, 0, 23, 59, 59, 999).getTime();
     return { from, to };
 }
 
@@ -115,12 +115,12 @@ function initials(name?: string | null) {
 function companyLogo(c?: CompanyMin | null): string | null {
     if (!c) return null;
     return (
-        c.profilePicture ??
-        c.profile_picture ??
-        c.logoUrl ??
-        c.logo_url ??
-        c.logo ??
-        c.avatar ??
+        c?.profilePicture ??
+        c?.profile_picture ??
+        c?.logoUrl ??
+        c?.logo_url ??
+        c?.logo ??
+        c?.avatar ??
         null
     );
 }
@@ -176,10 +176,9 @@ export default function MyReferralsPage() {
                             if (!cid) return;
 
                             try {
-                                const up = await j<any>(`/api/companies/${encodeURIComponent(cid)}`);
+                                const up = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
                                 const c = (up?.company ?? up?.data ?? up) as CompanyMin | null;
                                 if (c?.id) companiesMap[c.id] = c;
-
                             } catch {
                                 try {
                                     const up2 = await j<any>(`/api/company/${encodeURIComponent(cid)}`);
@@ -222,11 +221,9 @@ export default function MyReferralsPage() {
                                 const j0 = await r0.json();
                                 const arr: ProfileLite[] = j0?.profiles ?? j0 ?? [];
                                 for (const p of arr) profilesMap[p.id] = p;
-                                loaded = true;
                             }
                         } catch { }
                     }
-
                 }
 
                 if (!alive) return;
@@ -244,14 +241,14 @@ export default function MyReferralsPage() {
         return () => { alive = false; };
     }, [monthRange]);
 
-
     const filtered = useMemo(() => {
         if (!monthRange) return items;
         const { from, to } = monthRange;
-        return items.filter((r) => {
+        const out = items.filter((r) => {
             const t = new Date(r.created_at).getTime();
             return t >= from && t <= to;
         });
+        return out.length ? out : items;
     }, [items, monthRange]);
 
     return (
