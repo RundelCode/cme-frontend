@@ -44,7 +44,6 @@ export default function FiltersBar({ defaultValues, onSubmit }: Props) {
         <option value="">Tipo de proyecto</option>
         <option value="full-time">Tiempo completo</option>
         <option value="part-time">Tiempo parcial</option>
-        <option value="contract">Contrato</option>
       </select>
 
       <select value={paymentType} onChange={(e) => setPaymentType(e.target.value)}>
