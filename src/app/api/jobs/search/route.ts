@@ -1,4 +1,3 @@
-// src/app/api/jobs/search/route.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -17,7 +16,7 @@ function resolveApiUrl(req: NextRequest) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api";
+    "https://cme-back-3tsc.onrender.com/api";
   if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
   return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }
@@ -29,6 +28,16 @@ async function readUpstream(res: Response) {
   return { ok: res.ok, status: res.status, data, text, url: res.url, ctype: res.headers.get("content-type") || "" };
 }
 
+function mapOrderBy(v: string | null | undefined) {
+  switch ((v || "").toLowerCase()) {
+    case "newest": return "created_at_desc";
+    case "oldest": return "created_at_asc";
+    case "salary_desc": return "salary_desc";
+    case "salary_asc": return "salary_asc";
+    default: return v || "created_at_desc";
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const API = resolveApiUrl(req);
@@ -36,22 +45,45 @@ export async function GET(req: NextRequest) {
     const authorization = buildAuthHeader(req);
     const cookie = req.headers.get("cookie") ?? "";
 
-    const companyId = url.searchParams.get("companyId") || "";
     const limit = url.searchParams.get("limit") || "10";
     const offset = url.searchParams.get("offset") || "0";
-    const orderBy = url.searchParams.get("orderBy") || "created_at_desc";
+    const orderBy = mapOrderBy(url.searchParams.get("orderBy"));
 
     const qs = new URLSearchParams();
-    if (companyId) qs.set("companyId", companyId);
+    const copyKeys = [
+      "q",
+      "employmentType",
+      "locationType",
+      "location",
+      "companyId",
+      "status",
+      "minSalary",
+      "maxSalary",
+    ];
+    for (const k of copyKeys) {
+      const v = url.searchParams.get(k);
+      if (v != null && v !== "") qs.set(k, v);
+    }
+
+    const projectType = url.searchParams.get("projectType");
+    if (projectType && !qs.get("employmentType")) qs.set("employmentType", projectType);
+
+    const paymentType = url.searchParams.get("paymentType");
+    if (paymentType && !qs.get("paymentType")) qs.set("paymentType", paymentType);
+
+    const skillsAnyAll = ["skillsAny", "skillsAll"];
+    for (const key of skillsAnyAll) {
+      const arr = url.searchParams.getAll(`${key}[]`);
+      for (const v of arr) if (v) qs.append(`${key}[]`, v);
+      const single = url.searchParams.get(key);
+      if (single) qs.append(`${key}[]`, single);
+    }
+
     qs.set("limit", limit);
     qs.set("offset", offset);
     qs.set("orderBy", orderBy);
 
-    const targets = [
-      `${API}/job_offers/search?${qs.toString()}`,
-      `${API}/jobs/search?${qs.toString()}`,
-      `${API}/job-offers/search?${qs.toString()}`
-    ];
+    const target = `${API}/jobs/search?${qs.toString()}`;
 
     const headers: HeadersInit = {
       Accept: "application/json",
@@ -59,24 +91,15 @@ export async function GET(req: NextRequest) {
       ...(cookie ? { cookie } : {}),
     };
 
-    let payload: any = null;
-    let status = 502;
+    const r = await fetch(target, { method: "GET", headers, cache: "no-store", credentials: "include" });
+    const parsed = await readUpstream(r);
 
-    for (const t of targets) {
-      const r = await fetch(t, { method: "GET", headers, cache: "no-store", credentials: "include" });
-      const parsed = await readUpstream(r);
-      if (parsed.ok && (parsed.ctype.includes("application/json") || typeof parsed.data === "object")) {
-        payload = parsed.data ?? {};
-        status = parsed.status;
-        break;
-      }
-      status = parsed.status;
+    if (!parsed.ok || !(parsed.ctype.includes("application/json") || typeof parsed.data === "object")) {
+      const status = parsed.status || 502;
+      return NextResponse.json({ total: 0, items: [], error: `jobs_upstream_${status}` }, { status });
     }
 
-    if (!payload) {
-      return NextResponse.json({ total: 0, items: [], error: `jobs_upstream_${status}` }, { status: status || 502 });
-    }
-
+    const payload = parsed.data ?? {};
     const normalized = Array.isArray(payload)
       ? { total: payload.length, items: payload }
       : payload?.data && typeof payload.data === "object"
