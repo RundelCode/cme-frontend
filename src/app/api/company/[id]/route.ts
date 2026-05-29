@@ -93,6 +93,8 @@ export async function PATCH(req: NextRequest, context: any) {
     };
 
     const body = await req.json().catch(() => ({}));
+    const VALID_PLANS = ['free', 'basic', 'pro'];
+
     const payload: Record<string, any> = {
       name: body?.name,
       email: body?.email,
@@ -103,7 +105,7 @@ export async function PATCH(req: NextRequest, context: any) {
       profilePicture: normalizeOptional(body?.profilePicture),
       coverPhoto: normalizeOptional(body?.coverPhoto),
       companyRating: body?.companyRating ?? undefined,
-      subscriptionPlan: body?.subscriptionPlan ?? 'free',
+      subscriptionPlan: VALID_PLANS.includes(body?.subscriptionPlan) ? body.subscriptionPlan : 'free',
       verifiedAt: normalizeOptional(body?.verifiedAt),
     };
 
