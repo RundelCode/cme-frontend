@@ -86,6 +86,11 @@ export async function POST(req: Request) {
         });
 
         const { data, raw } = await readJson(up);
+        console.log("[company PATCH] upstream response", {
+            status: up.status,
+            data,
+            raw,
+        });
         if (!up.ok) {
             const msg = data?.error || data?.message || `companies_patch_upstream_${up.status}`;
             return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 502 });
