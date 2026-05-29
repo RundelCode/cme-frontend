@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   const dbg: Record<string, any> = {};
   try {
     const { email, password, rememberMe } = await req.json();
+    console.log("[login] body recibido:", { email, password, rememberMe });
     if (!email || !password) {
       return NextResponse.json(
         { error: "email y password son requeridos" },

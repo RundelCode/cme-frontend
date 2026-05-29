@@ -65,6 +65,7 @@ export default function Login() {
 
         setLoading(true);
         try {
+            console.log("[login] enviando:", { email, password, rememberMe });
             const res = await fetch("/api/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
