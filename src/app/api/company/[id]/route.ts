@@ -65,12 +65,8 @@ export async function GET(req: NextRequest, context: any) {
 
     const { data, raw } = await readJson(up);
     if (!up.ok) {
-      const msg =
-        data?.error || data?.message || `companies_upstream_${up.status}`;
-      return NextResponse.json(
-        { error: msg, raw: data ?? raw },
-        { status: up.status || 404 }
-      );
+      const msg = data?.error || data?.message || `companies_upstream_${up.status}`;
+      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 404 });
     }
     return NextResponse.json(data);
   } catch (e: any) {
@@ -111,11 +107,8 @@ export async function PATCH(req: NextRequest, context: any) {
       verifiedAt: normalizeOptional(body?.verifiedAt),
     };
 
-    Object.keys(payload).forEach(
-      (k) => payload[k] === undefined && delete payload[k]
-    );
-    payload.boolVerified =
-      body?.boolVerified == null ? false : !!body.boolVerified;
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+    payload.boolVerified = body?.boolVerified == null ? false : !!body.boolVerified;
 
     const up = await fetch(`${API}/companies/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -127,12 +120,8 @@ export async function PATCH(req: NextRequest, context: any) {
 
     const { data, raw } = await readJson(up);
     if (!up.ok) {
-      const msg =
-        data?.error || data?.message || `companies_patch_upstream_${up.status}`;
-      return NextResponse.json(
-        { error: msg, raw: data ?? raw },
-        { status: up.status || 502 }
-      );
+      const msg = data?.error || data?.message || `companies_patch_upstream_${up.status}`;
+      return NextResponse.json({ error: msg, raw: data ?? raw }, { status: up.status || 502 });
     }
     return NextResponse.json(data);
   } catch (e: any) {
