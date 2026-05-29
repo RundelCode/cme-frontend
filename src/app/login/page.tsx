@@ -5,7 +5,6 @@ import Image from 'next/image';
 import LoginPhoto from '../../../public/images/loginPhoto.png';
 import CMELOGO from '../../../public/images/CMELOGO.png';
 import Google from '../../../public/images/icons/Google.png';
-import Facebook from '../../../public/images/icons/Facebook.png';
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabase-client';
@@ -15,7 +14,6 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-
     const [formError, setFormError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
@@ -24,22 +22,19 @@ export default function Login() {
     const handleForgotPassword = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
         e.preventDefault();
     };
+
     const handleRegister = (e: React.MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
         e.preventDefault();
-        router.push("/register")
+        router.push("/register");
     };
 
     async function signInWithGoogle() {
         const redirectTo = `${window.location.origin}/auth/callback`;
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo }
         });
-
-        if (error) {
-            console.error('Error iniciando OAuth:', error);
-        } else {
-        }
+        if (error) console.error('Error iniciando OAuth:', error);
     }
 
     function mapGraphQLError(msg: string) {
@@ -73,13 +68,12 @@ export default function Login() {
             const res = await fetch("/api/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ email, password, rememberMe }),
                 credentials: "include",
             });
             const json = await res.json();
             if (!res.ok) throw new Error(json.error || "Login failed");
-            router.push("/")
-
+            router.push("/");
         } catch (err: any) {
             const message = typeof err?.message === 'string' ? err.message : 'Error desconocido';
             setFormError(mapGraphQLError(message));
@@ -103,7 +97,7 @@ export default function Login() {
                     />
                     <h2 className={styles.subtitle}>BIENVENIDO</h2>
 
-                    <form onSubmit={(e) => e.preventDefault()} className={styles.loginForm}>
+                    <form className={styles.loginForm}>
                         <button type="button" className={styles.socialMediaLoginButtion} onClick={signInWithGoogle}>
                             <Image className={styles.cmeLogo} src={Google} alt="GoogleIcon" width={20} height={20} style={{ width: 20, height: 20 }} priority />
                             Continua con Google
@@ -160,7 +154,6 @@ export default function Login() {
                                 />
                                 <p>Recuerdame</p>
                             </label>
-
                             <a href="#" onClick={handleForgotPassword}>¿Olvidaste tu contraseña?</a>
                         </div>
 
