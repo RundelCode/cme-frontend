@@ -1,103 +1,166 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  resolveApiUrl,
+  readJsonStrict,
+} from "@/app/api/_utils/proxy-helpers";
 
 export const runtime = "nodejs";
 
-function resolveApiUrl(req: NextRequest) {
-  const base =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL ||
-    "https://cme-monolith-7hth.onrender.com/api";
-
-  if (/^https?:\/\//i.test(base)) {
-    return base.replace(/\/$/, "");
-  }
-
-  return new URL(base, req.nextUrl.origin)
-    .toString()
-    .replace(/\/$/, "");
-}
-
-function decodeJwtPayload<T = any>(jwt: string): T | null {
+function decodeJwtPayload<T = any>(
+  jwt: string
+): T | null {
   try {
-    const [, b64] = jwt.split(".");
-    if (!b64) return null;
+    const [, b64] =
+      jwt.split(".");
 
-    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    if (!b64) {
+      return null;
+    }
 
-    const base64 = (b64 + pad)
-      .replace(/-/g, "+")
-      .replace(/_/g, "/");
+    const pad = "=".repeat(
+      (4 -
+        (b64.length %
+          4)) %
+      4
+    );
+
+    const base64 =
+      (b64 + pad)
+        .replace(
+          /-/g,
+          "+"
+        )
+        .replace(
+          /_/g,
+          "/"
+        );
 
     return JSON.parse(
-      Buffer.from(base64, "base64").toString("utf8")
+      Buffer.from(
+        base64,
+        "base64"
+      ).toString(
+        "utf8"
+      )
     );
   } catch {
     return null;
   }
 }
 
-function pickBestJwt(req: NextRequest) {
-  const access = req.cookies.get("access_token")?.value ?? null;
-  const session = req.cookies.get("session_access")?.value ?? null;
+function pickBestJwt(
+  req: NextRequest
+) {
+  const access =
+    req.cookies.get(
+      "access_token"
+    )?.value ?? null;
 
-  const accessPayload = access
-    ? decodeJwtPayload<any>(access)
-    : null;
+  const session =
+    req.cookies.get(
+      "session_access"
+    )?.value ?? null;
 
-  const sessionPayload = session
-    ? decodeJwtPayload<any>(session)
-    : null;
+  const accessPayload =
+    access
+      ? decodeJwtPayload(
+        access
+      )
+      : null;
 
-  if (accessPayload?.sub || accessPayload?.user_id) {
+  const sessionPayload =
+    session
+      ? decodeJwtPayload(
+        session
+      )
+      : null;
+
+  if (
+    accessPayload?.sub ||
+    accessPayload?.user_id
+  ) {
     return {
       jwt: access,
-      payload: accessPayload,
-      source: "access_token",
+      payload:
+        accessPayload,
+      source:
+        "access_token",
     };
   }
 
-  if (sessionPayload?.sub || sessionPayload?.user_id) {
+  if (
+    sessionPayload?.sub ||
+    sessionPayload?.user_id
+  ) {
     return {
       jwt: session,
-      payload: sessionPayload,
-      source: "session_access",
+      payload:
+        sessionPayload,
+      source:
+        "session_access",
     };
   }
 
   return {
-    jwt: null as string | null,
-    payload: null as any,
-    source: null as string | null,
+    jwt: null as
+      | string
+      | null,
+    payload:
+      null as any,
+    source: null as
+      | string
+      | null,
   };
 }
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: Promise<{ kind: string }> }
+  {
+    params,
+  }: {
+    params: Promise<{
+      kind: string;
+    }>;
+  }
 ) {
   try {
-    const { kind } = await params;
+    const { kind } =
+      await params;
 
-    console.log("UPLOAD ROUTE HIT");
-    console.log("KIND:", kind);
-
-    if (!["avatar", "cover"].includes(kind)) {
+    if (
+      ![
+        "avatar",
+        "cover",
+      ].includes(kind)
+    ) {
       return NextResponse.json(
         {
-          error: "route_not_supported",
+          error:
+            "route_not_supported",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
-    const { jwt, payload, source } = pickBestJwt(req);
+    const {
+      jwt,
+      payload,
+      source,
+    } = pickBestJwt(
+      req
+    );
 
     if (!jwt) {
       return NextResponse.json(
         {
-          error: "unauthenticated_missing_token",
+          error:
+            "unauthenticated_missing_token",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -109,84 +172,122 @@ export async function POST(
     if (!userId) {
       return NextResponse.json(
         {
-          error: "cannot_extract_user_id_from_token",
+          error:
+            "cannot_extract_user_id_from_token",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
-    const form = await req.formData();
+    const form =
+      await req.formData();
 
-    const file = form.get("file");
+    const file =
+      form.get("file");
 
-    if (!(file instanceof File)) {
+    if (
+      !(
+        file instanceof
+        File
+      )
+    ) {
       return NextResponse.json(
         {
-          error: "missing_file_field",
+          error:
+            "missing_file_field",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const fd = new FormData();
+    const fd =
+      new FormData();
 
-    fd.append("file", file, file.name);
-
-    const API = resolveApiUrl(req);
-
-    console.log(
-      "UPSTREAM:",
-      `${API}/uploads/self/${kind}`
+    fd.append(
+      "file",
+      file,
+      file.name
     );
 
-    const upstream = await fetch(
-      `${API}/uploads/self/${kind}`,
-      {
-        method: "POST",
-        headers: {
-          "x-user-id": String(userId),
-          "x-internal-gateway": "next-proxy",
-          "x-auth-source": source ?? "unknown",
-        },
-        body: fd,
-        cache: "no-store",
-      }
-    );
+    const API =
+      resolveApiUrl(req);
 
-    const text = await upstream.text();
+    const upstream =
+      await fetch(
+        `${API}/uploads/self/${kind}`,
+        {
+          method:
+            "POST",
+          headers: {
+            "x-user-id":
+              String(
+                userId
+              ),
+            "x-internal-gateway":
+              "next-proxy",
+            "x-auth-source":
+              source ??
+              "unknown",
+          },
+          body: fd,
+          cache:
+            "no-store",
+        }
+      );
 
     try {
-      const json = text
-        ? JSON.parse(text)
-        : null;
+      const {
+        data,
+      } =
+        await readJsonStrict(
+          upstream
+        );
 
       return new NextResponse(
-        JSON.stringify(json ?? {}),
+        JSON.stringify(
+          data ?? {}
+        ),
         {
-          status: upstream.status,
+          status:
+            upstream.status,
           headers: {
             "content-type":
               "application/json",
           },
         }
       );
-    } catch {
+    } catch (
+    e: any
+    ) {
       return NextResponse.json(
         {
-          error: "upstream_not_json",
-          sample: text.slice(0, 180),
+          error:
+            "upstream_not_json",
+          sample:
+            e?.raw?.slice(
+              0,
+              180
+            ) ?? "",
         },
-        { status: 502 }
+        {
+          status: 502,
+        }
       );
     }
   } catch (e: any) {
-    console.error(e);
-
     return NextResponse.json(
       {
-        error: e?.message || "internal_error",
+        error:
+          e?.message ||
+          "internal_error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
