@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  buildAuthHeader,
+  resolveApiUrl,
+  readJsonStrict,
+} from "@/app/api/_utils/proxy-helpers";
 
 /* ----------------- Tipos ----------------- */
 type ApplicationRow = {
@@ -18,49 +23,21 @@ type ProfileMini = {
   reputation_score?: number | null;
 };
 
-/* ----------------- Helpers ----------------- */
-function getCookieValue(cookieHeader: string, name: string): string | null {
-  if (!cookieHeader) return null;
-  const parts = cookieHeader.split(/;\s*/);
-  for (const p of parts) {
-    const [k, ...rest] = p.split("=");
-    if (k === name) {
-      try { return decodeURIComponent(rest.join("=")); } catch { return rest.join("="); }
-    }
-  }
-  return null;
-}
 
-function buildAuthHeader(req: Request): string | undefined {
-  const h = req.headers.get("authorization");
-  if (h && h.trim() !== "") return h;
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const token = getCookieValue(cookieHeader, "access_token");
-  if (token && token.trim() !== "") return `Bearer ${token}`;
-  return undefined;
-}
-
-function resolveApiUrl(reqUrl: string) {
-  const base =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL ||
-    "https://cme-monolith-7hth.onrender.com";
-  try {
-    new URL(base);
-    return base.replace(/\/+$/, "");
-  } catch {
-    const u = new URL(reqUrl);
-    return new URL(base, u.origin).toString().replace(/\/+$/, "");
-  }
-}
 
 async function readJson(res: Response) {
-  const ct = res.headers.get("content-type") || "";
-  const txt = await res.text();
-  if (ct.includes("application/json")) {
-    try { return { data: txt ? JSON.parse(txt) : null, txt }; } catch { }
+  try {
+    const { data, raw } = await readJsonStrict(res);
+    return {
+      data,
+      txt: raw,
+    };
+  } catch {
+    return {
+      data: null,
+      txt: "",
+    };
   }
-  return { data: null as any, txt };
 }
 
 function jsonError(message: string, status = 400) {
@@ -73,7 +50,7 @@ function jsonError(message: string, status = 400) {
    ========================================================= */
 export async function GET(req: Request) {
   try {
-    const API = resolveApiUrl(req.url);
+    const API = resolveApiUrl(req);
     const url = new URL(req.url);
     const jobOfferId = url.searchParams.get("jobOfferId") || undefined;
     const candidateId = url.searchParams.get("candidateId") || undefined;
@@ -241,7 +218,7 @@ export async function GET(req: Request) {
    ========================================================= */
 export async function POST(req: Request) {
   try {
-    const API = resolveApiUrl(req.url);
+    const API = resolveApiUrl(req);
     const bodyIn = await req.json().catch(() => ({}));
     const jobOfferId: string | undefined = bodyIn.jobOfferId || bodyIn.jobId;
 

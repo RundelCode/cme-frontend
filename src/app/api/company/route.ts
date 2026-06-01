@@ -1,25 +1,14 @@
-// app/api/company/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-
-function buildAuthHeader(req: NextRequest): string | undefined {
-  const fromHeader = req.headers.get("authorization");
-  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
-  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
-  return undefined;
-}
-
-function resolveApiUrl(req: NextRequest) {
-  const base =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://cme-monolith-7hth.onrender.com";
-  if (/^https?:\/\//i.test(base)) return base.replace(/\/+$/, "");
-  return new URL(base, req.nextUrl.origin).toString().replace(/\/+$/, "");
-}
+import {
+  buildAuthHeader,
+  resolveApiUrl,
+  readJsonStrict,
+} from "@/app/api/_utils/proxy-helpers";
 
 function camelCompany(c: any) {
   if (!c) return c;
+
   return {
     id: c.id,
     name: c.name,
@@ -59,36 +48,85 @@ async function fetchCompanyById(req: NextRequest, id: string) {
     cache: "no-store",
   });
 
-  const raw = await upstream.text();
-  let data: any = null;
-  try { data = raw ? JSON.parse(raw) : null; } catch {
-    return NextResponse.json({ error: "upstream_not_json", details: raw?.slice(0, 300) }, { status: 502 });
+  let data: any;
+
+  try {
+    const parsed = await readJsonStrict(upstream);
+    data = parsed.data;
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        error: "upstream_not_json",
+        details: err?.raw ?? null,
+      },
+      {
+        status: 502,
+      }
+    );
   }
 
   if (!upstream.ok || !data?.id) {
-    const message = data?.error || data?.message || `companies_upstream_${upstream.status}`;
-    return NextResponse.json({ error: message }, { status: upstream.status || 400 });
+    const message =
+      data?.error ||
+      data?.message ||
+      `companies_upstream_${upstream.status}`;
+
+    return NextResponse.json(
+      { error: message },
+      { status: upstream.status || 400 }
+    );
   }
 
-  return NextResponse.json({ company: camelCompany(data) });
+  return NextResponse.json({
+    company: camelCompany(data),
+  });
 }
 
 export async function POST(req: NextRequest) {
   try {
     const { id } = await req.json().catch(() => ({}));
-    if (!id) return NextResponse.json({ error: "Missing 'id' in body" }, { status: 400 });
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Missing 'id' in body" },
+        { status: 400 }
+      );
+    }
+
     return await fetchCompanyById(req, id);
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: err?.message || "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
     const id = new URL(req.url).searchParams.get("id") ?? "";
-    if (!id) return NextResponse.json({ error: "Missing 'id' query param" }, { status: 400 });
+
+    if (!id) {
+      return NextResponse.json(
+        { error: "Missing 'id' query param" },
+        { status: 400 }
+      );
+    }
+
     return await fetchCompanyById(req, id);
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: err?.message || "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
+

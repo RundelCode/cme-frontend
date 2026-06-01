@@ -70,20 +70,28 @@ export default function Client() {
   useEffect(() => {
     (async () => {
       try {
-        const meRes = await fetch("/api/me", { credentials: "include", cache: "no-store" });
+        const meRes = await fetch("/api/me", {
+          credentials: "include",
+          cache: "no-store",
+        });
+
         const me = await meRes.json().catch(() => null);
-        console.log("[createCompany] /api/me", { status: meRes.status, ok: meRes.ok, me });
-        const roles: string[] = []
-          .concat(me?.role || [])
-          .concat(me?.user?.role || [])
-          .concat(Array.isArray(me?.roles) ? me.roles : [])
-          .concat(Array.isArray(me?.user?.roles) ? me.user.roles : []);
-        const roleStrs = roles.map((r) => String(r).trim().toLowerCase());
-        const flags = [me?.is_company_admin, me?.user?.is_company_admin].some(Boolean);
-        const aliases = new Set(["company_admin", "companyadmin", "employer", "company-owner", "company_owner", "org_admin", "employer_admin"]);
-        const hit = roleStrs.some((r) => aliases.has(r));
-        setIsCompanyAdmin(Boolean(flags || hit));
-        if (!(flags || hit)) setAuthErr("Solo los usuarios con rol 'company_admin' pueden crear empresas.");
+
+        const role = String(
+          me?.role ??
+          me?.user?.role ??
+          ""
+        ).toLowerCase();
+
+        const isCompanyAdmin = role === "company_admin";
+
+        setIsCompanyAdmin(isCompanyAdmin);
+
+        if (!isCompanyAdmin) {
+          setAuthErr(
+            "Solo los usuarios con rol 'company_admin' pueden crear empresas."
+          );
+        }
       } catch (e) {
         console.error("[createCompany] auth error", e);
         setAuthErr("No autenticado");

@@ -1,27 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-
-function buildAuthHeader(req: Request): string | undefined {
-  const fromHeader = req.headers.get("authorization");
-  if (fromHeader && fromHeader.trim() !== "") return fromHeader;
-  const cookieHeader = req.headers.get("cookie") ?? "";
-  const m = cookieHeader.match(/(?:^|;\s*)access_token=([^;]+)/i);
-  if (m?.[1]) return `Bearer ${decodeURIComponent(m[1])}`;
-  return undefined;
-}
-
-function resolveApiUrl(reqUrl: string) {
-  const base =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.API_URL ||
-    "https://cme-monolith-7hth.onrender.com";
-  try {
-    new URL(base);
-    return base.replace(/\/+$/, "");
-  } catch {
-    const u = new URL(reqUrl);
-    return new URL(base, u.origin).toString().replace(/\/+$/, "");
-  }
-}
+import {
+  buildAuthHeader,
+  resolveApiUrl,
+  readJsonStrict,
+} from "@/app/api/_utils/proxy-helpers";
 
 type Job = {
   id: string;
@@ -58,97 +40,158 @@ type CompanyRaw = {
   updated_at?: string | null;
 };
 
-export async function GET(req: NextRequest, context: any) {
+export async function GET(
+  req: NextRequest,
+  context: any
+) {
   try {
     const id = context?.params?.id;
-    if (!id)
+
+    if (!id) {
       return NextResponse.json(
-        { job: null, company: null, error: "missing_job_id" },
-        { status: 400 }
-      );
-
-    const API = resolveApiUrl(req.url);
-    const authorization = buildAuthHeader(req);
-    const cookie = req.headers.get("cookie") ?? "";
-
-    const headers: HeadersInit = {
-      Accept: "application/json",
-      ...(authorization ? { Authorization: authorization } : {}),
-      ...(cookie ? { cookie } : {}),
-    };
-
-    // Fetch job
-    const jobRes = await fetch(`${API}/jobs/${encodeURIComponent(id)}`, {
-      method: "GET",
-      headers,
-      cache: "no-store",
-    });
-
-    const jobRaw = await jobRes.text();
-    let job: Job | null = null;
-    try {
-      const parsed = jobRaw ? JSON.parse(jobRaw) : null;
-      if (jobRes.ok && parsed?.id) job = parsed as Job;
-    } catch { }
-
-    if (!jobRes.ok || !job) {
-      const msg = (() => {
-        try {
-          const parsed = jobRaw ? JSON.parse(jobRaw) : null;
-          return (
-            parsed?.error ||
-            parsed?.message ||
-            `jobs_upstream_${jobRes.status}`
-          );
-        } catch {
-          return `jobs_upstream_${jobRes.status}`;
+        {
+          job: null,
+          company: null,
+          error: "missing_job_id",
+        },
+        {
+          status: 400,
         }
-      })();
-      return NextResponse.json(
-        { job: null, company: null, error: msg },
-        { status: jobRes.status || 400 }
       );
     }
 
-    // Fetch company if exists
+    const API = resolveApiUrl(req);
+
+    const authorization =
+      buildAuthHeader(req);
+
+    const cookie =
+      req.headers.get("cookie") ?? "";
+
+    const headers: HeadersInit = {
+      Accept: "application/json",
+      ...(authorization
+        ? { Authorization: authorization }
+        : {}),
+      ...(cookie ? { cookie } : {}),
+    };
+
+    const jobRes = await fetch(
+      `${API}/jobs/${encodeURIComponent(
+        id
+      )}`,
+      {
+        method: "GET",
+        headers,
+        cache: "no-store",
+      }
+    );
+
+    let job: Job | null = null;
+
+    try {
+      const parsed =
+        await readJsonStrict(jobRes);
+
+      if (
+        jobRes.ok &&
+        parsed.data?.id
+      ) {
+        job =
+          parsed.data as Job;
+      }
+    } catch { }
+
+    if (!jobRes.ok || !job) {
+      return NextResponse.json(
+        {
+          job: null,
+          company: null,
+          error: `jobs_upstream_${jobRes.status}`,
+        },
+        {
+          status:
+            jobRes.status || 400,
+        }
+      );
+    }
+
     let company: {
       name?: string | null;
-      profilePicture?: string | null;
-      coverPhoto?: string | null;
+      profilePicture?:
+      | string
+      | null;
+      coverPhoto?:
+      | string
+      | null;
       location?: string | null;
     } | null = null;
 
     if (job.company_id) {
       try {
         const compRes = await fetch(
-          `${API}/companies/${encodeURIComponent(job.company_id)}`,
+          `${API}/companies/${encodeURIComponent(
+            job.company_id
+          )}`,
           {
             method: "GET",
             headers,
             cache: "no-store",
           }
         );
+
         if (compRes.ok) {
-          const comp = (await compRes.json().catch(() => null)) as
+          const parsed =
+            await readJsonStrict(
+              compRes
+            );
+
+          const comp =
+            parsed.data as
             | CompanyRaw
             | null;
+
           if (comp?.id) {
             company = {
-              name: comp.name ?? null,
-              profilePicture: comp.profile_picture ?? null,
-              coverPhoto: comp.cover_photo ?? null,
-              location: comp.location ?? null,
+              name:
+                comp.name ??
+                null,
+              profilePicture:
+                comp.profile_picture ??
+                null,
+              coverPhoto:
+                comp.cover_photo ??
+                null,
+              location:
+                comp.location ??
+                null,
             };
           }
         }
       } catch { }
     }
 
-    return NextResponse.json({ job, company }, { status: 200 });
+    return NextResponse.json(
+      {
+        job,
+        company,
+      },
+      {
+        status: 200,
+      }
+    );
   } catch (e: any) {
     return NextResponse.json(
-      { job: null, company: null, error: e?.message || "job_fetch_error" },
-      { status: 500 }
+      {
+        job: null,
+        company: null,
+        error:
+          e?.message ||
+          "job_fetch_error",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }

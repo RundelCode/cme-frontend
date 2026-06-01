@@ -123,7 +123,7 @@ type UpdatePayload = {
 };
 
 async function apiPatchMyProfile(payload: UpdatePayload) {
-  const res = await fetch("/api/profile/update", {
+  const res = await fetch("/api/profiles/me", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",

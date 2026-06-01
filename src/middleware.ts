@@ -1,3 +1,4 @@
+
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
@@ -9,8 +10,13 @@ function readAccessToken(req: NextRequest): string | null {
     null;
 
   if (!raw) return null;
+
   const v = String(raw).trim();
-  if (!v || v === "null" || v === "undefined") return null;
+
+  if (!v || v === "null" || v === "undefined") {
+    return null;
+  }
+
   return v;
 }
 
@@ -31,7 +37,6 @@ export function middleware(req: NextRequest) {
   return NextResponse.redirect(loginUrl);
 }
 
-
 export const config = {
   matcher: [
     "/applications",
@@ -49,6 +54,12 @@ export const config = {
     "/profiles/me",
     "/profiles/me/:path*",
 
+    "/profiles/users",
+    "/profiles/users/:path*",
+
+    "/profiles/companies",
+    "/profiles/companies/:path*",
+
     "/referrals",
     "/referrals/:path*",
 
@@ -57,12 +68,21 @@ export const config = {
 
     "/company",
     "/company/:path*",
+
     "/createCompany",
     "/createCompany/:path*",
+
     "/updateCompany",
     "/updateCompany/:path*",
 
     "/finance",
     "/finance/:path*",
+
+    "/jobs/new",
+    "/jobs/new/:path*",
+
+    "/search",
+    "/search/:path*",
   ],
 };
+

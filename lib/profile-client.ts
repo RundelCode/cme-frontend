@@ -1,7 +1,7 @@
 import { SearchProfilesInput, UserProfile } from "./profile-types";
 
 export async function searchProfiles(input: SearchProfilesInput = {}): Promise<UserProfile[]> {
-  const res = await fetch("/api/profile/search", {
+  const res = await fetch("/api/profiles", {
     method: "POST",
     headers: { "content-type": "application/json" },
     credentials: "include",

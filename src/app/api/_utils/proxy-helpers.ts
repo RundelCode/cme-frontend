@@ -30,7 +30,7 @@ export function resolveApiUrl(input: NextRequest | Request | string) {
     const base =
         process.env.NEXT_PUBLIC_API_URL ||
         process.env.API_URL ||
-        "http://localhost:3001/api"; // <- BACKEND por defecto (NO 3000)
+        "http://localhost:3001/api";
 
     const trim = (s: string) => s.replace(/\/$/, "");
     if (/^https?:\/\//i.test(base)) return trim(base);
