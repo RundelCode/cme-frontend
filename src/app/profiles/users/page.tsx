@@ -98,7 +98,8 @@ function hasValidEducation(edu: EducationItem[] | null | undefined) {
 }
 
 export default async function Page(context: any) {
-  const id = context?.searchParams?.id?.trim();
+  const searchParams = await context.searchParams;
+  const id = searchParams?.id?.trim();
   const profile = id ? await getProfileById(id) : null;
 
   return (
