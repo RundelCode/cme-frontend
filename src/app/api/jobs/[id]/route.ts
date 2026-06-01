@@ -60,7 +60,7 @@ type CompanyRaw = {
 
 export async function GET(req: NextRequest, context: any) {
   try {
-    const id = context?.params?.id;
+    const { id } = await context.params; // ✅ fix Next.js 15
     if (!id)
       return NextResponse.json(
         { job: null, company: null, error: "missing_job_id" },
