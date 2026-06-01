@@ -177,7 +177,7 @@ export default function Client() {
         method: "POST",
         headers: { "content-type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ input: payload }),
+        body: JSON.stringify(payload),
       });
       const raw = await res.text();
       let json: any = null;

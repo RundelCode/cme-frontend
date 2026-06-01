@@ -44,7 +44,7 @@ function resolveApiUrl(reqUrl: string) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api";
+    "https://cme-monolith-7hth.onrender.com";
   try {
     new URL(base);
     return base.replace(/\/+$/, "");
@@ -58,7 +58,7 @@ async function readJson(res: Response) {
   const ct = res.headers.get("content-type") || "";
   const txt = await res.text();
   if (ct.includes("application/json")) {
-    try { return { data: txt ? JSON.parse(txt) : null, txt }; } catch { /* fallthrough */ }
+    try { return { data: txt ? JSON.parse(txt) : null, txt }; } catch { }
   }
   return { data: null as any, txt };
 }

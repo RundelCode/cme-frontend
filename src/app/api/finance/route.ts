@@ -17,7 +17,7 @@ function resolveApiUrl(req: NextRequest) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api";
+    "https://cme-monolith-7hth.onrender.com";
   if (/^https?:\/\//i.test(base)) return base.replace(/\/$/, "");
   return new URL(base, req.nextUrl.origin).toString().replace(/\/$/, "");
 }

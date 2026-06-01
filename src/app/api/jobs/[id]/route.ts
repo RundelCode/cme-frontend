@@ -13,7 +13,7 @@ function resolveApiUrl(reqUrl: string) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api";
+    "https://cme-monolith-7hth.onrender.com";
   try {
     new URL(base);
     return base.replace(/\/+$/, "");

@@ -20,7 +20,7 @@ function resolveApiUrl(reqUrl: string) {
   const base =
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.API_URL ||
-    "cme-monolith.vercel.app/api";
+    "https://cme-monolith.vercel.app/api";
   try {
     new URL(base);
     return base.replace(/\/$/, "");
@@ -72,8 +72,7 @@ async function getCurrentUser(req: NextRequest, API: string) {
 export async function POST(req: NextRequest) {
   const t0 = Date.now();
   try {
-    const body = await req.json().catch(() => ({}));
-    const input = body?.input ?? {};
+    const input = await req.json().catch(() => ({}));
     const API = resolveApiUrl(req.url);
     const cookie = req.headers.get("cookie") ?? "";
     const authorization = buildAuthHeader(req);
