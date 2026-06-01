@@ -26,7 +26,7 @@ function resolveApiUrl(reqUrl: string) {
 
 export async function PATCH(req: NextRequest, context: any) {
     try {
-        const id = context?.params?.id;
+        const { id } = await context.params;
         if (!id) {
             return NextResponse.json(
                 { error: "missing_notification_id" },

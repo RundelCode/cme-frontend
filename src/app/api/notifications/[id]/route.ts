@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, context: any) {
     req.headers.get("x-debug") === "1";
 
   try {
-    const id = context?.params?.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: "missing_id" }, { status: 400 });
     }
@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, context: any) {
     req.headers.get("x-debug") === "1";
 
   try {
-    const id = context?.params?.id;
+    const { id } = await context.params;
     if (!id) {
       return NextResponse.json({ error: "missing_id" }, { status: 400 });
     }

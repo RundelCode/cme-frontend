@@ -25,7 +25,7 @@ function resolveApiUrl(reqUrl: string) {
 
 export async function GET(req: Request, context: any) {
     try {
-        const id = context?.params?.id;
+        const { id } = await context.params;
         if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
 
         const API = resolveApiUrl(req.url);

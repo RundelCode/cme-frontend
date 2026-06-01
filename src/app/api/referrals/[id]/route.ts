@@ -24,7 +24,7 @@ function resolveReferralsBase(req: NextRequest) {
 
 export async function PATCH(req: NextRequest, context: any) {
     try {
-        const id = context?.params?.id;
+        const { id } = await context.params;
         if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
 
         const API = resolveReferralsBase(req);
